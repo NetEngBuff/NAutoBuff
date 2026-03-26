@@ -84,7 +84,6 @@ def update_gnmic_yaml_from_hosts():
                     continue
                 target = {
                     "subscriptions": list((config.get("subscriptions") or {}).keys()),
-                    "tags": {"hostname": hostname},
                 }
                 if username:
                     target["username"] = username
@@ -92,6 +91,11 @@ def update_gnmic_yaml_from_hosts():
                     target["password"] = password
                 # gnmic uses the map key as the address — use IP:port directly
                 config["targets"][f"{ip}:6030"] = target
+
+        # Remove stale processors section if present
+        config.pop("processors", None)
+        if "outputs" in config and "influxdb" in config["outputs"]:
+            config["outputs"]["influxdb"].pop("event-processors", None)
 
         with open(gnmic_yaml, "w") as f:
             yaml.dump(config, f, sort_keys=False)
