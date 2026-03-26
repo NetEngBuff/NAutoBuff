@@ -27,9 +27,6 @@ subscriptions:
   device-info:
     paths:
     - /system/state/hostname
-    - /system/state/os-version
-    - /system/state/mac-address
-    - /system/state/uptime
     sample-interval: 60s
   device-health:
     paths:

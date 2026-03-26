@@ -44,10 +44,12 @@
         <span style="font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);background:var(--color-primary);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</span>
         <div>
           <p style="font-weight:var(--font-weight-semibold);margin-bottom:2px;">Open Grafana</p>
-          <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);">
-            Go to <a href="{{ grafana_base_url }}" target="_blank" style="color:var(--color-primary);">{{ grafana_base_url }}</a>
-            and log in with <code>admin / admin</code>
+          <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);margin-bottom:var(--space-2);">
+            Log in with <code>admin / admin</code>
           </p>
+          <a href="{{ grafana_base_url }}" target="_blank" class="btn btn-primary btn-sm">
+            Open Grafana &rarr; <span style="opacity:0.8;font-weight:normal;">{{ grafana_base_url }}</span>
+          </a>
         </div>
       </div>
 
@@ -79,10 +81,9 @@
         <div>
           <p style="font-weight:var(--font-weight-semibold);margin-bottom:2px;">Pin the Dashboard Here</p>
           <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);">
-            Save the dashboard, copy its URL from your browser, then set the environment variable before starting NAutoHUB:
+            Save the dashboard and copy its URL from your browser. Then stop NAutoHUB (<code>Ctrl+C</code>) and restart with the URL set:
           </p>
-          <pre style="font-size:11px;background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-sm);margin-top:var(--space-2);">export GRAFANA_DASHBOARD_URL="http://localhost:3000/d/your-dashboard-id/name"
-./run_nahub.sh</pre>
+          <pre style="font-size:11px;background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-sm);margin-top:var(--space-2);">GRAFANA_DASHBOARD_URL="http://localhost:3000/d/your-id/name" ./pilot-config/run_nahub.sh</pre>
         </div>
       </div>
 

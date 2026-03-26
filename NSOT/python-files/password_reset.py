@@ -1,10 +1,14 @@
 import csv
 import os
+import subprocess
 import time
 import string
 import secrets
 from jinja2 import Environment, FileSystemLoader
 from netmiko import ConnectHandler
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gnmi_hosts import update_gnmic_yaml_from_hosts
 
 # File paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -130,6 +134,14 @@ def rotate_passwords():
         writer.writerows(rows)
 
     print(f"[✔] Password rotation complete. Next rotation in {check_interval // 60} minutes.")
+
+    # Keep gnmic credentials in sync with the new passwords
+    update_gnmic_yaml_from_hosts()
+    try:
+        subprocess.run(["sudo", "systemctl", "restart", "gnmic_nautohub.service"], check=True)
+        print("[✔] gnmic_nautohub.service restarted with updated credentials")
+    except subprocess.CalledProcessError:
+        print("[⚠] Could not restart gnmic_nautohub.service — restart it manually")
 
 
 def main():

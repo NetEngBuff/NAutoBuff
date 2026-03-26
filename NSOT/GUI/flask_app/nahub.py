@@ -86,6 +86,32 @@ from gnmi_hosts import update_gnmic_yaml_from_hosts
 # File path for IPAM CSV file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IPAM_DIR = os.path.join(BASE_DIR, "..", "..", "IPAM")
+
+
+def _reset_hosts_csv_passwords(default_password="admin"):
+    """
+    After a topology redeploy the golden config resets all device passwords to
+    the default.  Reset hosts.csv to match so gnmic and Netmiko can authenticate.
+    """
+    hosts_csv = os.path.join(IPAM_DIR, "hosts.csv")
+    if not os.path.exists(hosts_csv):
+        return
+    try:
+        rows, fieldnames = [], []
+        with open(hosts_csv, newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            fieldnames = list(reader.fieldnames or [])
+            rows = list(reader)
+        for row in rows:
+            row["old_password"] = row.get("password", "")
+            row["password"] = default_password
+        with open(hosts_csv, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(rows)
+        print("[✔] hosts.csv passwords reset to default after topology deploy")
+    except Exception as e:
+        print(f"[⚠] Could not reset hosts.csv passwords: {e}")
 PILOT_DIR = os.path.join(BASE_DIR, "..", "..", "..", "pilot-config")
 ipam_file_path = os.path.join(IPAM_DIR, "ipam_output.csv")
 
@@ -602,6 +628,7 @@ def deploy_topology_route():
 
         deploy_output = result.stdout
         time.sleep(2)
+        _reset_hosts_csv_passwords()
         update_gnmic_yaml_from_hosts()
 
         # System services still require sudo, ensure NOPASSWD is set in sudoers
@@ -740,6 +767,7 @@ def add_device():
                 text=True,
             )
             time.sleep(2)
+            _reset_hosts_csv_passwords()
             update_gnmic_yaml_from_hosts()
             subprocess.run(
                 ["sudo", "systemctl", "restart", "gnmic_nautohub.service"], check=True
