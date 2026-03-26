@@ -186,7 +186,10 @@ def login():
             user = User(user_data)
             login_user(user, remember=request.form.get("remember") == "on")
             record_login(user_data["id"])
-            return redirect(request.args.get("next") or url_for("homepage"))
+            next_page = request.args.get("next", "")
+            if next_page and next_page.startswith("/") and not next_page.startswith("//"):
+                return redirect(next_page)
+            return redirect(url_for("homepage"))
         error = "Invalid username or password."
     return render_template("login.html", error=error)
 

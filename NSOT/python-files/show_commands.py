@@ -4,14 +4,22 @@ from netmiko import ConnectHandler
 
 CSV_FILE = os.path.join(os.path.dirname(__file__), "..", "IPAM", "hosts.csv")
 
+VENDOR_NETMIKO_MAP = {
+    "arista": "arista_eos",
+    "cisco": "cisco_ios",
+    "juniper": "juniper_junos",
+}
+
 
 def find_device_info(hostname):
     with open(CSV_FILE, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             if row["hostname"] == hostname:
+                vendor = row.get("vendor", "arista").strip().lower()
+                device_type = VENDOR_NETMIKO_MAP.get(vendor, "arista_eos")
                 return {
-                    "device_type": "arista_eos",
+                    "device_type": device_type,
                     "ip": row["management_ip"],
                     "username": row["username"],
                     "password": row["password"],

@@ -4,9 +4,9 @@ import time
 import requests
 import os
 
-JENKINS_JOB_NAME = "NAutoHUB"
-JENKINS_USER = "ashwin"
-JENKINS_TOKEN = "ashwin"
+JENKINS_JOB_NAME = os.environ.get("JENKINS_JOB_NAME", "NAutoHUB")
+JENKINS_USER = os.environ.get("JENKINS_USER", "admin")
+JENKINS_TOKEN = os.environ.get("JENKINS_TOKEN", "")
 
 # --- Git Push Functions ---
 

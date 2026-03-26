@@ -41,9 +41,27 @@ def push_configuration(device_id):
         print("Config file not found for device.")
         return "Config file not found for device."
 
+    # Map vendor to Netmiko device type
+    vendor_map = {
+        "arista": "arista_eos",
+        "cisco": "cisco_ios",
+        "juniper": "juniper_junos",
+    }
+    vendor = ""
+    try:
+        with open(csv_path, mode="r", encoding="utf-8-sig") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                if row["hostname"].strip() == device_id.strip():
+                    vendor = row.get("vendor", "").strip().lower()
+                    break
+    except Exception:
+        pass
+    device_type = vendor_map.get(vendor, "arista_eos")
+
     # Build Netmiko connection dictionary
     device = {
-        "device_type": "arista_eos",
+        "device_type": device_type,
         "host": management_ip,
         "username": username,
         "password": password,

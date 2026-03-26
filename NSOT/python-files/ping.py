@@ -30,7 +30,6 @@ def ping_remote(source, destination, username, password, device_type="arista_eos
         "ip": source,
         "username": username,
         "password": password,
-        "session_log": "netmiko_session.log",  # Logs SSH session output for debugging
     }
 
     try:

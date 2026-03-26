@@ -11,13 +11,22 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE_PATH = os.path.join(CURRENT_DIR, "..", "IPAM", "hosts.csv")
 OUTPUT_DIR = os.path.join(CURRENT_DIR, "..", "golden_configs")
 
+VENDOR_NETMIKO_MAP = {
+    "arista": "arista_eos",
+    "cisco": "cisco_ios",
+    "juniper": "juniper_junos",
+}
+
 
 def fetch_and_save_config(device_info):
     """Fetch running config and save it to a file."""
     print(f"Starting to process device: {device_info['hostname']}")
 
+    vendor = device_info.get("vendor", "arista").strip().lower()
+    device_type = VENDOR_NETMIKO_MAP.get(vendor, "arista_eos")
+
     device = {
-        "device_type": "arista_eos",
+        "device_type": device_type,
         "ip": device_info["management_ip"],
         "username": device_info["username"],
         "password": device_info["password"],
@@ -69,6 +78,7 @@ def fetch_configs_from_csv():
                 "username": row["username"],
                 "password": row["password"],
                 "management_ip": row["management_ip"],
+                "vendor": row.get("vendor", "arista"),
             }
             device_list.append(device_info)
             print(f"Added device {row['hostname']} to the device list.")
@@ -95,6 +105,7 @@ def fetch_config_for_device(hostname):
                     "username": row["username"],
                     "password": row["password"],
                     "management_ip": row["management_ip"],
+                    "vendor": row.get("vendor", "arista"),
                 }
                 return fetch_and_save_config(device_info)
 

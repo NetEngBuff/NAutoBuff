@@ -6,7 +6,7 @@ from netmiko import ConnectHandler
 
 def backup_running_config(device_id, device_vendor):
     """
-    Backup the current running configuration of a device to golden-configs folder.
+    Backup the current running configuration of a device to golden_configs folder.
 
     Args:
         device_id (str): Device hostname
@@ -48,8 +48,8 @@ def backup_running_config(device_id, device_vendor):
     if not device_type:
         return False, f"Unsupported vendor: {device_vendor}", None
 
-    # Create golden-configs directory if it doesn't exist
-    golden_config_dir = os.path.join(os.path.dirname(__file__), "..", "golden-configs")
+    # Create golden_configs directory if it doesn't exist
+    golden_config_dir = os.path.join(os.path.dirname(__file__), "..", "golden_configs")
     os.makedirs(golden_config_dir, exist_ok=True)
 
     # Build Netmiko connection dictionary
@@ -78,7 +78,7 @@ def backup_running_config(device_id, device_vendor):
 
         net_connect.disconnect()
 
-        # Save to golden-configs folder with timestamp
+        # Save to golden_configs folder with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_filename = f"{device_id}_golden.cfg"
         backup_filename_timestamped = f"{device_id}_backup_{timestamp}.cfg"
@@ -118,7 +118,7 @@ def rollback_to_golden_config(device_id, device_vendor):
     print(f"Starting rollback for device: {device_id}")
 
     # Check if golden config exists
-    golden_config_dir = os.path.join(os.path.dirname(__file__), "..", "golden-configs")
+    golden_config_dir = os.path.join(os.path.dirname(__file__), "..", "golden_configs")
     golden_config_path = os.path.join(golden_config_dir, f"{device_id}_golden.cfg")
 
     if not os.path.exists(golden_config_path):
