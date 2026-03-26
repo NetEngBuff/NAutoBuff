@@ -36,10 +36,27 @@ def init_db():
                 role       TEXT NOT NULL,
                 created_by TEXT NOT NULL,
                 created_at TEXT DEFAULT (datetime('now')),
-                expires_at TEXT NOT NULL,
                 used       INTEGER DEFAULT 0
             )
         """)
+        # Migration: drop expires_at column if it still exists from old schema
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(invite_tokens)").fetchall()]
+        if "expires_at" in cols:
+            conn.execute("""
+                CREATE TABLE invite_tokens_new (
+                    token      TEXT PRIMARY KEY,
+                    role       TEXT NOT NULL,
+                    created_by TEXT NOT NULL,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    used       INTEGER DEFAULT 0
+                )
+            """)
+            conn.execute("""
+                INSERT INTO invite_tokens_new (token, role, created_by, created_at, used)
+                SELECT token, role, created_by, created_at, used FROM invite_tokens
+            """)
+            conn.execute("DROP TABLE invite_tokens")
+            conn.execute("ALTER TABLE invite_tokens_new RENAME TO invite_tokens")
         conn.commit()
 
     # Seed default admin if table is empty

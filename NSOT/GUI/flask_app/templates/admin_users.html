@@ -33,9 +33,10 @@
 </div>
 {% endif %}
 
+<!-- Top row: Create User | Invite -->
 <div style="max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4);">
 
-  <!-- Create User directly -->
+  <!-- Create User -->
   <div class="card card-elevated">
     <div class="card-header"><h4>Create User</h4></div>
     <div class="card-body">
@@ -60,32 +61,63 @@
     </div>
   </div>
 
-  <!-- Invite Link -->
-  <div class="card card-elevated">
-    <div class="card-header"><h4>Invite via Link</h4></div>
-    <div class="card-body">
-      <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);margin-bottom:var(--space-4);">
-        Generate a single-use link — expires after the recipient registers.
-      </p>
-      <form method="POST" class="form">
+  <!-- Invite — compact: generator + history in one card -->
+  <div class="card card-elevated" style="display:flex;flex-direction:column;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <h4 style="margin:0;">Invite Link</h4>
+      <span style="font-size:var(--font-size-xs);color:var(--color-text-muted);">single-use</span>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:var(--space-3);flex:1;">
+
+      <!-- Inline generator row -->
+      <form method="POST" style="display:flex;gap:var(--space-2);align-items:center;">
         <input type="hidden" name="action" value="invite">
-        <div class="form-group">
-          <label class="form-label">Role for invitee</label>
-          <select name="role" class="form-select">
-            {% for r in roles %}<option value="{{ r }}">{{ r|capitalize }}</option>{% endfor %}
-          </select>
-        </div>
-        <button type="submit" class="btn btn-secondary btn-block" style="margin-top:var(--space-6);">Generate Invite Link</button>
+        <select name="role" class="form-select" style="flex:1;">
+          {% for r in roles %}<option value="{{ r }}">{{ r|capitalize }}</option>{% endfor %}
+        </select>
+        <button type="submit" class="btn btn-secondary btn-sm" style="white-space:nowrap;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>Generate
+        </button>
       </form>
+
+      <!-- History list -->
+      <div style="flex:1;overflow-y:auto;max-height:180px;">
+        {% if invites %}
+          {% for inv in invites %}
+          <div style="display:flex;align-items:center;gap:var(--space-2);padding:5px 0;border-bottom:1px solid var(--color-border);">
+            <span style="font-size:10px;font-weight:var(--font-weight-semibold);
+              border:1px solid;border-radius:var(--radius-sm);padding:1px 6px;
+              color:{% if inv.role == 'admin' %}var(--color-error){% elif inv.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-text-muted){% endif %};
+              border-color:{% if inv.role == 'admin' %}var(--color-error){% elif inv.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-border){% endif %};">
+              {{ inv.role }}
+            </span>
+            <span style="flex:1;font-size:var(--font-size-xs);color:{% if inv.used %}var(--color-success){% else %}var(--color-primary){% endif %};">
+              {% if inv.used %}Used{% else %}Pending{% endif %}
+            </span>
+            {% if not inv.used %}
+            <form method="POST" onsubmit="return confirm('Revoke?')" style="margin:0;">
+              <input type="hidden" name="action" value="revoke_invite">
+              <input type="hidden" name="token" value="{{ inv.token }}">
+              <button type="submit" class="btn btn-danger btn-sm" style="padding:1px 8px;font-size:10px;">Revoke</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="padding:var(--space-3) 0;text-align:center;color:var(--color-text-muted);font-size:var(--font-size-xs);">No invites yet.</div>
+        {% endif %}
+      </div>
+
     </div>
   </div>
 
 </div>
 
-<!-- Users + Invites side by side -->
-<div style="max-width:900px;margin:0 auto;display:grid;grid-template-columns:1.6fr 1fr;gap:var(--space-4);">
-
-  <!-- User Table -->
+<!-- Users table -->
+<div style="max-width:900px;margin:0 auto;">
   <div class="card card-elevated">
     <div class="card-header"><h4>All Users</h4></div>
     <div class="card-body" style="padding:0;">
@@ -151,52 +183,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Invite History -->
-  <div class="card card-elevated">
-    <div class="card-header"><h4>Invite History</h4></div>
-    <div class="card-body" style="padding:0;">
-      {% if invites %}
-      <div class="table-container" style="margin:0;">
-        <table class="table table-striped">
-          <thead>
-            <tr><th>Role</th><th>Status</th><th></th></tr>
-          </thead>
-          <tbody>
-            {% for inv in invites %}
-            <tr>
-              <td>
-                <span style="font-size:10px;font-weight:var(--font-weight-semibold);
-                  border:1px solid var(--color-primary);border-radius:var(--radius-sm);
-                  padding:1px 6px;color:var(--color-primary);">{{ inv.role }}</span>
-              </td>
-              <td style="font-size:var(--font-size-xs);">
-                {% if inv.used %}
-                  <span style="color:var(--color-success);">Used</span>
-                {% else %}
-                  <span style="color:var(--color-primary);">Pending</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if not inv.used %}
-                <form method="POST" onsubmit="return confirm('Revoke?')">
-                  <input type="hidden" name="action" value="revoke_invite">
-                  <input type="hidden" name="token" value="{{ inv.token }}">
-                  <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
-                </form>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <div style="padding:var(--space-4);text-align:center;color:var(--color-text-muted);font-size:var(--font-size-sm);">No invites yet.</div>
-      {% endif %}
-    </div>
-  </div>
-
 </div>
 
 <script>

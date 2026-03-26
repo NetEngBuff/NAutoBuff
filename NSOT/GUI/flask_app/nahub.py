@@ -529,8 +529,13 @@ def build_topology():
         link_dev1_list = request.form.get("link_dev1_json")
         link_dev2_list = request.form.get("link_dev2_json")
         if link_dev1_list and link_dev2_list:
-            dev1_list = json.loads(link_dev1_list)
-            dev2_list = json.loads(link_dev2_list)
+            try:
+                dev1_list = json.loads(link_dev1_list)
+                dev2_list = json.loads(link_dev2_list)
+            except json.JSONDecodeError as e:
+                return render_template("build_topology.html",
+                                       docker_images=get_docker_images(),
+                                       error=f"Invalid link data: {e}")
             links = list(zip(dev1_list, dev2_list))
 
         # ✅ Build topology and update CSV
@@ -567,8 +572,8 @@ def deploy_topology_route():
     )
     
     print("[INFO] Destroying old topology...")
-    # Using result.run with capture_output=True to keep console clean
-    subprocess.run(f"sudo containerlab destroy -t {yaml_path}", shell=True, capture_output=True, text=True)
+    subprocess.run(["sudo", "containerlab", "destroy", "-t", yaml_path],
+                   capture_output=True, text=True)
 
     # Cleanup directory
     try:
@@ -586,8 +591,7 @@ def deploy_topology_route():
     try:
         # We capture output to prevent the "messy" terminal logs you saw earlier
         result = subprocess.run(
-            f"sudo containerlab deploy -t {yaml_path}",
-            shell=True,
+            ["sudo", "containerlab", "deploy", "-t", yaml_path],
             capture_output=True,
             text=True,
             check=True
@@ -627,13 +631,12 @@ def delete_topology_route():
     print("[INFO] Deleting topology...")
     try:
         result = subprocess.run(
-            f"sudo containerlab destroy -t {yaml_path}",
-            shell=True,
+            ["sudo", "containerlab", "destroy", "-t", yaml_path],
             capture_output=True,
             text=True,
             check=True
         )
-        
+
         # Re-verify lab name for folder cleanup
         with open(yaml_path) as f:
             data = yaml.safe_load(f)
@@ -673,7 +676,10 @@ def add_device():
         ip_address = ip_with_subnet.split("/")[0]
         username = request.form.get("username", "")
         password = request.form.get("password", "")
-        connection_count = int(request.form.get("connection_count", "0"))
+        try:
+            connection_count = max(0, min(int(request.form.get("connection_count", "0")), 50))
+        except (ValueError, TypeError):
+            connection_count = 0
 
         # Optional DHCP relay values
         relay_toggle = request.form.get("relay_toggle")
@@ -695,7 +701,8 @@ def add_device():
             os.path.join(os.path.dirname(__file__), "../../../pilot-config/topo.yml")
         )
         print("[INFO] Destroying old topology before update...")
-        os.system(f"sudo containerlab destroy -t {topo_path} || true")
+        subprocess.run(["sudo", "containerlab", "destroy", "-t", topo_path],
+                       capture_output=True, text=True)
 
         try:
             update_topology(
@@ -725,8 +732,7 @@ def add_device():
                 print(f"⚠️ Path does not exist, skipping: {clab_path}")
 
             deploy_output = subprocess.check_output(
-                f"sudo containerlab deploy -t {topo_path}",
-                shell=True,
+                ["sudo", "containerlab", "deploy", "-t", topo_path],
                 stderr=subprocess.STDOUT,
                 text=True,
             )
@@ -1221,8 +1227,7 @@ def topology():
     if not _is_port_open(50080):
         try:
             subprocess.Popen(
-                f"sudo containerlab graph -t {topo_path}",
-                shell=True,
+                ["sudo", "containerlab", "graph", "-t", topo_path],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -1244,9 +1249,6 @@ def topology():
 
     graph_url = f"http://{interface_ip}:50080"
     return render_template("topology.html", graph_url=graph_url)
-
-
-import docker
 
 
 @app.route("/hosts-data")
@@ -1315,4 +1317,5 @@ def clab_health():
 if __name__ == "__main__":
     thread = Thread(target=ipam_reader.read_ipam_file, daemon=True)
     thread.start()
-    app.run(host="0.0.0.0", port=5555, debug=True, threaded=True)
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=5555, debug=debug, threaded=True)
