@@ -14,7 +14,7 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Device Name</label>
-          <select name="device_id" class="form-select" required>
+          <select name="device_id" class="form-select" required onchange="onConfigDeviceSelect(this.value)">
             <option value="" disabled selected>Select Device</option>
             {% for device in devices %}
             <option value="{{ device }}">{{ device }}</option>
@@ -22,13 +22,12 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Device Vendor</label>
-          <select name="device_vendor" class="form-select" required>
-            <option value="">Select Vendor</option>
-            <option value="arista">Arista</option>
-            <option value="cisco">Cisco</option>
-            <option value="juniper">Juniper</option>
-          </select>
+          <label class="form-label">Vendor <span style="font-weight:var(--font-weight-normal);color:var(--color-text-muted)">(from hosts.csv)</span></label>
+          <div id="vendor-badge" style="display:none; align-items:center; gap:var(--space-2); padding:var(--space-2) var(--space-3); background:var(--color-primary-light,rgba(99,102,241,0.08)); border:1px solid var(--color-primary); border-radius:var(--radius-md); font-size:var(--font-size-sm); font-weight:var(--font-weight-medium); color:var(--color-primary);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span id="vendor-badge-text">—</span>
+          </div>
+          <div id="vendor-missing" style="display:none; font-size:var(--font-size-xs); color:var(--color-error); margin-top:var(--space-1);">No vendor set — update in Add Hosts</div>
         </div>
       </div>
 
@@ -876,12 +875,43 @@ function formatFileSize(bytes) {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
+let configDeviceVendor = "";
+
+function onConfigDeviceSelect(deviceId) {
+  const badge = document.getElementById('vendor-badge');
+  const badgeText = document.getElementById('vendor-badge-text');
+  const missing = document.getElementById('vendor-missing');
+
+  if (!deviceId) {
+    badge.style.display = 'none';
+    missing.style.display = 'none';
+    configDeviceVendor = "";
+    return;
+  }
+
+  fetch('/hosts-data')
+    .then(r => r.json())
+    .then(hosts => {
+      const host = hosts.find(h => h.hostname === deviceId);
+      const vendor = host?.vendor || "";
+      configDeviceVendor = vendor;
+      if (vendor) {
+        badgeText.textContent = vendor.charAt(0).toUpperCase() + vendor.slice(1);
+        badge.style.display = 'flex';
+        missing.style.display = 'none';
+      } else {
+        badge.style.display = 'none';
+        missing.style.display = 'block';
+      }
+    })
+    .catch(() => {});
+}
+
 async function uploadConfigFile() {
   const deviceId = document.querySelector('select[name="device_id"]').value;
-  const deviceVendor = document.querySelector('select[name="device_vendor"]').value;
 
-  if (!deviceId || !deviceVendor) {
-    alert('Please select both device name and vendor');
+  if (!deviceId) {
+    alert('Please select a device');
     return;
   }
 
@@ -897,7 +927,6 @@ async function uploadConfigFile() {
   const formData = new FormData();
   formData.append('config_file', uploadedFile);
   formData.append('device_id', deviceId);
-  formData.append('device_vendor', deviceVendor);
 
   try {
     const response = await fetch('/upload-config', {

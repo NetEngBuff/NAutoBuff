@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sign Up - NAutoHUB</title>
+  <script>
+    (function() {
+      const t = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--color-bg); }
+    .signup-card {
+      width: 100%; max-width: 400px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-8);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .signup-logo {
+      display: flex; align-items: center; justify-content: center; gap: var(--space-2);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem; letter-spacing: 0.05em;
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-6);
+    }
+  </style>
+</head>
+<body>
+  <div class="signup-card">
+    <div class="signup-logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+        <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+      </svg>
+      NAutoHUB
+    </div>
+
+    {% if not invite %}
+      <div class="alert alert-error">
+        <span class="alert-icon">&#10007;</span>
+        <div class="alert-content">{{ error }}</div>
+      </div>
+      <p style="text-align:center;margin-top:var(--space-4);font-size:var(--font-size-sm);color:var(--color-text-muted);">
+        Contact your NAutoHUB administrator for a valid invite link.
+      </p>
+
+    {% elif success %}
+      <div class="alert alert-success">
+        <span class="alert-icon">&#10003;</span>
+        <div class="alert-content">Account created successfully!</div>
+      </div>
+      <p style="text-align:center;margin-top:var(--space-4);font-size:var(--font-size-sm);color:var(--color-text-muted);">
+        You can now <a href="{{ url_for('login') }}" style="color:var(--color-primary);">log in</a>.
+      </p>
+
+    {% else %}
+      <div style="text-align:center;margin-bottom:var(--space-5);">
+        <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);margin-bottom:var(--space-2);">You've been invited to join NAutoHUB</p>
+        <span style="font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);border:1px solid var(--color-primary);border-radius:var(--radius-sm);padding:2px 10px;color:var(--color-primary);">
+          Role: {{ invite.role }}
+        </span>
+      </div>
+
+      {% if error %}
+      <div class="alert alert-error" style="margin-bottom:var(--space-4);">
+        <span class="alert-icon">&#10007;</span>
+        <div class="alert-content">{{ error }}</div>
+      </div>
+      {% endif %}
+
+      <form method="POST" class="form">
+        <div class="form-group">
+          <label class="form-label">Choose a Username</label>
+          <input type="text" name="username" class="form-input" autofocus required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password <span style="font-weight:400;color:var(--color-text-muted)">(min 8 characters)</span></label>
+          <input type="password" name="password" class="form-input" required minlength="8">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm Password</label>
+          <input type="password" name="confirm_password" class="form-input" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:var(--space-2);">
+          Create Account
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</body>
+</html>

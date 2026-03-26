@@ -67,6 +67,7 @@
     </div>
 
     <div class="navbar-right">
+      {% if current_user.is_authenticated and current_user.is_operator() %}
       <button class="navbar-rollback-btn" onclick="showRollbackModal()" title="Rollback Configuration">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="1 4 1 10 7 10"/>
@@ -74,10 +75,30 @@
         </svg>
         <span class="navbar-rollback-text">Rollback</span>
       </button>
+      {% endif %}
       <div class="status-indicator" id="clabStatus" title="Checking status...">
         <span class="status-dot neutral" id="statusDot"></span>
         <span id="statusText">Clab</span>
       </div>
+      {% if current_user.is_authenticated %}
+      <div style="display:flex;align-items:center;gap:var(--space-2);">
+        <span style="font-size:var(--font-size-xs);color:var(--color-text-muted);">{{ current_user.username }}</span>
+        <span style="font-size:10px;font-weight:var(--font-weight-semibold);border:1px solid;border-radius:var(--radius-sm);padding:1px 6px;
+          color:{% if current_user.role == 'admin' %}var(--color-error){% elif current_user.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-text-muted){% endif %};
+          border-color:{% if current_user.role == 'admin' %}var(--color-error){% elif current_user.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-border){% endif %};">
+          {{ current_user.role }}
+        </span>
+        <a href="{{ url_for('logout') }}" style="color:var(--color-text-muted);display:flex;align-items:center;" title="Log out">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </a>
+      </div>
+      {% else %}
+      <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm">Log in</a>
+      {% endif %}
       <button class="navbar-menu-btn" onclick="toggleSideMenu()" title="Menu">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="3" y1="12" x2="21" y2="12"/>
@@ -110,15 +131,6 @@
               <option value="{{ device }}">{{ device }}</option>
               {% endfor %}
             {% endif %}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Vendor</label>
-          <select id="rollbackVendor" class="form-select">
-            <option value="">Select Vendor</option>
-            <option value="arista">Arista</option>
-            <option value="cisco">Cisco</option>
-            <option value="juniper">Juniper</option>
           </select>
         </div>
         <div class="alert alert-warning" style="margin-top: var(--space-4);">
@@ -154,6 +166,7 @@
       </button>
     </div>
     <div class="side-menu-content">
+      {% if current_user.is_authenticated and current_user.is_operator() %}
       <div class="side-menu-section">
         <span class="side-menu-section-title">Build</span>
       </div>
@@ -197,6 +210,7 @@
           Configure Device
         </a>
       </nav>
+      {% endif %}
 
       <div class="side-menu-section">
         <span class="side-menu-section-title">Manage</span>
@@ -241,6 +255,31 @@
           Topology
         </a>
       </nav>
+
+      {% if current_user.is_authenticated and current_user.role == 'admin' %}
+      <div class="side-menu-section">
+        <span class="side-menu-section-title">Admin</span>
+      </div>
+      <nav class="side-menu-nav">
+        <a href="{{ url_for('hosts_inventory') }}" class="side-menu-link">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          Hosts Inventory
+        </a>
+        <a href="{{ url_for('admin_users') }}" class="side-menu-link">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          User Management
+        </a>
+      </nav>
+      {% endif %}
 
       <div class="side-menu-section">
         <span class="side-menu-section-title">Help</span>
@@ -511,16 +550,14 @@
         const modal = document.getElementById('rollbackModal');
         modal.classList.remove('visible');
         document.getElementById('rollbackDevice').value = '';
-        document.getElementById('rollbackVendor').value = '';
       }
     }
 
     async function executeRollback() {
       const deviceId = document.getElementById('rollbackDevice').value;
-      const deviceVendor = document.getElementById('rollbackVendor').value;
 
-      if (!deviceId || !deviceVendor) {
-        alert('Please select both device and vendor');
+      if (!deviceId) {
+        alert('Please select a device');
         return;
       }
 
@@ -534,10 +571,7 @@
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            device_id: deviceId,
-            device_vendor: deviceVendor
-          })
+          body: JSON.stringify({ device_id: deviceId })
         });
 
         const data = await response.json();

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login - NAutoHUB</title>
+  <script>
+    (function() {
+      const t = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--color-bg); }
+    .login-card {
+      width: 100%; max-width: 380px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-8);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .login-logo {
+      display: flex; align-items: center; justify-content: center; gap: var(--space-2);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem; letter-spacing: 0.05em;
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-6);
+    }
+    .login-title {
+      font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary); margin-bottom: var(--space-6); text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+        <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+      </svg>
+      NAutoHUB
+    </div>
+    <p class="login-title">Sign in to continue</p>
+
+    {% if error %}
+    <div class="alert alert-error" style="margin-bottom:var(--space-4);">
+      <span class="alert-icon">&#10007;</span>
+      <div class="alert-content">{{ error }}</div>
+    </div>
+    {% endif %}
+
+    <form method="POST" class="form">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" name="username" class="form-input" autofocus required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-check">
+          <input type="checkbox" name="remember" class="form-check-input">
+          <span class="form-check-label">Remember me</span>
+        </label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:var(--space-2);">
+        Sign In
+      </button>
+    </form>
+  </div>
+</body>
+</html>

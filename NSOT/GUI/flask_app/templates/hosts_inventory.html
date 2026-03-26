@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Hosts Inventory - NAutoHUB{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Hosts Inventory</h1>
+  <p class="page-description">Full device inventory from hosts.csv — admin access only</p>
+</div>
+
+<div class="table-container">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Hostname</th>
+        <th>Management IP</th>
+        <th>Subnet</th>
+        <th>Vendor</th>
+        <th>Username</th>
+        <th>Password</th>
+        <th>Old Password</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for h in hosts %}
+      <tr>
+        <td style="font-weight:var(--font-weight-semibold);">{{ h.hostname }}</td>
+        <td class="font-mono">{{ h.management_ip }}</td>
+        <td class="font-mono">{{ h.get('subnet_cidr', '—') }}</td>
+        <td>
+          {% if h.get('vendor') %}
+          <span style="font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);
+            border:1px solid var(--color-primary);border-radius:var(--radius-sm);
+            padding:2px 8px;color:var(--color-primary);">{{ h.vendor }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="font-mono">{{ h.username }}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:var(--space-2);">
+            <span class="font-mono" id="pwd-{{ loop.index }}" style="filter:blur(4px);transition:filter 0.2s;">{{ h.password }}</span>
+            <button onclick="togglePwd('{{ loop.index }}')" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:2px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </td>
+        <td>
+          {% if h.get('old_password') %}
+          <div style="display:flex;align-items:center;gap:var(--space-2);">
+            <span class="font-mono" id="oldpwd-{{ loop.index }}" style="filter:blur(4px);transition:filter 0.2s;">{{ h.old_password }}</span>
+            <button onclick="toggleOldPwd('{{ loop.index }}')" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:2px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if not hosts %}
+<div class="empty-state">
+  <h3 class="empty-state-title">No hosts found</h3>
+  <p class="empty-state-description">Add hosts via the Add Hosts page first.</p>
+</div>
+{% endif %}
+
+<script>
+function togglePwd(i) {
+  const el = document.getElementById('pwd-' + i);
+  el.style.filter = el.style.filter ? '' : 'blur(4px)';
+}
+function toggleOldPwd(i) {
+  const el = document.getElementById('oldpwd-' + i);
+  el.style.filter = el.style.filter ? '' : 'blur(4px)';
+}
+</script>
+{% endblock %}

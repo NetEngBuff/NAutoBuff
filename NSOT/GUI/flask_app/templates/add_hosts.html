@@ -54,9 +54,21 @@
               <input type="text" name="management_ip[]" class="form-input mgmt-ip-field" placeholder="10.0.0.10" required>
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Subnet (CIDR bits)</label>
-            <input type="number" name="subnet_cidr[]" class="form-input" placeholder="24" min="0" max="32" required style="max-width: 150px;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Subnet (CIDR bits)</label>
+              <input type="number" name="subnet_cidr[]" class="form-input" placeholder="24" min="0" max="32" required style="max-width: 150px;">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Vendor</label>
+              <select name="vendor[]" class="form-select" required>
+                <option value="" disabled selected>Select Vendor</option>
+                <option value="arista">Arista</option>
+                <option value="cisco">Cisco</option>
+                <option value="juniper">Juniper</option>
+                <option value="linux">Linux</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -183,9 +195,21 @@ function addDeviceForm() {
         <input type="text" name="management_ip[]" class="form-input mgmt-ip-field" placeholder="${oobPlaceholder}" required>
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Subnet (CIDR bits)</label>
-      <input type="number" name="subnet_cidr[]" class="form-input" placeholder="24" min="0" max="32" required style="max-width: 150px;">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Subnet (CIDR bits)</label>
+        <input type="number" name="subnet_cidr[]" class="form-input" placeholder="24" min="0" max="32" required style="max-width: 150px;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Vendor</label>
+        <select name="vendor[]" class="form-select" required>
+          <option value="" disabled selected>Select Vendor</option>
+          <option value="arista">Arista</option>
+          <option value="cisco">Cisco</option>
+          <option value="juniper">Juniper</option>
+          <option value="linux">Linux</option>
+        </select>
+      </div>
     </div>
   `;
   document.getElementById('device-form-list').appendChild(deviceForm);

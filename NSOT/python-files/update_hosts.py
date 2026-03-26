@@ -20,8 +20,9 @@ def regenerate_hosts_csv(devices):
         "username",
         "password",
         "management_ip",
+        "subnet_cidr",
+        "vendor",
         "old_password",
-        "new_password",
     ]
 
     with open(csv_path, mode="w", newline="") as csvfile:
@@ -35,8 +36,9 @@ def regenerate_hosts_csv(devices):
                     "username": dev.get("username", ""),
                     "password": dev.get("password", ""),
                     "management_ip": dev.get("ip_address", ""),
+                    "subnet_cidr": dev.get("subnet_cidr", ""),
+                    "vendor": dev.get("vendor", ""),
                     "old_password": "",
-                    "new_password": "",
                 }
             )
 
@@ -65,8 +67,9 @@ def update_hosts_csv(device_name, ip_address, username="admin", password="admin"
                 "username": username,
                 "password": password,
                 "management_ip": ip_address,
+                "subnet_cidr": "",
+                "vendor": "",
                 "old_password": "",
-                "new_password": "",
             }
         )
 
@@ -76,8 +79,9 @@ def update_hosts_csv(device_name, ip_address, username="admin", password="admin"
             "username",
             "password",
             "management_ip",
+            "subnet_cidr",
+            "vendor",
             "old_password",
-            "new_password",
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()

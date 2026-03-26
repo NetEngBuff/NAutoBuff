@@ -12,3 +12,4 @@ scikit-learn
 jinja2
 tensorflow[and-cuda]
 netifaces
+flask-login

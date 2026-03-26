@@ -188,7 +188,8 @@
 
 <script>
 let dockerImages = {{ docker_images|tojson|safe }};
-let kinds = ["ceos", "linux"];
+let kinds = ["ceos", "linux", "cisco_iol", "crpd", "vjunosswitch"];
+const VENDOR_KIND_MAP = { arista: "ceos", cisco: "cisco_iol", juniper: "crpd", linux: "linux" };
 let deviceRows = [];
 let linkRows = [];
 let hostsData = [];  // loaded from hosts.csv via /hosts-data
@@ -301,6 +302,7 @@ function onDeviceSelect(i) {
   const mgmtInput = document.querySelector(`[name="device_mgmt_ip_${i}"]`);
   const userInput = document.querySelector(`[name="device_username_${i}"]`);
   const passInput = document.querySelector(`[name="device_password_${i}"]`);
+  const kindSelect = document.getElementById(`kind-${i}`);
   const pill = document.getElementById(`hosts-pill-${i}`);
 
   if (chosen) {
@@ -308,6 +310,12 @@ function onDeviceSelect(i) {
     mgmtInput.value = chosen.management_ip;
     userInput.value = chosen.username;
     passInput.value = chosen.password;
+
+    // Auto-set kind from vendor
+    const autoKind = VENDOR_KIND_MAP[chosen.vendor] || "";
+    if (kindSelect && autoKind) kindSelect.value = autoKind;
+    toggleConfigExec(i);
+
     pill.innerHTML = `
       <span class="pill-item">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -317,6 +325,7 @@ function onDeviceSelect(i) {
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         ${chosen.username}
       </span>
+      ${chosen.vendor ? `<span class="pill-item" style="color:var(--color-primary);font-weight:var(--font-weight-medium);">${chosen.vendor}${autoKind ? " → " + autoKind : ""}</span>` : ""}
       <span class="pill-badge">from hosts.csv</span>`;
     pill.style.display = "flex";
   } else {

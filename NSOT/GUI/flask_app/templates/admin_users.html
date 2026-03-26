@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}User Management - NAutoHUB{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">User Management</h1>
+  <p class="page-description">Manage accounts, roles, and invite new users</p>
+</div>
+
+{% if message %}
+<div class="alert alert-success" style="max-width:900px;margin:0 auto var(--space-4);">
+  <span class="alert-icon">&#10003;</span>
+  <div class="alert-content">{{ message }}</div>
+</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-error" style="max-width:900px;margin:0 auto var(--space-4);">
+  <span class="alert-icon">&#10007;</span>
+  <div class="alert-content">{{ error }}</div>
+</div>
+{% endif %}
+
+{% if invite_url %}
+<div class="card card-elevated" style="max-width:900px;margin:0 auto var(--space-4);border-color:var(--color-primary);">
+  <div class="card-body" style="display:flex;align-items:center;gap:var(--space-3);">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" style="flex-shrink:0">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+    </svg>
+    <code id="invite-url" style="font-size:var(--font-size-sm);word-break:break-all;color:var(--color-primary);flex:1;">{{ invite_url }}</code>
+    <button onclick="copyInviteUrl()" class="btn btn-secondary btn-sm" id="copy-btn" style="flex-shrink:0;">Copy</button>
+  </div>
+</div>
+{% endif %}
+
+<div style="max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4);">
+
+  <!-- Create User directly -->
+  <div class="card card-elevated">
+    <div class="card-header"><h4>Create User</h4></div>
+    <div class="card-body">
+      <form method="POST" class="form">
+        <input type="hidden" name="action" value="create">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input type="text" name="username" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select name="role" class="form-select">
+            {% for r in roles %}<option value="{{ r }}">{{ r|capitalize }}</option>{% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Create</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Invite Link -->
+  <div class="card card-elevated">
+    <div class="card-header"><h4>Invite via Link</h4></div>
+    <div class="card-body">
+      <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);margin-bottom:var(--space-4);">
+        Generate a single-use link — expires after the recipient registers.
+      </p>
+      <form method="POST" class="form">
+        <input type="hidden" name="action" value="invite">
+        <div class="form-group">
+          <label class="form-label">Role for invitee</label>
+          <select name="role" class="form-select">
+            {% for r in roles %}<option value="{{ r }}">{{ r|capitalize }}</option>{% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-secondary btn-block" style="margin-top:var(--space-6);">Generate Invite Link</button>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<!-- Users + Invites side by side -->
+<div style="max-width:900px;margin:0 auto;display:grid;grid-template-columns:1.6fr 1fr;gap:var(--space-4);">
+
+  <!-- User Table -->
+  <div class="card card-elevated">
+    <div class="card-header"><h4>All Users</h4></div>
+    <div class="card-body" style="padding:0;">
+      <div class="table-container" style="margin:0;">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Role</th>
+              <th>Last Login</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td>
+                {{ u.username }}
+                {% if u.username == current_user.username %}
+                <span style="font-size:10px;color:var(--color-primary);margin-left:4px;">(you)</span>
+                {% endif %}
+              </td>
+              <td>
+                <span style="font-size:10px;font-weight:var(--font-weight-semibold);
+                  border:1px solid;border-radius:var(--radius-sm);padding:1px 6px;
+                  color:{% if u.role == 'admin' %}var(--color-error){% elif u.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-text-muted){% endif %};
+                  border-color:{% if u.role == 'admin' %}var(--color-error){% elif u.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-border){% endif %};">
+                  {{ u.role }}
+                </span>
+              </td>
+              <td style="font-size:var(--font-size-xs);color:var(--color-text-muted);">{{ u.last_login or 'Never' }}</td>
+              <td>
+                {% if u.username != current_user.username %}
+                <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+                  <form method="POST" style="display:flex;gap:4px;align-items:center;">
+                    <input type="hidden" name="action" value="change_role">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <select name="role" class="form-select" style="font-size:10px;padding:2px 4px;height:auto;">
+                      {% for r in roles %}<option value="{{ r }}" {% if r == u.role %}selected{% endif %}>{{ r }}</option>{% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-secondary btn-sm">Set</button>
+                  </form>
+                  <form method="POST" style="display:flex;gap:4px;align-items:center;">
+                    <input type="hidden" name="action" value="reset_password">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <input type="password" name="new_password" class="form-input" style="font-size:10px;padding:2px 4px;height:auto;width:90px;" placeholder="New pwd">
+                    <button type="submit" class="btn btn-secondary btn-sm">Reset</button>
+                  </form>
+                  <form method="POST" onsubmit="return confirm('Delete {{ u.username }}?')">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <button type="submit" class="btn btn-danger btn-sm">Del</button>
+                  </form>
+                </div>
+                {% else %}
+                <span style="color:var(--color-text-muted);font-size:var(--font-size-xs);">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invite History -->
+  <div class="card card-elevated">
+    <div class="card-header"><h4>Invite History</h4></div>
+    <div class="card-body" style="padding:0;">
+      {% if invites %}
+      <div class="table-container" style="margin:0;">
+        <table class="table table-striped">
+          <thead>
+            <tr><th>Role</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for inv in invites %}
+            <tr>
+              <td>
+                <span style="font-size:10px;font-weight:var(--font-weight-semibold);
+                  border:1px solid var(--color-primary);border-radius:var(--radius-sm);
+                  padding:1px 6px;color:var(--color-primary);">{{ inv.role }}</span>
+              </td>
+              <td style="font-size:var(--font-size-xs);">
+                {% if inv.used %}
+                  <span style="color:var(--color-success);">Used</span>
+                {% else %}
+                  <span style="color:var(--color-primary);">Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if not inv.used %}
+                <form method="POST" onsubmit="return confirm('Revoke?')">
+                  <input type="hidden" name="action" value="revoke_invite">
+                  <input type="hidden" name="token" value="{{ inv.token }}">
+                  <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="padding:var(--space-4);text-align:center;color:var(--color-text-muted);font-size:var(--font-size-sm);">No invites yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+function copyInviteUrl() {
+  const url = document.getElementById('invite-url').textContent.trim();
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    btn.classList.replace('btn-secondary', 'btn-primary');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.replace('btn-primary', 'btn-secondary'); }, 2000);
+  });
+}
+</script>
+{% endblock %}

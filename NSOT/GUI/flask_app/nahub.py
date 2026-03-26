@@ -15,7 +15,17 @@ from flask import (
     jsonify,
     stream_with_context,
     Response,
+    flash,
 )
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    login_user,
+    logout_user,
+    login_required,
+    current_user,
+)
+from functools import wraps
 from jinja2 import Environment, FileSystemLoader
 import subprocess
 from threading import Thread
@@ -48,6 +58,12 @@ topo_path = os.path.abspath(
 
 # Import your custom modules from 'python-files'
 from create_hosts import write_hosts_csv
+from user_db import (
+    init_db, get_all_users, get_user_by_id, get_user_by_username,
+    create_user, update_user_password, update_user_role, delete_user,
+    verify_password, record_login, ROLES,
+    create_invite, get_invite, consume_invite, get_all_invites, revoke_invite,
+)
 from ping import ping_local, ping_remote
 from goldenConfig import generate_configs
 from show_commands import execute_show_command
@@ -78,28 +94,227 @@ ipam_reader = IPAMReader(file_path=ipam_file_path, update_interval=10)
 hosts_reader = HostsReader(BASE_DIR)
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("NAHUB_SECRET_KEY", "nahub-dev-secret-change-in-prod")
+
+# ── Flask-Login setup ──────────────────────────────────────────────────────────
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
+login_manager.login_message = "Please log in to access this page."
+
+
+class User(UserMixin):
+    def __init__(self, data):
+        self.id = str(data["id"])
+        self.username = data["username"]
+        self.role = data["role"]
+
+    def is_admin(self):
+        return self.role == "admin"
+
+    def is_operator(self):
+        return self.role in ("admin", "operator")
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    data = get_user_by_id(int(user_id))
+    return User(data) if data else None
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin():
+            return redirect(url_for("homepage"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def operator_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_operator():
+            return redirect(url_for("homepage"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+# Initialise user database on startup
+init_db()
 
 # Set up Jinja2 environment to load templates from 'NSOT/templates' folder
 env = Environment(loader=FileSystemLoader(templates_dir))
 
-# Context processor to make devices available in all templates
+def _get_vendor_for_device(device_id):
+    """Look up vendor for a device from hosts.csv."""
+    hosts_csv_path = os.path.join(IPAM_DIR, "hosts.csv")
+    try:
+        with open(hosts_csv_path, newline="") as f:
+            for row in csv.DictReader(f):
+                if row.get("hostname", "").strip() == device_id.strip():
+                    return row.get("vendor", "").strip() or None
+    except Exception:
+        pass
+    return None
+
+
+# Context processor to make devices + current time available in all templates
 @app.context_processor
-def inject_devices():
+def inject_globals():
     try:
         devices = hosts_reader.get_devices()
-        return dict(devices=devices)
     except Exception as e:
         print(f"Error loading devices for context: {e}")
-        return dict(devices=[])
+        devices = []
+    return dict(
+        devices=devices,
+        now=time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
+    )
+
+
+# ── Auth routes ───────────────────────────────────────────────────────────────
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("homepage"))
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        user_data = verify_password(username, password)
+        if user_data:
+            user = User(user_data)
+            login_user(user, remember=request.form.get("remember") == "on")
+            record_login(user_data["id"])
+            return redirect(request.args.get("next") or url_for("homepage"))
+        error = "Invalid username or password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("login"))
+
+
+# ── Invite signup ─────────────────────────────────────────────────────────────
+@app.route("/signup/<token>", methods=["GET", "POST"])
+def signup(token):
+    invite = get_invite(token)
+    if not invite:
+        return render_template("signup.html", error="This invite link is invalid or has expired.", invite=None)
+
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm  = request.form.get("confirm_password", "")
+
+        if not username or not password:
+            error = "Username and password are required."
+        elif password != confirm:
+            error = "Passwords do not match."
+        elif len(password) < 8:
+            error = "Password must be at least 8 characters."
+        elif get_user_by_username(username):
+            error = f"Username '{username}' is already taken."
+        else:
+            create_user(username, password, invite["role"])
+            consume_invite(token)
+            return render_template("signup.html", success=True, invite=invite)
+
+    return render_template("signup.html", invite=invite, error=error)
+
+
+
+# ── Admin: user management ─────────────────────────────────────────────────────
+@app.route("/admin/users", methods=["GET", "POST"])
+@login_required
+@admin_required
+def admin_users():
+    message = None
+    error = None
+    invite_url = None
+    if request.method == "POST":
+        action = request.form.get("action")
+        try:
+            if action == "create":
+                uname = request.form.get("username", "").strip()
+                pwd = request.form.get("password", "")
+                role = request.form.get("role", "viewer")
+                if not uname or not pwd:
+                    error = "Username and password are required."
+                elif get_user_by_username(uname):
+                    error = f"Username '{uname}' already exists."
+                else:
+                    create_user(uname, pwd, role)
+                    message = f"User '{uname}' created as {role}."
+            elif action == "delete":
+                uid = int(request.form.get("user_id"))
+                target = get_user_by_id(uid)
+                if target and target["username"] == current_user.username:
+                    error = "You cannot delete your own account."
+                elif target:
+                    delete_user(uid)
+                    message = f"User '{target['username']}' deleted."
+            elif action == "change_role":
+                uid = int(request.form.get("user_id"))
+                role = request.form.get("role")
+                target = get_user_by_id(uid)
+                if target and target["username"] == current_user.username:
+                    error = "You cannot change your own role."
+                elif target:
+                    update_user_role(uid, role)
+                    message = f"Role updated for '{target['username']}'."
+            elif action == "reset_password":
+                uid = int(request.form.get("user_id"))
+                pwd = request.form.get("new_password", "")
+                if not pwd:
+                    error = "New password cannot be empty."
+                else:
+                    update_user_password(uid, pwd)
+                    message = "Password updated."
+            elif action == "invite":
+                role = request.form.get("role", "viewer")
+                token = create_invite(role, current_user.username)
+                invite_url = url_for("signup", token=token, _external=True)
+                message = f"Invite link generated for role: {role}."
+            elif action == "revoke_invite":
+                revoke_invite(request.form.get("token"))
+                message = "Invite revoked."
+        except Exception as e:
+            error = str(e)
+    users = get_all_users()
+    invites = get_all_invites()
+    return render_template("admin_users.html", users=users, invites=invites, roles=ROLES,
+                           message=message, error=error, invite_url=invite_url)
+
+
+# ── Admin: hosts inventory ─────────────────────────────────────────────────────
+@app.route("/admin/hosts-inventory")
+@login_required
+@admin_required
+def hosts_inventory():
+    hosts = []
+    hosts_csv_path = os.path.join(IPAM_DIR, "hosts.csv")
+    try:
+        with open(hosts_csv_path, newline="", encoding="utf-8-sig") as f:
+            hosts = list(csv.DictReader(f))
+    except Exception as e:
+        print(f"[⚠] Could not read hosts.csv: {e}")
+    return render_template("hosts_inventory.html", hosts=hosts)
 
 
 @app.route("/")
+@login_required
 def homepage():
     devices = hosts_reader.get_devices()
     return render_template("homepage.html", devices=devices)
 
 
 @app.route("/chat-query", methods=["POST"])
+@login_required
 def chat_query():
     data = request.json
     user_input = data.get("message")
@@ -223,6 +438,8 @@ If the user's input is technical (related to networking, configs, interfaces, pr
 
 
 @app.route("/shutdown-ollama", methods=["POST"])
+@login_required
+@operator_required
 def shutdown_ollama_route():
     try:
         stop_ollama_model("llama3.1")
@@ -232,6 +449,8 @@ def shutdown_ollama_route():
 
 
 @app.route("/add-hosts", methods=["GET", "POST"])
+@login_required
+@operator_required
 def add_hosts():
     message = None
     if request.method == "POST":
@@ -240,13 +459,14 @@ def add_hosts():
         passwords = request.form.getlist("password[]")
         management_ips = request.form.getlist("management_ip[]")
         subnet_cidrs = request.form.getlist("subnet_cidr[]")
+        vendors = request.form.getlist("vendor[]")
         save_mode = request.form.get("save_mode", "new")
 
         rows = []
         for i in range(len(hostnames)):
             if hostnames[i] and usernames[i] and passwords[i] and management_ips[i] and subnet_cidrs[i]:
                 rows.append(
-                    [hostnames[i], usernames[i], passwords[i], management_ips[i], subnet_cidrs[i]]
+                    [hostnames[i], usernames[i], passwords[i], management_ips[i], subnet_cidrs[i], vendors[i] if i < len(vendors) else ""]
                 )
 
         if rows:
@@ -261,6 +481,8 @@ def add_hosts():
 
 
 @app.route("/build-topology", methods=["GET", "POST"])
+@login_required
+@operator_required
 def build_topology():
     if request.method == "POST" and "generate" in request.form:
         topo_name = request.form.get("topo_name", "custom_topo")
@@ -335,6 +557,8 @@ def build_topology():
 
 
 @app.route("/deploy-topology", methods=["POST"], endpoint="deploy_topology_route")
+@login_required
+@operator_required
 def deploy_topology_route():
     yaml_path = os.path.abspath(
         os.path.join(
@@ -392,6 +616,8 @@ def deploy_topology_route():
 
 
 @app.route("/delete-topology", methods=["POST"], endpoint="delete_topology_route")
+@login_required
+@operator_required
 def delete_topology_route():
     yaml_path = os.path.abspath(
         os.path.join(
@@ -431,6 +657,8 @@ def delete_topology_route():
 
 
 @app.route("/add-device", methods=["GET", "POST"])
+@login_required
+@operator_required
 def add_device():
     message = None
 
@@ -547,12 +775,20 @@ def add_device():
 
 
 @app.route("/configure-device", methods=["GET", "POST"])
+@login_required
+@operator_required
 def configure_device():
     try:
         devices = hosts_reader.get_devices()
         if request.method == "POST":
             device_id = request.form.get("device_id")
-            device_vendor = request.form.get("device_vendor")
+            device_vendor = _get_vendor_for_device(device_id) if device_id else None
+            if not device_vendor:
+                return render_template(
+                    "configure_device.html",
+                    devices=devices,
+                    message=f"⚠️ No vendor set for {device_id}. Please update the host in Add Hosts.",
+                )
 
             # Interfaces
             interfaces = []
@@ -746,6 +982,8 @@ def configure_device():
 
 
 @app.route("/push-config", methods=["POST"])
+@login_required
+@operator_required
 def push_config():
     data = request.get_json()
     device_id = data.get("device_id")
@@ -760,6 +998,8 @@ def push_config():
 
 
 @app.route("/upload-config", methods=["POST"])
+@login_required
+@operator_required
 def upload_config():
     """
     Handle uploaded configuration file and push to device using Netmiko
@@ -767,14 +1007,14 @@ def upload_config():
     try:
         # Get form data
         device_id = request.form.get("device_id")
-        device_vendor = request.form.get("device_vendor")
         config_file = request.files.get("config_file")
 
-        # Validate inputs
-        if not device_id or not device_vendor:
-            return jsonify(
-                {"status": "error", "message": "Device ID and vendor are required"}
-            )
+        if not device_id:
+            return jsonify({"status": "error", "message": "Device ID is required"})
+
+        device_vendor = _get_vendor_for_device(device_id)
+        if not device_vendor:
+            return jsonify({"status": "error", "message": f"No vendor set for {device_id}. Please update the host in Add Hosts."})
 
         if not config_file:
             return jsonify({"status": "error", "message": "No config file provided"})
@@ -799,6 +1039,8 @@ def upload_config():
 
 
 @app.route("/rollback", methods=["POST"])
+@login_required
+@operator_required
 def rollback_device():
     """
     Rollback a device to its golden configuration
@@ -806,12 +1048,13 @@ def rollback_device():
     try:
         data = request.get_json()
         device_id = data.get("device_id")
-        device_vendor = data.get("device_vendor")
 
-        if not device_id or not device_vendor:
-            return jsonify(
-                {"status": "error", "message": "Device ID and vendor are required"}
-            )
+        if not device_id:
+            return jsonify({"status": "error", "message": "Device ID is required"})
+
+        device_vendor = _get_vendor_for_device(device_id)
+        if not device_vendor:
+            return jsonify({"status": "error", "message": f"No vendor set for {device_id}. Please update the host in Add Hosts."})
 
         # Perform rollback
         success, message = rollback_to_golden_config(device_id, device_vendor)
@@ -827,12 +1070,14 @@ def rollback_device():
 
 
 @app.route("/tools", methods=["GET", "POST"])
+@login_required
 def tools():
     devices = hosts_reader.get_devices()
     return render_template("tools.html", devices=devices)
 
 
 @app.route("/api/ping", methods=["POST"])
+@login_required
 def api_ping():
     data = request.get_json()
     source = data.get("source", "").strip()
@@ -849,6 +1094,7 @@ def api_ping():
 
 
 @app.route("/api/show-command", methods=["POST"])
+@login_required
 def api_show_command():
     data = request.get_json()
     hostname = data.get("device", "")
@@ -862,6 +1108,8 @@ def api_show_command():
 
 
 @app.route("/api/golden-config", methods=["POST"])
+@login_required
+@operator_required
 def api_golden_config():
     data = request.get_json()
     select_all = data.get("select_all", False)
@@ -878,12 +1126,14 @@ def api_golden_config():
 
 
 @app.route("/ipam")
+@login_required
 def ipam():
     """Route to display IPAM table."""
     return render_template("ipam.html", ipam_data=ipam_reader.ipam_data, poll_interval=ipam_reader.update_interval)
 
 
 @app.route("/ipam-data")
+@login_required
 def ipam_data_json():
     """JSON endpoint returning current IPAM data, last update time, and poll interval."""
     data = ipam_reader.ipam_data
@@ -896,16 +1146,19 @@ def ipam_data_json():
 
 
 @app.route("/about")
+@login_required
 def about():
     return render_template("about.html")
 
 
 @app.route("/contact")
+@login_required
 def contact():
     return render_template("contact.html")
 
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
     # Embed your Grafana dashboard in the dashboard template
     return render_template("dashboard.html")
@@ -963,6 +1216,7 @@ def _wait_for_port(port, host="127.0.0.1", timeout=12):
 
 
 @app.route("/topology")
+@login_required
 def topology():
     if not _is_port_open(50080):
         try:
@@ -996,6 +1250,7 @@ import docker
 
 
 @app.route("/hosts-data")
+@login_required
 def hosts_data():
     """Return full host inventory from hosts.csv as JSON for the UI."""
     hosts = []
@@ -1010,6 +1265,7 @@ def hosts_data():
                     "management_ip": f"{mgmt_ip}/{subnet}" if mgmt_ip else "",
                     "username": row.get("username", ""),
                     "password": row.get("password", ""),
+                    "vendor": row.get("vendor", ""),
                 })
     except Exception as e:
         print(f"[⚠] Could not read hosts.csv: {e}")
@@ -1017,6 +1273,7 @@ def hosts_data():
 
 
 @app.route("/oob-network-info")
+@login_required
 def oob_network_info():
     """Read netcfg.yaml and return OOB network details for the UI hint."""
     netcfg_path = os.path.join(PILOT_DIR, "netcfg.yaml")
@@ -1042,6 +1299,7 @@ def oob_network_info():
 
 
 @app.route("/clab-health")
+@login_required
 def clab_health():
     try:
         client = docker.from_env()

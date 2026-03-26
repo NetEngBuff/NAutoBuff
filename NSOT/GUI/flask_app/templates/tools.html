@@ -9,6 +9,7 @@
 
 <div class="grid grid-cols-3 gap-6">
 
+  {% if current_user.is_operator() %}
   <!-- Golden Config Generator -->
   <div class="tool-card">
     <div class="tool-card-header">
@@ -39,6 +40,7 @@
       <div id="gc-result" class="output-container mt-4" style="display:none;"></div>
     </div>
   </div>
+  {% endif %}
 
   <!-- Show Configs -->
   <div class="tool-card">

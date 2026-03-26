@@ -15,8 +15,8 @@ def write_hosts_csv(data_rows, append=False):
         "password",
         "management_ip",
         "subnet_cidr",
+        "vendor",
         "old_password",
-        "new_password",
     ]
 
     mode = "a" if append else "w"
@@ -27,6 +27,6 @@ def write_hosts_csv(data_rows, append=False):
         if not append or not file_exists:
             writer.writerow(headers)
         for row in data_rows:
-            writer.writerow(row + ["", ""])
+            writer.writerow(row + [""])
 
     return csv_path
