@@ -65,6 +65,203 @@ def deploy():
             print(f"❌ Failed to enable/start {service}")
 
 
+def _build_grafana_dashboard(ds_uid, hostname_ip_map=None):
+    """
+    Return the full Grafana dashboard JSON for NAutoHUB telemetry.
+
+    hostname_ip_map: dict of {hostname: "IP:port"}, e.g. {"R1": "172.20.20.3:6030"}.
+    Built dynamically from hosts.csv + containerlab IPs — nothing hardcoded.
+    If empty (topology not yet deployed), the Device variable has no options yet;
+    gnmi_hosts.py re-syncs it after each topology deploy.
+    """
+    if hostname_ip_map is None:
+        hostname_ip_map = {}
+
+    def ds():
+        return {"type": "influxdb", "uid": ds_uid}
+
+    def target(ref, query):
+        return {"refId": ref, "datasource": ds(), "query": query}
+
+    def timeseries(pid, title, x, y, w, h, query, unit="short"):
+        return {
+            "id": pid, "type": "timeseries", "title": title,
+            "gridPos": {"x": x, "y": y, "w": w, "h": h},
+            "datasource": ds(),
+            "fieldConfig": {
+                "defaults": {"unit": unit,
+                             "custom": {"lineWidth": 2, "fillOpacity": 5}},
+                "overrides": []},
+            "options": {
+                "tooltip": {"mode": "multi", "sort": "desc"},
+                "legend": {"displayMode": "table", "placement": "bottom"}},
+            "targets": [target("A", query)],
+        }
+
+    def table(pid, title, x, y, w, h, query):
+        return {
+            "id": pid, "type": "table", "title": title,
+            "gridPos": {"x": x, "y": y, "w": w, "h": h},
+            "datasource": ds(),
+            "fieldConfig": {"defaults": {}, "overrides": []},
+            "options": {"cellHeight": "sm", "footer": {"show": False}},
+            "targets": [target("A", query)],
+        }
+
+    def stat(pid, title, x, y, w, h, query, unit="percent"):
+        return {
+            "id": pid, "type": "stat", "title": title,
+            "gridPos": {"x": x, "y": y, "w": w, "h": h},
+            "datasource": ds(),
+            "fieldConfig": {
+                "defaults": {
+                    "unit": unit,
+                    "thresholds": {"mode": "absolute", "steps": [
+                        {"color": "green", "value": None},
+                        {"color": "yellow", "value": 60},
+                        {"color": "red", "value": 85}]},
+                    "mappings": []},
+                "overrides": []},
+            "options": {
+                "reduceOptions": {"calcs": ["lastNotNull"]},
+                "colorMode": "background", "graphMode": "area"},
+            "targets": [target("A", query)],
+        }
+
+    def row(pid, title, y):
+        return {"id": pid, "type": "row", "title": title,
+                "gridPos": {"x": 0, "y": y, "w": 24, "h": 1},
+                "collapsed": False}
+
+    B = "NAutoHUB"
+    SF = '|> filter(fn: (r) => r.source =~ /^${hostname:regex}$/)'
+
+    # Build Flux inline device-name mapper from the live hostname→IP map.
+    # Falls back to r.source (shows IP:port) when no topology is deployed yet.
+    if hostname_ip_map:
+        cases = " ".join(
+            f'else if r.source == "{ip}" then "{name}"'
+            for name, ip in hostname_ip_map.items()
+        )
+        DEV = f'(if false then "" {cases} else r.source)'
+    else:
+        DEV = "r.source"
+
+    q_cpu = (
+        f'from(bucket: "{B}")\n'
+        f'  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n'
+        f'  |> filter(fn: (r) => r._measurement == "device-health")\n'
+        f'  |> filter(fn: (r) => r._field == "/components/component/cpu/utilization/state/instant")\n'
+        f'  {SF}\n'
+        f'  |> group(columns: ["source", "_time"])\n'
+        f'  |> mean()\n'
+        f'  |> group(columns: ["source"])\n'
+        f'  |> map(fn: (r) => ({{r with _field: {DEV}}}))'
+    )
+
+    def counter_rate(field, exclude_mgmt=True):
+        mgmt_filter = '  |> filter(fn: (r) => r.interface_name !~ /^Management/)\n' if exclude_mgmt else ''
+        return (
+            f'from(bucket: "{B}")\n'
+            f'  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n'
+            f'  |> filter(fn: (r) => r._measurement == "interface-counters")\n'
+            f'  |> filter(fn: (r) => r._field == "/interfaces/interface/state/counters/{field}")\n'
+            f'{mgmt_filter}'
+            f'  {SF}\n'
+            f'  |> derivative(unit: 1s, nonNegative: true)\n'
+            f'  |> map(fn: (r) => ({{r with _field: {DEV} + "/" + r.interface_name}}))'
+        )
+
+    q_status = (
+        f'from(bucket: "{B}")\n'
+        f'  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n'
+        f'  |> filter(fn: (r) => r._measurement == "interface-status")\n'
+        f'  {SF}\n'
+        f'  |> last()\n'
+        f'  |> map(fn: (r) => ({{r with source: {DEV}}}))\n'
+        f'  |> pivot(rowKey: ["source", "interface_name"], columnKey: ["_field"], valueColumn: "_value")\n'
+        f'  |> rename(columns: {{source: "Device", interface_name: "Interface",'
+        f' "/interfaces/interface/state/oper-status": "Oper Status",'
+        f' "/interfaces/interface/state/admin-status": "Admin Status"}})\n'
+        f'  |> keep(columns: ["Device", "Interface", "Oper Status", "Admin Status"])'
+    )
+
+    q_static = (
+        f'from(bucket: "{B}")\n'
+        f'  |> range(start: -2h)\n'
+        f'  |> filter(fn: (r) => r._measurement == "interface-static")\n'
+        f'  {SF}\n'
+        f'  |> last()\n'
+        f'  |> map(fn: (r) => ({{r with source: {DEV}}}))\n'
+        f'  |> pivot(rowKey: ["source", "interface_name"], columnKey: ["_field"], valueColumn: "_value")\n'
+        f'  |> rename(columns: {{source: "Device", interface_name: "Interface",'
+        f' "/interfaces/interface/ethernet/state/mac-address": "MAC Address",'
+        f' "/interfaces/interface/state/mtu": "MTU"}})\n'
+        f'  |> keep(columns: ["Device", "Interface", "MAC Address", "MTU"])'
+    )
+
+    panels = [
+        row(10, "Device Health", 0),
+        stat(11, "CPU Utilization %", 0, 1, 24, 5, q_cpu, unit="percent"),
+
+        row(20, "Interface Traffic", 6),
+        timeseries(21, "Bandwidth In (bytes/s)", 0, 7, 12, 8,
+                   counter_rate("in-octets"), unit="Bps"),
+        timeseries(22, "Bandwidth Out (bytes/s)", 12, 7, 12, 8,
+                   counter_rate("out-octets"), unit="Bps"),
+
+        row(30, "Packet Rates", 15),
+        timeseries(31, "Packets In / sec", 0, 16, 12, 8,
+                   counter_rate("in-pkts"), unit="pps"),
+        timeseries(32, "Packets Out / sec", 12, 16, 12, 8,
+                   counter_rate("out-pkts"), unit="pps"),
+
+        row(40, "Errors & Drops", 24),
+        timeseries(41, "Interface Errors / sec", 0, 25, 12, 7,
+                   counter_rate("in-errors"), unit="pps"),
+        timeseries(42, "Interface Drops / sec", 12, 25, 12, 7,
+                   counter_rate("in-discards"), unit="pps"),
+
+        row(50, "Interface Status", 32),
+        table(51, "Oper / Admin Status", 0, 33, 12, 8, q_status),
+        table(52, "MAC Address & MTU", 12, 33, 12, 8, q_static),
+    ]
+
+    # Build the Device dropdown variable from the live hostname→IP map
+    var_options = [{"text": "All", "value": "$__all", "selected": True}]
+    for name, ip in hostname_ip_map.items():
+        var_options.append({"text": name, "value": ip, "selected": False})
+
+    import re as _re
+    all_value = "|".join(_re.escape(ip) for ip in hostname_ip_map.values()) if hostname_ip_map else ".*"
+    var_query = ", ".join(f"{name} : {ip}" for name, ip in hostname_ip_map.items())
+
+    return {
+        "uid": "nautohub-telemetry",
+        "title": "NAutoHUB Network Telemetry",
+        "tags": ["nautohub", "gnmi"],
+        "editable": True,
+        "graphTooltip": 1,
+        "time": {"from": "now-30m", "to": "now"},
+        "refresh": "10s",
+        "templating": {
+            "list": [{
+                "name": "hostname",
+                "label": "Device",
+                "type": "custom",
+                "query": var_query,
+                "current": {"text": ["All"], "value": ["$__all"]},
+                "options": var_options,
+                "includeAll": True,
+                "allValue": all_value,
+                "multi": True,
+                "hide": 0,
+            }]
+        },
+        "panels": panels,
+    }
+
+
 def setup_monitoring(base_path):
     """
     Initialize InfluxDB, generate gnmic-stream.yaml with a real token,
@@ -185,10 +382,70 @@ def setup_monitoring(base_path):
         print("   → After Grafana starts, add a Flux datasource pointing to http://localhost:8086")
         print(f"   → Use org: NAutoHUB  bucket: NAutoHUB  token: {token[:20]}...")
 
+    # ── 6. Create/update the Grafana telemetry dashboard ─────────────────────
+    grafana_auth = base64.b64encode(b"admin:admin").decode()
+    ds_uid = None
+    try:
+        req = urllib.request.Request(
+            "http://localhost:3000/api/datasources/name/NAutoHUB-InfluxDB",
+            headers={"Authorization": "Basic " + grafana_auth},
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            ds_uid = json.loads(resp.read()).get("uid")
+    except Exception:
+        pass
+
+    if ds_uid:
+        # Build hostname→IP map from gnmi_hosts so the dashboard isn't hardcoded.
+        # If topology isn't deployed yet the map will be empty; gnmi_hosts re-syncs
+        # the dashboard after each deploy automatically.
+        hostname_ip_map = {}
+        try:
+            import sys as _sys
+            _sys.path.insert(0, str(base_path / "NSOT" / "python-files"))
+            from gnmi_hosts import _get_clab_mgmt_ips, update_gnmic_yaml_from_hosts  # noqa: F401
+            import csv as _csv
+            clab_ips = _get_clab_mgmt_ips()
+            hosts_csv = base_path / "NSOT" / "IPAM" / "hosts.csv"
+            if hosts_csv.exists():
+                with open(hosts_csv, newline="") as _f:
+                    for row in _csv.DictReader(_f):
+                        hostname = row.get("hostname", "").strip()
+                        mgmt_ip = row.get("management_ip", "").strip()
+                        if not hostname:
+                            continue
+                        ip = clab_ips.get(hostname) or mgmt_ip
+                        if ip:
+                            hostname_ip_map[hostname] = f"{ip}:6030"
+        except Exception:
+            pass  # topology not deployed yet — dashboard created with empty variable
+
+        dashboard_payload = json.dumps({
+            "overwrite": True,
+            "dashboard": _build_grafana_dashboard(ds_uid, hostname_ip_map),
+        }).encode()
+        try:
+            req = urllib.request.Request(
+                "http://localhost:3000/api/dashboards/db",
+                data=dashboard_payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Basic " + grafana_auth,
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read())
+                url = result.get("url", "")
+                print(f"✅ Grafana dashboard created: http://localhost:3000{url}")
+        except Exception as e:
+            print(f"ℹ️  Could not create Grafana dashboard: {e}")
+    else:
+        print("ℹ️  Grafana datasource UID not found — skipping dashboard creation")
+
     print("\n✅ Monitoring setup complete.")
     print("   InfluxDB : http://localhost:8086  (admin / NAutoHUB123!)")
     print("   Grafana  : http://localhost:3000  (admin / admin)")
-    print("   → Build dashboards in Grafana using the 'NAutoHUB-InfluxDB' datasource")
 
 
 def main():
@@ -282,7 +539,7 @@ After=network.target docker.service
 Requires=docker.service
 
 [Service]
-ExecStart=/usr/local/bin/gnmic subscribe --config {base_path}/gnmic-stream.yaml
+ExecStart=/usr/local/bin/gnmic subscribe --log --config {base_path}/gnmic-stream.yaml
 WorkingDirectory={base_path}
 Restart=always
 User={service_user}

@@ -1,8 +1,16 @@
 import csv
 import json
+import re
 import subprocess
+import urllib.request
+import urllib.error
+import base64
 import yaml
 import os
+
+GRAFANA_URL = "http://localhost:3000"
+GRAFANA_AUTH = base64.b64encode(b"admin:admin").decode()
+DASHBOARD_UID = "nautohub-telemetry"  # set by pilot.py on first run; adwlqs9 legacy
 
 
 def _get_clab_mgmt_ips():
@@ -101,5 +109,111 @@ def update_gnmic_yaml_from_hosts():
             yaml.dump(config, f, sort_keys=False)
 
         print(f"[✔] gnmic-stream.yaml updated with {len(config['targets'])} target(s)")
+
+        # Build hostname→IP:port map from what we just wrote, then sync Grafana
+        hostname_ip_map = {}
+        with open(hosts_csv, newline="") as csvfile2:
+            for row in csv.DictReader(csvfile2):
+                hostname = row.get("hostname", "").strip()
+                mgmt_ip = row.get("management_ip", "").strip()
+                if not hostname:
+                    continue
+                ip = clab_ips.get(hostname) or mgmt_ip
+                if ip:
+                    hostname_ip_map[hostname] = f"{ip}:6030"
+        _sync_grafana_dashboard(hostname_ip_map)
+
     except Exception as e:
         print(f"[⚠] Failed to update gnmic-stream.yaml: {e}")
+
+
+def _sync_grafana_dashboard(hostname_ip_map):
+    """
+    Patch the NAutoHUB Grafana dashboard so the Device variable and Flux
+    device-name mapper reflect the current hostname→IP mapping from hosts.csv
+    + containerlab.  Safe to call repeatedly — skipped silently if Grafana
+    is unreachable or the dashboard doesn't exist yet.
+    """
+    if not hostname_ip_map:
+        return
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Basic " + GRAFANA_AUTH,
+    }
+
+    # Fetch current dashboard JSON
+    try:
+        req = urllib.request.Request(
+            f"{GRAFANA_URL}/api/dashboards/uid/{DASHBOARD_UID}",
+            headers=headers,
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            payload = json.loads(resp.read())
+    except Exception:
+        return  # Grafana not up or dashboard not yet created
+
+    dashboard = payload.get("dashboard", {})
+    folderId = payload.get("meta", {}).get("folderId", 0)
+
+    # --- Update Device variable options ---
+    var_query = ", ".join(f"{name} : {ip}" for name, ip in hostname_ip_map.items())
+    all_value = "|".join(re.escape(ip) for ip in hostname_ip_map.values())
+    var_options = [{"text": "All", "value": "$__all", "selected": True}]
+    for name, ip in hostname_ip_map.items():
+        var_options.append({"text": name, "value": ip, "selected": False})
+
+    for var in dashboard.get("templating", {}).get("list", []):
+        if var.get("name") == "hostname":
+            var["query"] = var_query
+            var["options"] = var_options
+            var["allValue"] = all_value
+            var["current"] = {"text": ["All"], "value": ["$__all"]}
+            break
+
+    # --- Update Flux DEV mapper in every panel query ---
+    cases = " ".join(
+        f'else if r.source == "{ip}" then "{name}"'
+        for name, ip in hostname_ip_map.items()
+    )
+    new_dev = f'(if false then "" {cases} else r.source)'
+
+    # Replace any existing DEV expression (pattern: starts with "(if false then" or
+    # legacy hardcoded "if r.source ==")
+    dev_pattern = re.compile(
+        r'\(if false then "".*?else r\.source\)'
+        r'|\(if r\.source ==.*?else r\.source\)',
+        re.DOTALL,
+    )
+
+    def patch_query(q):
+        return dev_pattern.sub(new_dev, q)
+
+    for panel in dashboard.get("panels", []):
+        for t in panel.get("targets", []):
+            if "query" in t:
+                t["query"] = patch_query(t["query"])
+        # recurse into collapsed rows
+        for inner in panel.get("panels", []):
+            for t in inner.get("targets", []):
+                if "query" in t:
+                    t["query"] = patch_query(t["query"])
+
+    # Post updated dashboard back
+    try:
+        body = json.dumps({
+            "overwrite": True,
+            "folderId": folderId,
+            "dashboard": dashboard,
+        }).encode()
+        req = urllib.request.Request(
+            f"{GRAFANA_URL}/api/dashboards/db",
+            data=body,
+            headers=headers,
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=8):
+            pass
+        print(f"[✔] Grafana dashboard variable synced for {list(hostname_ip_map.keys())}")
+    except Exception as e:
+        print(f"[⚠] Could not sync Grafana dashboard: {e}")
