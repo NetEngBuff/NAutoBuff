@@ -2,6 +2,11 @@ import os
 import pathlib
 import subprocess
 import getpass
+import json
+import time
+import urllib.request
+import urllib.error
+import base64
 
 
 def find_base_path():
@@ -58,6 +63,132 @@ def deploy():
             print(f"✅ Enabled & started: {service}")
         except subprocess.CalledProcessError:
             print(f"❌ Failed to enable/start {service}")
+
+
+def setup_monitoring(base_path):
+    """
+    Initialize InfluxDB, generate gnmic-stream.yaml with a real token,
+    and configure the Grafana datasource automatically.
+    """
+    print("\n[INFO] Setting up monitoring stack (InfluxDB → gnmic → Grafana)...")
+
+    # ── 1. Wait for InfluxDB ──────────────────────────────────────────────────
+    for attempt in range(15):
+        ping = subprocess.run(["influx", "ping"], capture_output=True, text=True)
+        if ping.returncode == 0:
+            break
+        print(f"  Waiting for InfluxDB ({attempt + 1}/15)...")
+        time.sleep(2)
+    else:
+        print("❌ InfluxDB is not responding. Skipping monitoring setup.")
+        return
+
+    # ── 2. Initialize InfluxDB (idempotent — skipped if already set up) ───────
+    setup = subprocess.run(
+        ["influx", "setup",
+         "--username", "admin",
+         "--password", "NAutoHUB123!",
+         "--org", "NAutoHUB",
+         "--bucket", "NAutoHUB",
+         "--retention", "0",
+         "--force"],
+        capture_output=True, text=True,
+    )
+    if setup.returncode == 0:
+        print("✅ InfluxDB initialized  (admin / NAutoHUB123!)")
+    else:
+        print("ℹ️  InfluxDB already initialized, skipping setup")
+
+    # ── 3. Get or create a gnmic API token ────────────────────────────────────
+    token = None
+
+    list_result = subprocess.run(
+        ["influx", "auth", "list", "--org", "NAutoHUB", "--json"],
+        capture_output=True, text=True,
+    )
+    if list_result.returncode == 0:
+        try:
+            for auth in json.loads(list_result.stdout or "[]"):
+                if "gnmic" in auth.get("description", "").lower():
+                    token = auth.get("token")
+                    print("ℹ️  Reusing existing gnmic token")
+                    break
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    if not token:
+        create = subprocess.run(
+            ["influx", "auth", "create",
+             "--org", "NAutoHUB",
+             "--all-access",
+             "--description", "gnmic-nautohub",
+             "--json"],
+            capture_output=True, text=True,
+        )
+        if create.returncode == 0:
+            try:
+                data = json.loads(create.stdout)
+                token = (data[0] if isinstance(data, list) else data).get("token")
+            except (json.JSONDecodeError, IndexError, KeyError):
+                pass
+
+    if not token:
+        print("❌ Could not obtain InfluxDB token — set it manually in gnmic-stream.yaml")
+        return
+
+    # ── 4. Write gnmic-stream.yaml from the example template ─────────────────
+    example = base_path / "gnmic-stream.yaml.example"
+    output  = base_path / "gnmic-stream.yaml"
+    if example.exists():
+        output.write_text(example.read_text().replace("INFLUXDB_TOKEN_HERE", token))
+        print("✅ gnmic-stream.yaml generated with InfluxDB token")
+    else:
+        print("❌ gnmic-stream.yaml.example not found — cannot generate config")
+        return
+
+    # ── 5. Configure Grafana datasource via HTTP API ──────────────────────────
+    print("[INFO] Waiting for Grafana to be ready...")
+    time.sleep(6)
+
+    ds_payload = json.dumps({
+        "name": "NAutoHUB-InfluxDB",
+        "type": "influxdb",
+        "access": "proxy",
+        "url": "http://localhost:8086",
+        "jsonData": {
+            "version": "Flux",
+            "organization": "NAutoHUB",
+            "defaultBucket": "NAutoHUB",
+        },
+        "secureJsonData": {"token": token},
+    }).encode()
+
+    try:
+        req = urllib.request.Request(
+            "http://localhost:3000/api/datasources",
+            data=ds_payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Basic " + base64.b64encode(b"admin:admin").decode(),
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=8):
+            print("✅ Grafana datasource 'NAutoHUB-InfluxDB' created")
+    except urllib.error.HTTPError as e:
+        if e.code == 409:
+            print("ℹ️  Grafana datasource already exists")
+        else:
+            print(f"ℹ️  Grafana API returned {e.code} — configure datasource manually at http://localhost:3000")
+    except Exception as e:
+        print(f"ℹ️  Grafana not reachable: {e}")
+        print("   → After Grafana starts, add a Flux datasource pointing to http://localhost:8086")
+        print(f"   → Use org: NAutoHUB  bucket: NAutoHUB  token: {token[:20]}...")
+
+    print("\n✅ Monitoring setup complete.")
+    print("   InfluxDB : http://localhost:8086  (admin / NAutoHUB123!)")
+    print("   Grafana  : http://localhost:3000  (admin / admin)")
+    print("   → Build dashboards in Grafana using the 'NAutoHUB-InfluxDB' datasource")
 
 
 def main():
@@ -173,3 +304,5 @@ if __name__ == "__main__":
     subprocess.run(["sudo", "systemctl", "start", "jenkins"], check=True)
     print("✅ Jenkins enabled and started")
     main()
+    base = find_base_path()
+    setup_monitoring(base)

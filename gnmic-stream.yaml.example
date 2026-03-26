@@ -1,0 +1,50 @@
+# gnmic-stream.yaml.example
+# Copy to gnmic-stream.yaml and replace INFLUXDB_TOKEN_HERE with your InfluxDB token.
+# pilot.py does this automatically when you run ./pilot.sh
+
+username: admin
+password: admin
+insecure: true
+
+# Targets are populated automatically by gnmi_hosts.py when topology is deployed.
+targets: {}
+
+subscriptions:
+  interface-counters:
+    paths:
+    - /interfaces/interface/state/counters
+    sample-interval: 1s
+  interface-status:
+    paths:
+    - /interfaces/interface/state/oper-status
+    - /interfaces/interface/state/admin-status
+    sample-interval: 5s
+  interface-static:
+    paths:
+    - /interfaces/interface/state/mtu
+    - /interfaces/interface/ethernet/state/mac-address
+    sample-interval: 30s
+  device-info:
+    paths:
+    - /system/state/hostname
+    - /system/state/os-version
+    - /system/state/mac-address
+    - /system/state/uptime
+    sample-interval: 60s
+  device-health:
+    paths:
+    - /components/component/cpu
+    - /components/component/state/temperature
+    sample-interval: 10s
+
+outputs:
+  influxdb:
+    type: influxdb
+    address: http://localhost:8086
+    org: NAutoHUB
+    bucket: NAutoHUB
+    token: INFLUXDB_TOKEN_HERE
+    override-timestamps: true
+    timestamp-precision: ns
+    health-check-period: 10s
+    debug: false

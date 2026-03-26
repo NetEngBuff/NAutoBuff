@@ -38,6 +38,14 @@ echo "[5/12] Installing Grafana..."
 curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor --yes | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
 echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
 sudo apt-get update && sudo apt-get install -y grafana
+
+# Allow Grafana to be embedded in iframes (required for the NAutoHUB dashboard page)
+sudo sed -i 's/;allow_embedding = .*/allow_embedding = true/' /etc/grafana/grafana.ini || true
+# Enable anonymous viewer access so the iframe loads without requiring a Grafana login
+sudo sed -i '/^\[auth\.anonymous\]/,/^\[/ s/;enabled = false/enabled = true/' /etc/grafana/grafana.ini || true
+sudo sed -i '/^\[auth\.anonymous\]/,/^\[/ s/;org_name = .*/org_name = Main Org./' /etc/grafana/grafana.ini || true
+sudo sed -i '/^\[auth\.anonymous\]/,/^\[/ s/;org_role = .*/org_role = Viewer/' /etc/grafana/grafana.ini || true
+
 sudo systemctl enable --now grafana-server
 
 echo "[6/12] Installing Ngrok..."

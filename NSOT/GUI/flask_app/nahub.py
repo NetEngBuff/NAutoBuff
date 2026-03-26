@@ -1166,11 +1166,18 @@ def contact():
     return render_template("contact.html")
 
 
+GRAFANA_BASE_URL = os.environ.get("GRAFANA_BASE_URL", "http://localhost:3000")
+GRAFANA_DASHBOARD_URL = os.environ.get("GRAFANA_DASHBOARD_URL", "")
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    # Embed your Grafana dashboard in the dashboard template
-    return render_template("dashboard.html")
+    return render_template(
+        "dashboard.html",
+        grafana_base_url=GRAFANA_BASE_URL,
+        grafana_dashboard_url=GRAFANA_DASHBOARD_URL,
+    )
 
 
 def run_deployment_and_relay_config(
@@ -1301,6 +1308,21 @@ def oob_network_info():
     except Exception as e:
         print(f"[⚠] Could not read netcfg.yaml: {e}")
     return jsonify({"interface": None, "host_ip": None, "subnet": None})
+
+
+@app.route("/api/jenkins-status")
+@login_required
+def jenkins_status():
+    """Return the current ngrok public URL and derived Jenkins/webhook URLs."""
+    from git_jenkins import find_ngrok_log_file, get_latest_ngrok_url
+    log_path = find_ngrok_log_file()
+    ngrok_url = get_latest_ngrok_url(log_path) if log_path else None
+    job = os.environ.get("JENKINS_JOB_NAME", "NAutoHUB")
+    return jsonify({
+        "ngrok_url": ngrok_url,
+        "jenkins_url": f"{ngrok_url}/job/{job}" if ngrok_url else None,
+        "webhook_url": f"{ngrok_url}/github-webhook/" if ngrok_url else None,
+    })
 
 
 @app.route("/clab-health")
