@@ -1195,7 +1195,11 @@ def contact():
 
 
 GRAFANA_BASE_URL = os.environ.get("GRAFANA_BASE_URL", "http://localhost:3000")
-GRAFANA_DASHBOARD_URL = os.environ.get("GRAFANA_DASHBOARD_URL", "")
+# Use env var if explicitly set; otherwise use the known UID created by pilot.py
+GRAFANA_DASHBOARD_URL = os.environ.get(
+    "GRAFANA_DASHBOARD_URL",
+    f"{GRAFANA_BASE_URL}/d/nautohub-telemetry",
+)
 
 
 @app.route("/dashboard")

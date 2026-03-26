@@ -7,7 +7,6 @@
   <p class="page-description">Real-time network monitoring and metrics via Grafana</p>
 </div>
 
-{% if grafana_dashboard_url %}
 <div class="iframe-container">
   <iframe
     id="grafanaFrame"
@@ -18,7 +17,7 @@
 </div>
 
 <div style="margin-top:var(--space-3);text-align:right;">
-  <a href="{{ grafana_base_url }}" target="_blank" class="btn btn-secondary btn-sm">
+  <a href="{{ grafana_dashboard_url }}" target="_blank" class="btn btn-secondary btn-sm">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;">
       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
       <polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/>
@@ -26,69 +25,4 @@
     Open in Grafana
   </a>
 </div>
-
-{% else %}
-<!-- Setup guide — shown when no GRAFANA_DASHBOARD_URL env var is set -->
-<div class="card card-elevated" style="max-width:760px;margin:0 auto;">
-  <div class="card-header">
-    <h4>Dashboard Setup Required</h4>
-  </div>
-  <div class="card-body">
-    <p style="color:var(--color-text-muted);font-size:var(--font-size-sm);margin-bottom:var(--space-5);">
-      Grafana is running but no dashboard URL is configured yet. Follow the steps below to create your network dashboard.
-    </p>
-
-    <div style="display:flex;flex-direction:column;gap:var(--space-4);">
-
-      <div style="display:flex;gap:var(--space-3);align-items:flex-start;">
-        <span style="font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);background:var(--color-primary);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</span>
-        <div>
-          <p style="font-weight:var(--font-weight-semibold);margin-bottom:2px;">Open Grafana</p>
-          <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);margin-bottom:var(--space-2);">
-            Log in with <code>admin / admin</code>
-          </p>
-          <a href="{{ grafana_base_url }}" target="_blank" class="btn btn-primary btn-sm">
-            Open Grafana &rarr; <span style="opacity:0.8;font-weight:normal;">{{ grafana_base_url }}</span>
-          </a>
-        </div>
-      </div>
-
-      <div style="display:flex;gap:var(--space-3);align-items:flex-start;">
-        <span style="font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);background:var(--color-primary);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span>
-        <div>
-          <p style="font-weight:var(--font-weight-semibold);margin-bottom:2px;">Verify Datasource</p>
-          <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);">
-            Go to <strong>Connections → Data sources</strong>. You should see <strong>NAutoHUB-InfluxDB</strong> already configured (created by <code>pilot.py</code>). If missing, add an InfluxDB v2 datasource pointing to <code>http://localhost:8086</code>, org <code>NAutoHUB</code>, bucket <code>NAutoHUB</code>.
-          </p>
-        </div>
-      </div>
-
-      <div style="display:flex;gap:var(--space-3);align-items:flex-start;">
-        <span style="font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);background:var(--color-primary);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span>
-        <div>
-          <p style="font-weight:var(--font-weight-semibold);margin-bottom:2px;">Create a Dashboard</p>
-          <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);">
-            Go to <strong>Dashboards → New → New dashboard</strong>. Add panels using Flux queries against the <strong>NAutoHUB-InfluxDB</strong> datasource. Example query:
-          </p>
-          <pre style="font-size:11px;background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-sm);margin-top:var(--space-2);overflow-x:auto;">from(bucket: "NAutoHUB")
-  |> range(start: -1h)
-  |> filter(fn: (r) => r._measurement == "interface_counters")</pre>
-        </div>
-      </div>
-
-      <div style="display:flex;gap:var(--space-3);align-items:flex-start;">
-        <span style="font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);background:var(--color-primary);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">4</span>
-        <div>
-          <p style="font-weight:var(--font-weight-semibold);margin-bottom:2px;">Pin the Dashboard Here</p>
-          <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);">
-            Save the dashboard and copy its URL from your browser. Then stop NAutoHUB (<code>Ctrl+C</code>) and restart with the URL set:
-          </p>
-          <pre style="font-size:11px;background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-sm);margin-top:var(--space-2);">GRAFANA_DASHBOARD_URL="http://localhost:3000/d/your-id/name" ./pilot-config/run_nahub.sh</pre>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</div>
-{% endif %}
 {% endblock %}
