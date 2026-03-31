@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Tools - NAutoHUB{% endblock %}
 
+{% block head %}
+<!-- xterm.js -->
+<link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<!-- Socket.IO client (must match Flask-SocketIO 5.x / protocol v5) -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+{% endblock head %}
+
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Network Tools</h1>
@@ -95,6 +104,30 @@
         </button>
       </div>
       <div id="show-result" class="output-container mt-4" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Console Access -->
+  <div class="tool-card">
+    <div class="tool-card-header">
+      <h3 class="tool-card-title">Console Access</h3>
+      <p class="tool-card-description">Interactive SSH terminal for each device</p>
+    </div>
+    <div class="tool-card-body">
+      <div class="form">
+        <div class="form-group">
+          <label class="form-label">Select Device</label>
+          <select id="console-device" class="form-select">
+            <option value="" disabled selected>Select Device</option>
+            {% for device in devices %}
+            <option value="{{ device }}">{{ device }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="openConsole()">
+          Open Terminal
+        </button>
+      </div>
     </div>
   </div>
 
@@ -287,5 +320,177 @@ if (!document.getElementById('tools-spin-style')) {
   s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
   document.head.appendChild(s);
 }
+</script>
+
+<!-- ── Console Overlay ──────────────────────────────────────────────────── -->
+<div id="console-overlay" style="
+  display:none; position:fixed; inset:0; z-index:9000;
+  background:rgba(0,0,0,0.85); flex-direction:column;
+  align-items:center; justify-content:center;">
+
+  <div style="
+    width:92vw; max-width:1200px; height:80vh;
+    background:#0d1117; border:1px solid #30363d; border-radius:10px;
+    display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+
+    <!-- header bar -->
+    <div style="
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 16px; background:#161b22; border-bottom:1px solid #30363d;
+      flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:18px;">&#128196;</span>
+        <span id="console-title" style="color:#e6edf3; font-weight:600; font-size:14px;">
+          Console
+        </span>
+        <span id="console-status-dot" style="
+          width:8px; height:8px; border-radius:50%;
+          background:#484f58; display:inline-block; margin-left:4px;"></span>
+        <span id="console-status-text" style="color:#8b949e; font-size:12px;">Connecting…</span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button onclick="clearConsole()" title="Clear" style="
+          background:none; border:1px solid #30363d; color:#8b949e;
+          border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px;">
+          Clear
+        </button>
+        <button onclick="closeConsole()" title="Close" style="
+          background:none; border:1px solid #30363d; color:#8b949e;
+          border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px;">
+          &#10005; Close
+        </button>
+      </div>
+    </div>
+
+    <!-- terminal container -->
+    <div id="console-terminal" style="flex:1; overflow:hidden; padding:8px;"></div>
+  </div>
+</div>
+
+<style>
+#console-overlay .xterm { height: 100%; }
+#console-overlay .xterm-viewport { overflow-y: hidden !important; }
+</style>
+
+<script>
+(function () {
+  let _socket = null, _term = null, _fitAddon = null, _connected = false;
+
+  function _setStatus(dot, text) {
+    document.getElementById('console-status-dot').style.background = dot;
+    document.getElementById('console-status-text').textContent = text;
+  }
+
+  window.openConsole = function () {
+    const device = document.getElementById('console-device').value;
+    if (!device) { alert('Select a device first.'); return; }
+
+    const overlay = document.getElementById('console-overlay');
+    overlay.style.display = 'flex';
+    document.getElementById('console-title').textContent = device + ' — SSH Console';
+    _setStatus('#484f58', 'Connecting…');
+
+    // Build terminal if not yet created
+    if (!_term) {
+      _term = new Terminal({
+        theme: {
+          background: '#0d1117', foreground: '#e6edf3',
+          cursor: '#58a6ff', selectionBackground: '#264f78',
+          black: '#484f58', brightBlack: '#6e7681',
+        },
+        fontFamily: '"Cascadia Code", "Fira Code", Menlo, monospace',
+        fontSize: 13,
+        lineHeight: 1.2,
+        cursorBlink: true,
+        allowTransparency: true,
+        scrollback: 5000,
+      });
+      _fitAddon = new FitAddon.FitAddon();
+      _term.loadAddon(_fitAddon);
+      _term.open(document.getElementById('console-terminal'));
+      _fitAddon.fit();
+
+      _term.onData(d => {
+        if (_socket && _connected) _socket.emit('ssh_input', { data: d });
+      });
+    } else {
+      _term.clear();
+      _fitAddon.fit();
+    }
+
+    // Connect Socket.IO
+    if (_socket) { _socket.disconnect(); _socket = null; }
+    _connected = false;
+    _socket = io({ transports: ['websocket'] });
+
+    _socket.on('connect', () => {
+      _socket.emit('start_ssh', {
+        device,
+        cols: _term.cols,
+        rows: _term.rows,
+      });
+    });
+
+    _socket.on('ssh_ready', d => {
+      _connected = true;
+      _setStatus('#3fb950', 'Connected');
+    });
+
+    _socket.on('ssh_output', d => {
+      if (_term) _term.write(d.data);
+    });
+
+    _socket.on('ssh_error', d => {
+      _setStatus('#f85149', 'Error');
+      if (_term) _term.writeln('\r\n\x1b[31m✖ ' + d.message + '\x1b[0m');
+    });
+
+    _socket.on('ssh_closed', () => {
+      _connected = false;
+      _setStatus('#d29922', 'Disconnected');
+      if (_term) _term.writeln('\r\n\x1b[33m[Session closed]\x1b[0m');
+    });
+
+    _socket.on('disconnect', () => {
+      _connected = false;
+      _setStatus('#484f58', 'Disconnected');
+    });
+  };
+
+  window.closeConsole = function () {
+    if (_socket) { _socket.disconnect(); _socket = null; }
+    _connected = false;
+    document.getElementById('console-overlay').style.display = 'none';
+    _setStatus('#484f58', 'Connecting…');
+  };
+
+  window.clearConsole = function () {
+    if (_term) _term.clear();
+  };
+
+  // Resize terminal when window resizes
+  window.addEventListener('resize', () => {
+    if (_term && _fitAddon && document.getElementById('console-overlay').style.display !== 'none') {
+      _fitAddon.fit();
+      if (_socket && _connected) {
+        _socket.emit('ssh_resize', { cols: _term.cols, rows: _term.rows });
+      }
+    }
+  });
+
+  // Close on backdrop click
+  document.getElementById('console-overlay').addEventListener('click', function (e) {
+    if (e.target === this) closeConsole();
+  });
+
+  // Esc to close
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' &&
+        document.getElementById('console-overlay').style.display !== 'none') {
+      closeConsole();
+    }
+  });
+})();
 </script>
 {% endblock %}

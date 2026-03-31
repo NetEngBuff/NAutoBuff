@@ -13,3 +13,5 @@ jinja2
 tensorflow[and-cuda]
 netifaces
 flask-login
+flask-socketio
+simple-websocket

@@ -28,6 +28,8 @@ from flask_login import (
     login_required,
     current_user,
 )
+from flask_socketio import SocketIO, emit, disconnect as sio_disconnect
+import paramiko
 from functools import wraps
 from jinja2 import Environment, FileSystemLoader
 import subprocess
@@ -270,6 +272,10 @@ hosts_reader = HostsReader(BASE_DIR)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("NAHUB_SECRET_KEY", "nahub-dev-secret-change-in-prod")
+socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
+
+# ── SSH console session registry (keyed by Socket.IO sid) ─────────────────────
+_ssh_sessions: dict = {}
 
 # ── Flask-Login setup ──────────────────────────────────────────────────────────
 login_manager = LoginManager(app)
@@ -1612,8 +1618,117 @@ def clab_health():
         return jsonify({"status": "down", "message": f"Error: {str(e)}"})
 
 
+# ── SSH Console — Socket.IO handlers ─────────────────────────────────────────
+
+def _read_ssh_output(channel, sid):
+    """Background thread: forward SSH channel output to the browser."""
+    try:
+        while True:
+            if channel.closed:
+                break
+            if channel.recv_ready():
+                data = channel.recv(4096).decode("utf-8", errors="replace")
+                socketio.emit("ssh_output", {"data": data}, to=sid)
+            else:
+                time.sleep(0.02)
+    except Exception:
+        pass
+    finally:
+        socketio.emit("ssh_closed", {}, to=sid)
+        _ssh_sessions.pop(sid, None)
+
+
+@socketio.on("start_ssh")
+def handle_start_ssh(data):
+    sid = request.sid
+    device_id = (data.get("device") or "").strip()
+    if not device_id:
+        emit("ssh_error", {"message": "No device specified."})
+        return
+
+    # Look up credentials
+    hosts_csv = os.path.join(IPAM_DIR, "hosts.csv")
+    management_ip = username = password = None
+    try:
+        with open(hosts_csv, newline="", encoding="utf-8-sig") as f:
+            for row in csv.DictReader(f):
+                if row["hostname"].strip() == device_id:
+                    management_ip = row["management_ip"].strip()
+                    username = row["username"].strip()
+                    password = row["password"].strip()
+                    break
+    except Exception as e:
+        emit("ssh_error", {"message": f"Could not read hosts.csv: {e}"})
+        return
+
+    if not management_ip:
+        emit("ssh_error", {"message": f"Device '{device_id}' not found in inventory."})
+        return
+
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(
+            hostname=management_ip,
+            username=username,
+            password=password,
+            allow_agent=False,
+            look_for_keys=False,
+            timeout=10,
+        )
+        cols = int(data.get("cols", 220))
+        rows = int(data.get("rows", 50))
+        channel = ssh.invoke_shell(term="xterm-256color", width=cols, height=rows)
+        channel.setblocking(False)
+        _ssh_sessions[sid] = {"ssh": ssh, "channel": channel}
+        t = Thread(target=_read_ssh_output, args=(channel, sid), daemon=True)
+        t.start()
+        emit("ssh_ready", {"device": device_id})
+    except Exception as e:
+        emit("ssh_error", {"message": str(e)})
+
+
+@socketio.on("ssh_input")
+def handle_ssh_input(data):
+    sid = request.sid
+    session = _ssh_sessions.get(sid)
+    if session:
+        try:
+            session["channel"].send(data.get("data", ""))
+        except Exception:
+            pass
+
+
+@socketio.on("ssh_resize")
+def handle_ssh_resize(data):
+    sid = request.sid
+    session = _ssh_sessions.get(sid)
+    if session:
+        try:
+            session["channel"].resize_pty(
+                width=int(data.get("cols", 220)),
+                height=int(data.get("rows", 50)),
+            )
+        except Exception:
+            pass
+
+
+@socketio.on("disconnect")
+def handle_sio_disconnect():
+    sid = request.sid
+    session = _ssh_sessions.pop(sid, None)
+    if session:
+        try:
+            session["channel"].close()
+            session["ssh"].close()
+        except Exception:
+            pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     thread = Thread(target=ipam_reader.read_ipam_file, daemon=True)
     thread.start()
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
-    app.run(host="0.0.0.0", port=5555, debug=debug, threaded=True)
+    socketio.run(app, host="0.0.0.0", port=5555, debug=debug)
