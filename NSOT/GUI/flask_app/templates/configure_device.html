@@ -335,6 +335,30 @@
 </div>
 
 <style>
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: cfg-spin 1s linear infinite;
+}
+@keyframes cfg-spin { to { transform: rotate(360deg); } }
+.loading-text {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: opacity 0.5s ease-in-out;
+}
+</style>
+
+<style>
 /* Protocol Bubbles Grid */
 .protocol-grid {
   display: grid;
@@ -1612,6 +1636,56 @@ async function pushConfig() {
       </div>
     `;
   }
+}
+
+// ── Loading overlay ────────────────────────────────────────
+const loadingTerms = [
+  "Routing BGP packets to Valhalla...",
+  "Spinning up Layer 3 magic...",
+  "Injecting routes into the Matrix...",
+  "Summoning OSPF daemons...",
+  "Crafting VLAN potions...",
+  "Talking to network oracles...",
+  "Negotiating with DHCP spirits...",
+  "Sniffing packets from the astral plane...",
+  "Tunneling through hyperspace...",
+  "Enabling port-channel wizardry...",
+  "Building bridges with STP spells...",
+  "Conjuring MAC addresses...",
+  "Programming the P4 gods...",
+  "Pinging the void...",
+  "Weaving MPLS labels into destiny...",
+  "Peering with interdimensional routers...",
+  "Binding interfaces with eldritch configs...",
+  "Casting 'show run' scrolls...",
+  "Parsing YANGs of destiny...",
+  "Teleporting configs into flash...",
+];
+loadingTerms.sort(() => Math.random() - 0.5);
+let loadingIndex = 0;
+let loadingInterval = null;
+
+function rotateLoadingTerms() {
+  const el = document.getElementById("loading-text");
+  if (!el) return;
+  el.style.opacity = 0;
+  setTimeout(() => {
+    el.innerText = loadingTerms[loadingIndex];
+    el.style.opacity = 1;
+    loadingIndex = (loadingIndex + 1) % loadingTerms.length;
+  }, 500);
+  if (!loadingInterval) {
+    loadingInterval = setInterval(rotateLoadingTerms, 7000);
+  }
+}
+
+function showLoading() {
+  const overlay = document.getElementById("loading-overlay");
+  overlay.style.display = "flex";
+  overlay.offsetHeight; // trigger reflow for CSS transition
+  overlay.classList.add("visible");
+  rotateLoadingTerms();
+  return true;
 }
 </script>
 {% endblock %}

@@ -98,18 +98,6 @@ def generate_device_configs():
             if clear_config == "yes":
                 config += f"no router bgp {bgp_data['as_number']}\n"
             else:
-                networks = [
-                    {"ip": net["ip"], "mask": net.get("mask")}
-                    for family in bgp_data.get("address_families", [])
-                    for net in family.get("networks", [])
-                    if net.get("ip") and net.get("mask")
-                ]
-                neighbors = [
-                    neighbor
-                    for family in bgp_data.get("address_families", [])
-                    for neighbor in family.get("neighbors", [])
-                    if neighbor.get("ip") and neighbor.get("remote_as")
-                ]
                 template_key = "bgp_cisco" if vendor == "cisco" else "bgp"
                 config += templates[template_key].render(bgp=bgp_data)
 

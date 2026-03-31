@@ -61,7 +61,7 @@ def update_gnmic_yaml_from_hosts():
         return
 
     if not os.path.exists(hosts_csv):
-        print(f"[⚠] hosts.csv not found — skipping gNMI update")
+        print("[⚠] hosts.csv not found — skipping gNMI update")
         return
 
     # Prefer containerlab management IPs (Management0) over hosts.csv in-band IPs

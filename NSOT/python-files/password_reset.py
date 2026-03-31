@@ -8,7 +8,7 @@ from jinja2 import Environment, FileSystemLoader
 from netmiko import ConnectHandler
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gnmi_hosts import update_gnmic_yaml_from_hosts
+from gnmi_hosts import update_gnmic_yaml_from_hosts  # noqa: E402
 
 # File paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
