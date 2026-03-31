@@ -556,104 +556,231 @@ WantedBy=multi-user.target
     deploy()
 
 
+def _jenkins_get_creds():
+    """
+    Return (jenkins_url, user, credential) ready to use for API calls.
+    Prefers the token already saved in run_nahub.sh; falls back to the
+    initial admin password so callers work even before token generation.
+    """
+    import re as _re
+    jenkins_url = "http://localhost:8080"
+    user = "admin"
+    run_nahub = os.path.join(os.path.dirname(__file__), "run_nahub.sh")
+
+    # Try saved token first
+    if os.path.exists(run_nahub):
+        with open(run_nahub) as f:
+            content = f.read()
+        m = _re.search(r'JENKINS_TOKEN:-([^"}]+)', content)
+        if m and m.group(1).strip():
+            return jenkins_url, user, m.group(1).strip()
+
+    # Fall back to initial admin password
+    try:
+        r = subprocess.run(["sudo", "cat", "/var/lib/jenkins/secrets/initialAdminPassword"],
+                           capture_output=True, text=True, check=True)
+        return jenkins_url, user, r.stdout.strip()
+    except Exception:
+        return jenkins_url, user, ""
+
+
+def _jenkins_wait_ready(jenkins_url, auth_b64, timeout=90):
+    """Poll Jenkins /api/json until it responds or timeout expires. Returns True if ready."""
+    headers = {"Authorization": f"Basic {auth_b64}"}
+    for _ in range(timeout // 5):
+        try:
+            req = urllib.request.Request(f"{jenkins_url}/api/json", headers=headers)
+            urllib.request.urlopen(req, timeout=5)
+            return True
+        except Exception:
+            time.sleep(5)
+    return False
+
+
+def _jenkins_crumb(jenkins_url, headers):
+    """Return a dict with the crumb header added, or the original headers if crumbs are disabled."""
+    try:
+        req = urllib.request.Request(f"{jenkins_url}/crumbIssuer/api/json", headers=dict(headers))
+        with urllib.request.urlopen(req, timeout=10) as r:
+            d = json.loads(r.read())
+        return {**headers, d["crumbRequestField"]: d["crumb"]}
+    except urllib.error.HTTPError as e:
+        if e.code == 404:  # crumb issuer disabled
+            return headers
+        raise
+
+
 def provision_jenkins_token():
     """
     Wait for Jenkins to be ready, generate an API token using the initial admin
     password, and write it into run_nahub.sh automatically.
-    Skips gracefully if Jenkins is unreachable or already has a token set.
+    Returns the token string, or empty string on failure.
     """
-    jenkins_url = "http://localhost:8080"
+    import re as _re
+    jenkins_url, user, cred = _jenkins_get_creds()
     run_nahub = os.path.join(os.path.dirname(__file__), "run_nahub.sh")
-    token_marker = "JENKINS_TOKEN:-"
 
-    # Skip if a non-empty token is already baked into run_nahub.sh
-    if os.path.exists(run_nahub):
-        with open(run_nahub) as f:
-            content = f.read()
-        import re as _re
-        m = _re.search(r'JENKINS_TOKEN:-([^"}]+)', content)
-        if m and m.group(1).strip():
-            print(f"✅ Jenkins token already present in run_nahub.sh — skipping generation")
-            return
-
-    # Read the initial admin password
-    init_pass_path = "/var/lib/jenkins/secrets/initialAdminPassword"
+    # If we already have a token (not the initial password), skip generation
+    init_pass = ""
     try:
-        result = subprocess.run(
-            ["sudo", "cat", init_pass_path],
-            capture_output=True, text=True, check=True,
-        )
-        password = result.stdout.strip()
+        r = subprocess.run(["sudo", "cat", "/var/lib/jenkins/secrets/initialAdminPassword"],
+                           capture_output=True, text=True, check=True)
+        init_pass = r.stdout.strip()
     except Exception:
+        pass
+
+    if cred and cred != init_pass:
+        print("✅ Jenkins token already present in run_nahub.sh — skipping generation")
+        return cred
+
+    if not cred:
         print("⚠️  Could not read Jenkins initial password — skipping token generation")
-        return
+        return ""
 
-    # Wait up to 90 s for Jenkins to respond
+    auth_b64 = base64.b64encode(f"{user}:{cred}".encode()).decode()
     print("⏳ Waiting for Jenkins to be ready…")
-    auth_b64 = base64.b64encode(f"admin:{password}".encode()).decode()
-    headers = {"Authorization": f"Basic {auth_b64}", "Content-Type": "application/x-www-form-urlencoded"}
-    for _ in range(18):
-        try:
-            req = urllib.request.Request(f"{jenkins_url}/api/json", headers=headers)
-            urllib.request.urlopen(req, timeout=5)
-            break
-        except Exception:
-            time.sleep(5)
-    else:
+    if not _jenkins_wait_ready(jenkins_url, auth_b64):
         print("⚠️  Jenkins did not become ready in time — skipping token generation")
-        return
+        return ""
 
-    # Fetch CSRF crumb
+    headers = {"Authorization": f"Basic {auth_b64}", "Content-Type": "application/x-www-form-urlencoded"}
     try:
-        req = urllib.request.Request(f"{jenkins_url}/crumbIssuer/api/json", headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as r:
-            crumb_data = json.loads(r.read())
-        crumb_header = crumb_data["crumbRequestField"]
-        crumb_value = crumb_data["crumb"]
-        headers[crumb_header] = crumb_value
+        headers = _jenkins_crumb(jenkins_url, headers)
     except Exception as e:
-        print(f"⚠️  Could not fetch Jenkins crumb: {e} — skipping token generation")
-        return
+        print(f"⚠️  Could not fetch Jenkins crumb: {e}")
+        return ""
 
-    # Generate API token
     try:
         body = "newTokenName=NAutoHUB".encode()
         req = urllib.request.Request(
-            f"{jenkins_url}/user/admin/descriptorByName/jenkins.security.ApiTokenProperty/generateNewToken",
+            f"{jenkins_url}/user/{user}/descriptorByName/jenkins.security.ApiTokenProperty/generateNewToken",
             data=body, headers=headers, method="POST",
         )
         with urllib.request.urlopen(req, timeout=10) as r:
-            resp = json.loads(r.read())
-        token = resp["data"]["tokenValue"]
+            token = json.loads(r.read())["data"]["tokenValue"]
     except Exception as e:
         print(f"⚠️  Could not generate Jenkins API token: {e}")
-        return
+        return ""
 
-    # Write token into run_nahub.sh
     if not os.path.exists(run_nahub):
         print(f"⚠️  {run_nahub} not found — cannot write token")
-        return
+        return token
 
     with open(run_nahub) as f:
         content = f.read()
-
-    import re as _re
-    new_content = _re.sub(
-        r'(export JENKINS_TOKEN="\$\{JENKINS_TOKEN:-)[^"}]*("\}")',
-        rf'\g<1>{token}\2',
-        content,
-    )
-    # Handle the simpler no-default form too
     new_content = _re.sub(
         r'(export JENKINS_TOKEN="\$\{JENKINS_TOKEN:-)[^"]*(")',
         rf'\g<1>{token}\2',
-        new_content,
+        content,
     )
-
     with open(run_nahub, "w") as f:
         f.write(new_content)
 
-    print(f"✅ Jenkins API token generated and saved to run_nahub.sh")
+    print("✅ Jenkins API token generated and saved to run_nahub.sh")
+    return token
+
+
+def provision_jenkins_job():
+    """
+    Create the NAutoHUB Pipeline job in Jenkins if it doesn't already exist.
+    Detects the git remote URL automatically from the local repo.
+    """
+    jenkins_url, user, cred = _jenkins_get_creds()
+    if not cred:
+        print("⚠️  No Jenkins credentials available — skipping job creation")
+        return
+
+    auth_b64 = base64.b64encode(f"{user}:{cred}".encode()).decode()
+    headers = {"Authorization": f"Basic {auth_b64}"}
+    job_name = "NAutoHUB"
+
+    # Check if job already exists
+    try:
+        req = urllib.request.Request(f"{jenkins_url}/job/{job_name}/api/json", headers=headers)
+        urllib.request.urlopen(req, timeout=10)
+        print(f"✅ Jenkins job '{job_name}' already exists — skipping creation")
+        return
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            print(f"⚠️  Unexpected Jenkins response checking job: {e.code} — skipping")
+            return
+    except Exception as e:
+        print(f"⚠️  Could not reach Jenkins to check job: {e} — skipping")
+        return
+
+    # Detect git remote URL, convert SSH → HTTPS if needed
+    base = find_base_path()
+    try:
+        r = subprocess.run(["git", "remote", "get-url", "origin"],
+                           capture_output=True, text=True, check=True, cwd=str(base))
+        remote = r.stdout.strip()
+        # git@github.com:User/Repo.git → https://github.com/User/Repo.git
+        if remote.startswith("git@"):
+            remote = remote.replace(":", "/", 1).replace("git@", "https://", 1)
+        if not remote.endswith(".git"):
+            remote += ".git"
+    except Exception:
+        remote = "https://github.com/NetEngBuff/NAutoHUB.git"
+        print(f"⚠️  Could not detect git remote — using default: {remote}")
+
+    job_xml = f"""<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job">
+  <description>NAutoHUB CI/CD Pipeline — auto-created by pilot.py</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github">
+      <projectUrl>{remote.replace('.git', '/')}</projectUrl>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition" plugin="workflow-cps">
+    <scm class="hudson.plugins.git.GitSCM" plugin="git">
+      <configVersion>2</configVersion>
+      <userRemoteConfigs>
+        <hudson.plugins.git.UserRemoteConfig>
+          <url>{remote}</url>
+        </hudson.plugins.git.UserRemoteConfig>
+      </userRemoteConfigs>
+      <branches>
+        <hudson.plugins.git.BranchSpec>
+          <name>*/main</name>
+        </hudson.plugins.git.BranchSpec>
+      </branches>
+      <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+      <submoduleCfg class="empty-list"/>
+      <extensions/>
+    </scm>
+    <scriptPath>Jenkinsfile</scriptPath>
+    <lightweight>true</lightweight>
+  </definition>
+  <triggers>
+    <com.cloudbees.jenkins.GitHubPushTrigger plugin="github">
+      <spec></spec>
+    </com.cloudbees.jenkins.GitHubPushTrigger>
+  </triggers>
+  <disabled>false</disabled>
+</flow-definition>"""
+
+    headers_xml = {**headers, "Content-Type": "application/xml"}
+    try:
+        headers_xml = _jenkins_crumb(jenkins_url, headers_xml)
+    except Exception as e:
+        print(f"⚠️  Could not fetch Jenkins crumb for job creation: {e}")
+        return
+
+    try:
+        body = job_xml.encode("utf-8")
+        req = urllib.request.Request(
+            f"{jenkins_url}/createItem?name={job_name}",
+            data=body, headers=headers_xml, method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            _ = r.read()
+        print(f"✅ Jenkins job '{job_name}' created successfully (repo: {remote})")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")[:300]
+        print(f"⚠️  Failed to create Jenkins job: HTTP {e.code} — {body}")
+    except Exception as e:
+        print(f"⚠️  Failed to create Jenkins job: {e}")
 
 
 if __name__ == "__main__":
@@ -661,6 +788,7 @@ if __name__ == "__main__":
     subprocess.run(["sudo", "systemctl", "start", "jenkins"], check=True)
     print("✅ Jenkins enabled and started")
     provision_jenkins_token()
+    provision_jenkins_job()
     main()
     base = find_base_path()
     setup_monitoring(base)
