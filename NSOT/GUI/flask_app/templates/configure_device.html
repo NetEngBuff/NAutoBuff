@@ -1610,16 +1610,36 @@ function rotateTerms() {
 
 terms.sort(() => Math.random() - 0.5);
 
+function _hideLoading() {
+  const overlay = document.getElementById("loading-overlay");
+  overlay.classList.remove("visible");
+  overlay.style.display = "none";
+  clearInterval(rotateInterval);
+  rotateInterval = null;
+}
+
 async function pushConfig() {
   const deviceId = document.querySelector("select[name='device_id']").value;
   showLoading();
-  const response = await fetch("/push-config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ device_id: deviceId }),
-  });
 
-  const result = await response.json();
+  let result;
+  try {
+    const response = await fetch("/push-config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ device_id: deviceId }),
+    });
+    result = await response.json();
+  } catch (e) {
+    _hideLoading();
+    document.getElementById("push-message").innerHTML = `
+      <div class="alert alert-error">
+        <span class="alert-icon">&#10007;</span>
+        <div class="alert-content">Request failed: ${e.message}</div>
+      </div>`;
+    return;
+  }
+
   const messageContainer = document.getElementById("push-message");
   const pushWrapper = document.getElementById("push-button-wrapper");
 

@@ -60,7 +60,66 @@ echo "[8/12] Installing Jenkins..."
 sudo wget -O /etc/apt/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
 echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
 sudo apt-get update && sudo apt-get install -y jenkins
+
+# ── Automate Jenkins first-time configuration (no wizard, no manual steps) ──
+
+# Stop so we can configure before Jenkins writes anything
+sudo systemctl stop jenkins || true
+
+# 1. Skip the setup wizard by writing the installed version into both state files
+JENKINS_VER=$(dpkg -l jenkins 2>/dev/null | awk '/^ii/{print $3}' | head -1)
+for f in /var/lib/jenkins/jenkins.install.UpgradeWizard.state \
+          /var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion; do
+    sudo bash -c "echo '${JENKINS_VER}' > ${f}"
+    sudo chown jenkins:jenkins "${f}"
+done
+
+# 2. Groovy init script — creates admin/admin and marks setup complete
+sudo mkdir -p /var/lib/jenkins/init.groovy.d
+sudo tee /var/lib/jenkins/init.groovy.d/01-security.groovy > /dev/null <<'GROOVY'
+import jenkins.model.*
+import hudson.security.*
+import jenkins.install.InstallState
+
+def instance = Jenkins.get()
+if (instance.getSecurityRealm() instanceof HudsonPrivateSecurityRealm &&
+    instance.getSecurityRealm().getAllUsers().find { it.id == "admin" }) {
+    println("ℹ️  Jenkins admin already configured — skipping")
+    return
+}
+def realm = new HudsonPrivateSecurityRealm(false)
+realm.createAccount("admin", "admin")
+instance.setSecurityRealm(realm)
+def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+strategy.setAllowAnonymousRead(false)
+instance.setAuthorizationStrategy(strategy)
+instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
+instance.save()
+println("✅ Jenkins admin user and security configured")
+GROOVY
+sudo chown -R jenkins:jenkins /var/lib/jenkins/init.groovy.d/
+
+# 3. Install required plugins BEFORE first start using the Plugin Installation Manager
+echo "  Installing Jenkins plugins (git, pipeline, github)..."
+PLUGIN_JAR="/tmp/jenkins-plugin-manager.jar"
+if [ ! -f "${PLUGIN_JAR}" ]; then
+    curl -fsSL -o "${PLUGIN_JAR}" \
+      "https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.12.15/jenkins-plugin-manager-2.12.15.jar" \
+      || echo "  ⚠️  Could not download plugin manager — will install via REST API on first run"
+fi
+if [ -f "${PLUGIN_JAR}" ]; then
+    sudo java -jar "${PLUGIN_JAR}" \
+        --war /usr/share/jenkins/jenkins.war \
+        --plugin-download-directory /var/lib/jenkins/plugins \
+        --plugins "git:latest workflow-aggregator:latest github:latest pipeline-stage-view:latest" \
+        2>&1 | tail -5 \
+      && echo "  ✅ Plugins installed" \
+      || echo "  ⚠️  Plugin install had warnings — pilot.py will retry via API"
+    sudo chown -R jenkins:jenkins /var/lib/jenkins/plugins/ || true
+fi
+
 sudo systemctl enable --now jenkins
+echo "✅ Jenkins ready (credentials: admin / admin)"
 
 echo "[9/12] Setting up Python 3.12 via pyenv..."
 export PYENV_ROOT="$HOME/.pyenv"
@@ -96,4 +155,43 @@ sudo usermod -aG docker jenkins || true
 sudo setcap cap_net_admin,cap_net_raw,cap_sys_admin+ep $(which containerlab)
 sudo chmod o+rx $HOME
 
+# ── Ngrok configuration ──────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+NGROK_CONFIG="${SCRIPT_DIR}/../NSOT/misc/ngrok_config.yml"
+mkdir -p "$(dirname "${NGROK_CONFIG}")"
+
+if [ -f "${NGROK_CONFIG}" ]; then
+    echo "✅ Ngrok config already exists — skipping"
+else
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Ngrok tunnels your local Jenkins to GitHub for CI/CD"
+    echo "  Get your free auth token: https://dashboard.ngrok.com"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    read -rp "  Enter your Ngrok auth token (Enter to skip): " NGROK_TOKEN
+    if [ -n "${NGROK_TOKEN}" ]; then
+        cat > "${NGROK_CONFIG}" <<EOF
+---
+version: "2"
+authtoken: ${NGROK_TOKEN}
+region: us
+tunnels:
+  jenkins:
+    addr: 8080
+    proto: http
+EOF
+        echo "✅ Ngrok config written to ${NGROK_CONFIG}"
+    else
+        echo "⚠️  Skipped — create ${NGROK_CONFIG} manually before running pilot.py"
+        echo "   Format: authtoken: <your_token>  tunnels.jenkins.addr: 8080"
+    fi
+fi
+
+echo ""
 echo "✅ Setup Complete. Please log out and back in for group changes."
+echo ""
+echo "  Next step:  cd pilot-config && python pilot.py"
+echo ""
+echo "  One manual step remains after pilot.py:"
+echo "  → Add GitHub webhook: repo Settings → Webhooks → <ngrok_url>/github-webhook/"
+echo "  → The current ngrok URL is shown in the NAutoHUB burger menu → External Links → Jenkins"

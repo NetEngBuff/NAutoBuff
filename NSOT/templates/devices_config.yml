@@ -1,8 +1,8 @@
 ---
 devices:
-- hostname: R2
+- hostname: R3
   vendor: arista
   clear_config: 'no'
   vlans:
-  - id: '10'
+  - id: '20'
     name: test

@@ -680,6 +680,64 @@ def provision_jenkins_token():
     return token
 
 
+def provision_jenkins_plugins():
+    """
+    Ensure the required Jenkins plugins are installed.
+    Skips gracefully if already installed or Jenkins is unreachable.
+    """
+    required = ["git", "workflow-aggregator", "github", "pipeline-stage-view"]
+    jenkins_url, user, cred = _jenkins_get_creds()
+    if not cred:
+        return
+
+    auth_b64 = base64.b64encode(f"{user}:{cred}".encode()).decode()
+    headers = {"Authorization": f"Basic {auth_b64}"}
+
+    # Check which plugins are already active
+    try:
+        req = urllib.request.Request(
+            f"{jenkins_url}/pluginManager/api/json?depth=1&tree=plugins[shortName,active]",
+            headers=headers,
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+        installed = {p["shortName"] for p in data.get("plugins", []) if p.get("active")}
+    except Exception as e:
+        print(f"⚠️  Could not query Jenkins plugins: {e} — skipping plugin check")
+        return
+
+    missing = [p for p in required if p not in installed]
+    if not missing:
+        print(f"✅ All required Jenkins plugins already installed")
+        return
+
+    print(f"⏳ Installing Jenkins plugins: {missing}")
+    headers_xml = {**headers, "Content-Type": "text/xml"}
+    try:
+        headers_xml = _jenkins_crumb(jenkins_url, headers_xml)
+    except Exception as e:
+        print(f"⚠️  Could not fetch crumb for plugin install: {e}")
+        return
+
+    xml = "<jenkins>" + "".join(
+        f'<install plugin="{p}@latest"/>' for p in missing
+    ) + "</jenkins>"
+
+    try:
+        req = urllib.request.Request(
+            f"{jenkins_url}/pluginManager/installNecessaryPlugins",
+            data=xml.encode(), headers=headers_xml, method="POST",
+        )
+        urllib.request.urlopen(req, timeout=20)
+        print(f"✅ Plugin install queued — Jenkins will restart automatically")
+        # Wait for Jenkins to restart
+        time.sleep(15)
+        _jenkins_wait_ready(jenkins_url, auth_b64, timeout=90)
+        print(f"✅ Jenkins back up after plugin install")
+    except Exception as e:
+        print(f"⚠️  Plugin install request failed: {e}")
+
+
 def provision_jenkins_job():
     """
     Create the NAutoHUB Pipeline job in Jenkins if it doesn't already exist.
@@ -788,6 +846,7 @@ if __name__ == "__main__":
     subprocess.run(["sudo", "systemctl", "start", "jenkins"], check=True)
     print("✅ Jenkins enabled and started")
     provision_jenkins_token()
+    provision_jenkins_plugins()
     provision_jenkins_job()
     main()
     base = find_base_path()
