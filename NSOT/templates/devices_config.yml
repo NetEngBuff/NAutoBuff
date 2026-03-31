@@ -3,22 +3,6 @@ devices:
 - hostname: R1
   vendor: arista
   clear_config: 'no'
-  interfaces:
-  - name: ethernet2
-    ip_address: 10.10.10.1
-    subnet_mask: '24'
-  - name: loopback0
-    ip_address: 11.11.11.11
-    subnet_mask: '32'
-  bgp:
-    as_number: '65001'
-    address_families:
-    - type: ipv4
-      networks:
-      - ip: 11.11.11.11
-        mask: '32'
-      neighbors:
-      - ip: 10.10.10.3
-        remote_as: '65003'
-    redistribute_ospf: false
-    redistribute_rip: false
+  vlans:
+  - id: '100'
+    name: Test

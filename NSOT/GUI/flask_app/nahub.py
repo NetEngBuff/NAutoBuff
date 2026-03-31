@@ -88,6 +88,93 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IPAM_DIR = os.path.join(BASE_DIR, "..", "..", "IPAM")
 
 
+def _restore_golden_configs(hostnames):
+    """
+    Push golden configs back to a list of devices after a topology redeploy.
+    Skips any device that has no golden config file yet.
+    """
+    golden_dir = os.path.join(
+        os.path.dirname(__file__), "..", "..", "golden_configs"
+    )
+    hosts_csv = os.path.join(IPAM_DIR, "hosts.csv")
+
+    vendor_map = {}
+    try:
+        with open(hosts_csv, newline="", encoding="utf-8-sig") as f:
+            for row in csv.DictReader(f):
+                vendor_map[row["hostname"]] = (row.get("vendor") or "arista").strip().lower()
+    except Exception:
+        pass
+
+    for hostname in hostnames:
+        cfg_path = None
+        for name in [f"{hostname}_golden.cfg", f"goldenconfigs_{hostname}.cfg"]:
+            candidate = os.path.join(golden_dir, name)
+            if os.path.exists(candidate):
+                cfg_path = candidate
+                break
+        if not cfg_path:
+            print(f"[INFO] No golden config for {hostname} — skipping restore")
+            continue
+
+        vendor = vendor_map.get(hostname, "arista")
+        success, msg = rollback_to_golden_config(hostname, vendor)
+        print(f"[{'✔' if success else '⚠'}] Golden config restore {hostname}: {msg}")
+
+
+def _sync_hosts_clab_ips():
+    """
+    After a topology redeploy, update management_ip in hosts.csv with the
+    actual IPs assigned by containerlab so ipam.py and Netmiko use the right
+    addresses.
+    """
+    try:
+        result = subprocess.run(
+            ["sudo", "containerlab", "inspect", "--all", "--format", "json"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            return
+        data = json.loads(result.stdout or "{}")
+        if isinstance(data, dict):
+            containers = [c for lab in data.values()
+                          for c in (lab if isinstance(lab, list) else [])]
+        else:
+            containers = data
+
+        ip_map = {}
+        for c in containers:
+            name = c.get("name", "")
+            ipv4 = c.get("ipv4_address", "")
+            if not name or not ipv4:
+                continue
+            ip_map[name.rsplit("-", 1)[-1]] = ipv4.split("/")[0]
+
+        if not ip_map:
+            return
+
+        hosts_csv = os.path.join(IPAM_DIR, "hosts.csv")
+        rows, fieldnames = [], []
+        with open(hosts_csv, newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            fieldnames = list(reader.fieldnames or [])
+            rows = list(reader)
+
+        for row in rows:
+            hostname = row.get("hostname", "").strip()
+            if hostname in ip_map:
+                row["management_ip"] = ip_map[hostname]
+
+        with open(hosts_csv, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(rows)
+
+        print(f"[✔] Synced clab management IPs: {ip_map}")
+    except Exception as e:
+        print(f"[⚠] Could not sync clab IPs to hosts.csv: {e}")
+
+
 def _reset_hosts_csv_passwords(default_password="admin"):
     """
     After a topology redeploy the golden config resets all device passwords to
@@ -629,6 +716,7 @@ def deploy_topology_route():
         deploy_output = result.stdout
         time.sleep(2)
         _reset_hosts_csv_passwords()
+        _sync_hosts_clab_ips()
         update_gnmic_yaml_from_hosts()
 
         # System services still require sudo, ensure NOPASSWD is set in sudoers
@@ -704,8 +792,10 @@ def add_device():
         mac_address = request.form.get("mac_address", "")
         ip_with_subnet = request.form.get("ip_address", "")
         ip_address = ip_with_subnet.split("/")[0]
+        subnet_cidr = ip_with_subnet.split("/")[1] if "/" in ip_with_subnet else ""
         username = request.form.get("username", "")
         password = request.form.get("password", "")
+        vendor = request.form.get("vendor", "arista")
         try:
             connection_count = max(0, min(int(request.form.get("connection_count", "0")), 50))
         except (ValueError, TypeError):
@@ -730,6 +820,10 @@ def add_device():
         topo_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "../../../pilot-config/topo.yml")
         )
+        # Capture existing devices before we add the new one, so we can
+        # restore their golden configs after the topology redeploy.
+        existing_devices = get_hosts_from_csv()
+
         print("[INFO] Destroying old topology before update...")
         subprocess.run(["sudo", "containerlab", "destroy", "-t", topo_path],
                        capture_output=True, text=True)
@@ -750,17 +844,12 @@ def add_device():
             )
 
             update_hosts_csv(
-                device_name, ip_address, username=username, password=password
+                device_name, ip_address,
+                username=username, password=password,
+                subnet_cidr=subnet_cidr, vendor=vendor,
             )
 
             print("[INFO] Deploying new topology...")
-            clab_path = os.path.join(PILOT_DIR, "clab-example")
-            if os.path.exists(clab_path):
-                shutil.rmtree(clab_path)
-                print(f"✅ Removed: {clab_path}")
-            else:
-                print(f"⚠️ Path does not exist, skipping: {clab_path}")
-
             deploy_output = subprocess.check_output(
                 ["sudo", "containerlab", "deploy", "-t", topo_path],
                 stderr=subprocess.STDOUT,
@@ -768,6 +857,8 @@ def add_device():
             )
             time.sleep(2)
             _reset_hosts_csv_passwords()
+            _sync_hosts_clab_ips()
+            _restore_golden_configs(existing_devices)
             update_gnmic_yaml_from_hosts()
             subprocess.run(
                 ["sudo", "systemctl", "restart", "gnmic_nautohub.service"], check=True
@@ -1182,6 +1273,18 @@ def ipam_data_json():
     })
 
 
+@app.route("/ipam-sync-ips", methods=["POST"])
+@login_required
+def ipam_sync_ips():
+    """Sync management IPs in hosts.csv from containerlab, then restart ipam service."""
+    try:
+        _sync_hosts_clab_ips()
+        subprocess.run(["sudo", "systemctl", "restart", "ipam.service"], check=True)
+        return jsonify({"ok": True, "message": "IPs synced and IPAM restarted."})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+
 @app.route("/about")
 @login_required
 def about():
@@ -1200,6 +1303,7 @@ GRAFANA_DASHBOARD_URL = os.environ.get(
     "GRAFANA_DASHBOARD_URL",
     f"{GRAFANA_BASE_URL}/d/nautohub-telemetry",
 )
+INFLUXDB_URL = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
 
 
 @app.route("/dashboard")
@@ -1209,6 +1313,7 @@ def dashboard():
         "dashboard.html",
         grafana_base_url=GRAFANA_BASE_URL,
         grafana_dashboard_url=GRAFANA_DASHBOARD_URL,
+        influxdb_url=INFLUXDB_URL,
     )
 
 
@@ -1266,19 +1371,25 @@ def _wait_for_port(port, host="127.0.0.1", timeout=12):
 @app.route("/topology")
 @login_required
 def topology():
-    if not _is_port_open(50080):
-        try:
-            subprocess.Popen(
-                ["sudo", "containerlab", "graph", "-t", topo_path],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            print(f"[INFO] Started containerlab graph for: {topo_path}")
-            _wait_for_port(50080)
-        except Exception as e:
-            print(f"[ERROR] Failed to start containerlab graph: {e}")
-    else:
-        print("[INFO] containerlab graph already running on :50080")
+    # Always kill any stale containerlab graph process so the topology view
+    # reflects the current topo.yml after any redeploy.
+    try:
+        subprocess.run(
+            ["sudo", "pkill", "-f", "containerlab graph"],
+            capture_output=True,
+        )
+    except Exception:
+        pass
+    try:
+        subprocess.Popen(
+            ["sudo", "containerlab", "graph", "-t", topo_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        print(f"[INFO] Started containerlab graph for: {topo_path}")
+        _wait_for_port(50080)
+    except Exception as e:
+        print(f"[ERROR] Failed to start containerlab graph: {e}")
 
     try:
         gws = netifaces.gateways()

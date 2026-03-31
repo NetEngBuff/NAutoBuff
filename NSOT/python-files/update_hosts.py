@@ -45,7 +45,8 @@ def regenerate_hosts_csv(devices):
     print(f"[✔] Generated hosts.csv with {len(devices)} device(s).")
 
 
-def update_hosts_csv(device_name, ip_address, username="admin", password="admin"):
+def update_hosts_csv(device_name, ip_address, username="admin", password="admin",
+                     subnet_cidr="", vendor=""):
     rows = []
     device_found = False
 
@@ -57,6 +58,10 @@ def update_hosts_csv(device_name, ip_address, username="admin", password="admin"
                     row["management_ip"] = ip_address
                     row["username"] = username
                     row["password"] = password
+                    if subnet_cidr:
+                        row["subnet_cidr"] = subnet_cidr
+                    if vendor:
+                        row["vendor"] = vendor
                     device_found = True
                 rows.append(row)
 
@@ -67,8 +72,8 @@ def update_hosts_csv(device_name, ip_address, username="admin", password="admin"
                 "username": username,
                 "password": password,
                 "management_ip": ip_address,
-                "subnet_cidr": "",
-                "vendor": "",
+                "subnet_cidr": subnet_cidr,
+                "vendor": vendor,
                 "old_password": "",
             }
         )
@@ -83,7 +88,7 @@ def update_hosts_csv(device_name, ip_address, username="admin", password="admin"
             "vendor",
             "old_password",
         ]
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
 

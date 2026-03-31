@@ -117,11 +117,18 @@ def rollback_to_golden_config(device_id, device_vendor):
     """
     print(f"Starting rollback for device: {device_id}")
 
-    # Check if golden config exists
+    # Check if golden config exists — accept both naming conventions
     golden_config_dir = os.path.join(os.path.dirname(__file__), "..", "golden_configs")
-    golden_config_path = os.path.join(golden_config_dir, f"{device_id}_golden.cfg")
+    golden_config_path = None
+    for candidate in [
+        os.path.join(golden_config_dir, f"{device_id}_golden.cfg"),
+        os.path.join(golden_config_dir, f"goldenconfigs_{device_id}.cfg"),
+    ]:
+        if os.path.exists(candidate):
+            golden_config_path = candidate
+            break
 
-    if not os.path.exists(golden_config_path):
+    if not golden_config_path:
         return False, f"No golden config found for {device_id}. Please create a backup first."
 
     # Read golden config

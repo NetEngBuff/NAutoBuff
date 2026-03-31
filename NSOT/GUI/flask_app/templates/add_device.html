@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_macros.html' import next_steps %}
 {% block title %}Add Device - NAutoHUB{% endblock %}
 
 {% block content %}
@@ -9,21 +10,34 @@
 
 <div class="card card-elevated" style="max-width: 700px; margin: 0 auto;">
   <div class="card-body">
-    <form method="POST" class="form" id="add-device-form" onsubmit="showLoading()">
+    <form method="POST" class="form" id="add-device-form" onsubmit="return handleSubmit()">
+
+      <!-- Hidden field keeps connection count in sync for the server -->
+      <input type="hidden" name="connection_count" id="connection-count-hidden" value="0">
+
+      <!-- ── Device Information ─────────────────────────────── -->
       <div class="form-fieldset">
         <legend class="form-legend">Device Information</legend>
 
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Device Name</label>
-            <input type="text" name="device_name" class="form-input" required>
+            <input type="text" name="device_name" class="form-input" placeholder="R3" required>
           </div>
           <div class="form-group">
             <label class="form-label">Kind</label>
             <select name="kind" id="kind-select" class="form-select" required onchange="toggleExecOrConfig()">
-              <option value="">-- Select Kind --</option>
+              <option value="">-- Select --</option>
               <option value="ceos">ceos</option>
               <option value="linux">linux</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Vendor</label>
+            <select name="vendor" class="form-select" required>
+              <option value="arista">Arista</option>
+              <option value="cisco">Cisco</option>
+              <option value="juniper">Juniper</option>
             </select>
           </div>
         </div>
@@ -39,27 +53,28 @@
         </div>
 
         <div id="config-section" class="form-group" style="display: none;">
-          <label class="form-label">Config File Path</label>
-          <input type="text" name="config" class="form-input" placeholder="/path/to/config.cfg">
+          <label class="form-label">Config File Path <span class="form-hint">(optional)</span></label>
+          <input type="text" name="config" class="form-input" placeholder="/path/to/startup.cfg">
         </div>
 
         <div id="exec-section" class="form-group" style="display: none;">
-          <label class="form-label">Exec Commands (1 per line)</label>
-          <textarea name="exec[]" rows="4" class="form-textarea" placeholder="ip link set eth1 up&#10;dhclient eth1"></textarea>
+          <label class="form-label">Exec Commands <span class="form-hint">(one per line)</span></label>
+          <textarea name="exec[]" rows="3" class="form-textarea" placeholder="ip link set eth1 up&#10;dhclient eth1"></textarea>
         </div>
 
         <div class="form-group">
-          <label class="form-label">MAC Address (optional)</label>
-          <input type="text" name="mac_address" class="form-input">
+          <label class="form-label">MAC Address <span class="form-hint">(optional)</span></label>
+          <input type="text" name="mac_address" class="form-input" placeholder="aa:bb:cc:dd:ee:ff">
         </div>
       </div>
 
+      <!-- ── Network Configuration ──────────────────────────── -->
       <div class="form-fieldset">
         <legend class="form-legend">Network Configuration</legend>
 
         <div class="form-group">
-          <label class="form-label">Management IP Address (with subnet)</label>
-          <input type="text" name="ip_address" class="form-input" placeholder="10.0.0.1/24" required>
+          <label class="form-label">Management IP <span class="form-hint">(CIDR notation)</span></label>
+          <input type="text" name="ip_address" class="form-input" placeholder="172.20.20.10/24" required>
         </div>
 
         <div class="form-row">
@@ -72,31 +87,46 @@
             <input type="password" name="password" class="form-input" placeholder="admin" required>
           </div>
         </div>
-
-        <div class="form-group">
-          <label class="form-label">How many devices to connect to</label>
-          <input type="number" name="connection_count" id="connection-count" class="form-input" min="0" max="10" value="0" style="max-width: 150px;">
-        </div>
-
-        <div id="connection-dropdowns"></div>
       </div>
 
+      <!-- ── Connections ─────────────────────────────────────── -->
+      <div class="form-fieldset">
+        <legend class="form-legend">Connections</legend>
+
+        <div id="connection-rows"></div>
+
+        <button type="button" class="btn btn-secondary btn-sm" onclick="addConnection()" style="margin-top: var(--space-2);">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px;">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Add Connection
+        </button>
+      </div>
+
+      {% if message and '✅' in message %}
+      {{ next_steps([
+        {'url': '/configure-device', 'title': 'Configure Device', 'desc': 'Push configs to the new device',   'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 19.07A10 10 0 0 0 4.93 4.93"/></svg>'},
+        {'url': '/ipam',             'title': 'View IPAM',        'desc': 'Verify the new device IP',         'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'},
+        {'url': '/topology',         'title': 'View Topology',    'desc': 'See the updated network graph',    'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>'}
+      ]) }}
+      {% endif %}
+
       {% if message %}
-      <div class="alert alert-success">
-        <span class="alert-icon">&#10003;</span>
+      <div class="alert {{ 'alert-error' if '❌' in message else 'alert-success' }}">
+        <span class="alert-icon">{{ '✕' if '❌' in message else '✓' }}</span>
         <div class="alert-content">{{ message|safe }}</div>
       </div>
       {% endif %}
 
-      <div class="form-actions form-actions-center">
+      <div class="form-actions form-actions-center" style="margin-top: var(--space-5);">
         <button type="submit" class="btn btn-primary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Add Device
         </button>
       </div>
+
     </form>
   </div>
 </div>
@@ -110,7 +140,55 @@
 </div>
 
 <style>
-/* Loading overlay specific styles */
+.form-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-weight-normal);
+  margin-left: var(--space-1);
+}
+
+.connection-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.connection-row .form-select {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.connection-row label {
+  white-space: nowrap;
+  min-width: 110px;
+  margin-bottom: 0;
+}
+
+.btn-remove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-base);
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.btn-remove:hover {
+  background: var(--color-error-bg, rgba(239,68,68,0.1));
+  border-color: var(--color-error, #ef4444);
+  color: var(--color-error, #ef4444);
+}
+
 .loading-container {
   display: flex;
   flex-direction: column;
@@ -140,41 +218,67 @@
 </style>
 
 <script>
+// Available hosts injected from Jinja at page load
+const availableHosts = [{% for host in available_hosts %}"{{ host }}"{% if not loop.last %},{% endif %}{% endfor %}];
+
+function buildHostOptions() {
+  return availableHosts.map(h => `<option value="${h}">${h}</option>`).join("");
+}
+
+function updateConnectionCount() {
+  const rows = document.querySelectorAll("#connection-rows .connection-row");
+  document.getElementById("connection-count-hidden").value = rows.length;
+  // Re-index names and labels
+  rows.forEach((row, i) => {
+    row.querySelector("label").textContent = `Connect to Device ${i + 1}`;
+    row.querySelector("select").name = `connect_to_${i}`;
+  });
+}
+
+function addConnection() {
+  const container = document.getElementById("connection-rows");
+  const idx = container.querySelectorAll(".connection-row").length;
+  const row = document.createElement("div");
+  row.className = "connection-row";
+  row.innerHTML = `
+    <label class="form-label">Connect to Device ${idx + 1}</label>
+    <select name="connect_to_${idx}" class="form-select" required>
+      <option value="">-- Select Device --</option>
+      ${buildHostOptions()}
+    </select>
+    <button type="button" class="btn-remove" title="Remove" onclick="removeConnection(this)">&#215;</button>
+  `;
+  container.appendChild(row);
+  updateConnectionCount();
+}
+
+function removeConnection(btn) {
+  btn.closest(".connection-row").remove();
+  updateConnectionCount();
+}
+
 function toggleExecOrConfig() {
   const kind = document.getElementById("kind-select").value;
   document.getElementById("config-section").style.display = kind === "ceos" ? "block" : "none";
   document.getElementById("exec-section").style.display = kind === "linux" ? "block" : "none";
 }
 
-function renderConnectionDropdowns() {
-  const count = parseInt(document.getElementById("connection-count").value);
-  const container = document.getElementById("connection-dropdowns");
-  container.innerHTML = "";
-
-  for (let i = 0; i < count; i++) {
-    const div = document.createElement("div");
-    div.classList.add("form-group");
-    div.innerHTML = `
-      <label class="form-label">Connect to Device ${i + 1}</label>
-      <select name="connect_to_${i}" class="form-select" required>
-        <option value="">-- Select Device --</option>
-        {% for host in available_hosts %}
-          <option value="{{ host }}">{{ host }}</option>
-        {% endfor %}
-      </select>
-    `;
-    container.appendChild(div);
-  }
+function handleSubmit() {
+  updateConnectionCount();
+  showLoading();
+  return true;
 }
 
 function showLoading() {
-  document.getElementById("loading-overlay").style.display = "flex";
+  const overlay = document.getElementById("loading-overlay");
+  overlay.style.display = "flex";
+  overlay.offsetHeight; // trigger reflow for CSS transition
+  overlay.classList.add("visible");
   rotateTerms();
 }
 
 document.addEventListener("DOMContentLoaded", function () {
   toggleExecOrConfig();
-  document.getElementById("connection-count").addEventListener("input", renderConnectionDropdowns);
 });
 
 const terms = [
@@ -218,9 +322,7 @@ const terms = [
   "Teleporting configs into flash...",
 ];
 
-// Shuffle once to avoid repetition in each session
 terms.sort(() => Math.random() - 0.5);
-
 let index = 0;
 let rotateInterval;
 
@@ -232,7 +334,6 @@ function rotateTerms() {
     el.style.opacity = 1;
     index = (index + 1) % terms.length;
   }, 500);
-
   if (!rotateInterval) {
     rotateInterval = setInterval(rotateTerms, 7000);
   }
