@@ -8,6 +8,11 @@ JENKINS_JOB_NAME = os.environ.get("JENKINS_JOB_NAME", "NAutoHUB")
 JENKINS_USER = os.environ.get("JENKINS_USER", "admin")
 JENKINS_TOKEN = os.environ.get("JENKINS_TOKEN", "")
 
+# Headers required for ngrok free-tier tunnels: without this, ngrok
+# intercepts the request with an HTML browser-warning page instead of
+# forwarding it to Jenkins, causing JSON parse failures.
+NGROK_HEADERS = {"ngrok-skip-browser-warning": "true"}
+
 # --- Git Push Functions ---
 
 
@@ -78,7 +83,12 @@ def get_latest_build_number(jenkins_base_url, user, token):
             f"{jenkins_base_url}/job/{JENKINS_JOB_NAME}/api/json?tree=lastBuild[number]"
         )
         print("Fetching latest build number from URL:", url)
-        response = requests.get(url, auth=(user, token))
+        auth = (user, token) if token else None
+        response = requests.get(url, auth=auth, headers=NGROK_HEADERS, timeout=15)
+        if response.status_code != 200:
+            print(f"Jenkins API returned HTTP {response.status_code}. "
+                  f"Response: {response.text[:300]}")
+            return None
         response_data = response.json()
         latest_build_number = response_data.get("lastBuild", {}).get("number")
         if latest_build_number:
@@ -97,14 +107,16 @@ def check_build_result(jenkins_base_url, latest_build_number, user, token):
         f"{jenkins_base_url}/job/{JENKINS_JOB_NAME}/{latest_build_number}/api/json"
     )
     print("Checking build result from URL:", build_url)
-    response = requests.get(build_url, auth=(user, token))
+    auth = (user, token) if token else None
+    response = requests.get(build_url, auth=auth, headers=NGROK_HEADERS, timeout=15)
     if response.status_code == 200:
         build_info = response.json()
         result = build_info.get("result")
         print(f"Build result for build {latest_build_number}: {result}")
         return result
     else:
-        print(f"Failed to retrieve build status for build {latest_build_number}.")
+        print(f"Failed to retrieve build status for build {latest_build_number}. "
+              f"HTTP {response.status_code}: {response.text[:200]}")
         return None
 
 

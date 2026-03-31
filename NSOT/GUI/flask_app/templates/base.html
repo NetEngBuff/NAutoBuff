@@ -153,6 +153,45 @@
     </div>
   </div>
 
+  <!-- Health Check Modal -->
+  <div class="modal-overlay" id="healthCheckModal" onclick="closeHealthCheck(event)">
+    <div class="rollback-modal" style="max-width:640px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Service Health Check
+        </h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button onclick="loadHealthCheck()" title="Refresh"
+            style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:4px;display:flex;align-items:center;">
+            <svg id="hc-refresh-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+          </button>
+          <button class="modal-close" onclick="closeHealthCheck()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="modal-body" style="padding:0;">
+        <div id="hc-loading" style="padding:32px;text-align:center;color:var(--color-text-muted);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+          <div style="margin-top:8px;font-size:var(--font-size-sm);">Checking services…</div>
+        </div>
+        <table id="hc-table" style="display:none;width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--color-border);">
+              <th style="padding:10px 20px;text-align:left;font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;">Service</th>
+              <th style="padding:10px 12px;text-align:center;font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;">Status</th>
+              <th style="padding:10px 20px 10px 0;text-align:right;font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="hc-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- Side Menu -->
   <div class="menu-overlay" id="menuOverlay" onclick="toggleSideMenu()"></div>
   <aside class="side-menu" id="sideMenu">
@@ -254,6 +293,12 @@
           </svg>
           Topology
         </a>
+        <a href="#" class="side-menu-link" onclick="openHealthCheck(event)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          Health Check
+        </a>
       </nav>
 
       {% if current_user.is_authenticated and current_user.role == 'admin' %}
@@ -280,6 +325,47 @@
         </a>
       </nav>
       {% endif %}
+
+      <div class="side-menu-section">
+        <span class="side-menu-section-title">External Links</span>
+      </div>
+      <nav class="side-menu-nav">
+        <a href="{{ grafana_dashboard_url }}" target="_blank" class="side-menu-link">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          Grafana
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto;opacity:0.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+        <a href="{{ influxdb_url }}" target="_blank" class="side-menu-link">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+          </svg>
+          InfluxDB
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto;opacity:0.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+        <a id="menu-jenkins-link" href="#" target="_blank" class="side-menu-link" onclick="openJenkins(event)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          Jenkins
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto;opacity:0.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+        <div id="menu-ngrok-row" style="display:none;padding:4px 12px 8px 44px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input id="menu-ngrok-input" class="form-input" readonly placeholder="ngrok URL"
+              style="font-size:11px;height:28px;padding:0 8px;flex:1;min-width:0;">
+            <button onclick="copyMenuNgrok()" title="Copy webhook URL"
+              style="flex-shrink:0;padding:0 8px;height:28px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface-raised);cursor:pointer;font-size:11px;color:var(--color-text-muted);">
+              Copy
+            </button>
+          </div>
+          <div style="font-size:10px;color:var(--color-text-muted);margin-top:3px;" id="menu-ngrok-hint"></div>
+        </div>
+      </nav>
 
       <div class="side-menu-section">
         <span class="side-menu-section-title">Help</span>
@@ -584,6 +670,193 @@
         }
       } catch (error) {
         alert(`❌ Error: ${error.message}`);
+      }
+    }
+
+    // ========== Health Check Modal ==========
+    let _hcInterval = null;
+
+    function openHealthCheck(e) {
+      if (e) e.preventDefault();
+      document.getElementById('healthCheckModal').classList.add('visible');
+      loadHealthCheck();
+      _hcInterval = setInterval(loadHealthCheck, 10000);
+      // close side menu
+      document.getElementById('sideMenu').classList.remove('open');
+      document.getElementById('menuOverlay').classList.remove('visible');
+    }
+
+    function closeHealthCheck(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('healthCheckModal').classList.remove('visible');
+      clearInterval(_hcInterval);
+      _hcInterval = null;
+    }
+
+    function loadHealthCheck() {
+      const icon = document.getElementById('hc-refresh-icon');
+      icon.style.animation = 'spin 0.8s linear infinite';
+      fetch('/api/services')
+        .then(r => r.json())
+        .then(services => {
+          icon.style.animation = '';
+          document.getElementById('hc-loading').style.display = 'none';
+          const tbody = document.getElementById('hc-tbody');
+          tbody.innerHTML = '';
+          services.forEach(svc => {
+            const isActive  = svc.status === 'active';
+            const isFailed  = svc.status === 'failed';
+            const isInactive = !isActive;
+
+            let dotColor = '#6b7280'; // neutral
+            if (isActive)  dotColor = 'var(--color-success, #10b981)';
+            if (isFailed)  dotColor = 'var(--color-error,   #ef4444)';
+
+            const badge = isActive  ? '<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,.12);color:#10b981;font-weight:600;">running</span>'
+                        : isFailed  ? '<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(239,68,68,.12);color:#ef4444;font-weight:600;">failed</span>'
+                        : svc.status === 'unknown' ? '<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(107,114,128,.1);color:#6b7280;font-weight:600;">unknown</span>'
+                        : '<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(245,158,11,.12);color:#f59e0b;font-weight:600;">stopped</span>';
+
+            const disStart   = isActive  ? 'disabled' : '';
+            const disStop    = isInactive ? 'disabled' : '';
+
+            const row = document.createElement('tr');
+            row.style.borderBottom = '1px solid var(--color-border)';
+            row.innerHTML = `
+              <td style="padding:12px 20px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;${isActive ? 'box-shadow:0 0 0 2px rgba(16,185,129,.2)' : ''}"></span>
+                  <span style="font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);">${svc.label}</span>
+                </div>
+                <div style="font-size:10px;color:var(--color-text-muted);margin-top:2px;padding-left:16px;">${svc.unit}</div>
+              </td>
+              <td style="padding:12px;text-align:center;">${badge}</td>
+              <td style="padding:12px 20px 12px 0;text-align:right;white-space:nowrap;">
+                <button ${disStart} onclick="controlService('${svc.unit}','start',this)"
+                  style="padding:4px 10px;font-size:12px;border-radius:var(--radius-sm);border:1px solid var(--color-border);background:var(--color-surface-raised);cursor:${disStart ? 'not-allowed' : 'pointer'};color:var(--color-text);margin-right:4px;opacity:${disStart ? '.35' : '1'}">Start</button>
+                <button ${disStop} onclick="controlService('${svc.unit}','stop',this)"
+                  style="padding:4px 10px;font-size:12px;border-radius:var(--radius-sm);border:1px solid var(--color-border);background:var(--color-surface-raised);cursor:${disStop ? 'not-allowed' : 'pointer'};color:var(--color-text);margin-right:4px;opacity:${disStop ? '.35' : '1'}">Stop</button>
+                <button onclick="controlService('${svc.unit}','restart',this)"
+                  style="padding:4px 10px;font-size:12px;border-radius:var(--radius-sm);border:1px solid var(--color-border);background:var(--color-surface-raised);cursor:pointer;color:var(--color-text);">Restart</button>
+              </td>`;
+            tbody.appendChild(row);
+          });
+          document.getElementById('hc-table').style.display = 'table';
+        })
+        .catch(() => { icon.style.animation = ''; });
+    }
+
+    function controlService(unit, action, btn) {
+      if (!btn || btn.disabled) return;
+      // Disable all action buttons in the row while running
+      const row = btn.closest('tr');
+      const btns = row ? row.querySelectorAll('button') : [btn];
+      btns.forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
+      const orig = btn.textContent;
+      btn.textContent = '…';
+
+      fetch('/api/services/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unit, action }),
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) {
+          _hcToast('error', `${unit}: ${d.error}`);
+        } else {
+          _hcToast('ok', `${action} → ${unit}`);
+        }
+        setTimeout(loadHealthCheck, 1200);
+      })
+      .catch(e => {
+        _hcToast('error', `Request failed: ${e.message}`);
+        btns.forEach(b => { b.disabled = false; b.style.opacity = '1'; });
+        btn.textContent = orig;
+      });
+    }
+
+    function _hcToast(type, msg) {
+      const t = document.createElement('div');
+      t.textContent = (type === 'ok' ? '✔ ' : '✘ ') + msg;
+      t.style.cssText = `position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+        padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;z-index:99999;
+        background:${type === 'ok' ? '#10b981' : '#ef4444'};color:#fff;
+        box-shadow:0 4px 12px rgba(0,0,0,.2);pointer-events:none;`;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+
+    // ========== External Links (sidebar) ==========
+    let _jenkinsData = null;
+
+    function openJenkins(e) {
+      e.preventDefault();
+      const link = document.getElementById('menu-jenkins-link');
+      if (_jenkinsData && _jenkinsData.jenkins_url) {
+        window.open(_jenkinsData.jenkins_url, '_blank');
+      } else {
+        // fetch on first click
+        fetch('/api/jenkins-status')
+          .then(r => r.json())
+          .then(d => {
+            _jenkinsData = d;
+            _renderNgrokRow(d);
+            if (d.jenkins_url) window.open(d.jenkins_url, '_blank');
+            else alert('Ngrok tunnel not running — Jenkins URL unavailable.');
+          })
+          .catch(() => alert('Could not reach Jenkins status API.'));
+      }
+    }
+
+    function _renderNgrokRow(d) {
+      const row = document.getElementById('menu-ngrok-row');
+      const inp = document.getElementById('menu-ngrok-input');
+      const hint = document.getElementById('menu-ngrok-hint');
+      if (d && d.webhook_url) {
+        inp.value = d.webhook_url;
+        hint.textContent = 'Webhook URL (paste in GitHub repo → Settings → Webhooks)';
+        row.style.display = 'block';
+      } else {
+        row.style.display = 'none';
+      }
+    }
+
+    // Pre-load ngrok status when the side menu opens
+    const _origToggleSideMenu = toggleSideMenu;
+    toggleSideMenu = function() {
+      _origToggleSideMenu();
+      const menu = document.getElementById('sideMenu');
+      if (menu.classList.contains('open') && !_jenkinsData) {
+        fetch('/api/jenkins-status')
+          .then(r => r.json())
+          .then(d => { _jenkinsData = d; _renderNgrokRow(d); })
+          .catch(() => {});
+      }
+    };
+
+    function copyMenuNgrok() {
+      const inp = document.getElementById('menu-ngrok-input');
+      const btn = inp.nextElementSibling;
+      _copyText(inp.value, btn);
+    }
+
+    function _copyText(text, feedbackBtn) {
+      // Works on plain HTTP (no secure context required)
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+
+      if (feedbackBtn) {
+        const orig = feedbackBtn.textContent;
+        feedbackBtn.textContent = ok ? 'Copied!' : 'Failed';
+        setTimeout(() => { feedbackBtn.textContent = orig; }, 1500);
       }
     }
 

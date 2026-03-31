@@ -1306,6 +1306,16 @@ GRAFANA_DASHBOARD_URL = os.environ.get(
 INFLUXDB_URL = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
 
 
+@app.context_processor
+def inject_external_urls():
+    """Make monitoring URLs available in every template (used by base.html sidebar)."""
+    return {
+        "grafana_base_url": GRAFANA_BASE_URL,
+        "grafana_dashboard_url": GRAFANA_DASHBOARD_URL,
+        "influxdb_url": INFLUXDB_URL,
+    }
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -1451,6 +1461,61 @@ def oob_network_info():
     except Exception as e:
         print(f"[⚠] Could not read netcfg.yaml: {e}")
     return jsonify({"interface": None, "host_ip": None, "subnet": None})
+
+
+_MANAGED_SERVICES = [
+    {"unit": "ipam.service",                  "label": "IPAM (SNMP Polling)"},
+    {"unit": "gnmic_nautohub.service",         "label": "gNMI Telemetry"},
+    {"unit": "device_health_check.timer",      "label": "Device Health Check"},
+    {"unit": "password_update.service",        "label": "Password Rotation"},
+    {"unit": "ngrok.service",                  "label": "Ngrok Tunnel"},
+    {"unit": "jenkins",                        "label": "Jenkins CI/CD"},
+    {"unit": "influxdb",                       "label": "InfluxDB"},
+    {"unit": "grafana-server",                 "label": "Grafana"},
+    {"unit": "docker",                         "label": "Docker"},
+]
+_ALLOWED_UNITS = {s["unit"] for s in _MANAGED_SERVICES}
+
+
+@app.route("/api/services")
+@login_required
+def get_service_status():
+    results = []
+    for svc in _MANAGED_SERVICES:
+        try:
+            r = subprocess.run(
+                ["systemctl", "is-active", svc["unit"]],
+                capture_output=True, text=True, timeout=5,
+            )
+            status = r.stdout.strip()
+        except Exception:
+            status = "unknown"
+        results.append({"unit": svc["unit"], "label": svc["label"], "status": status})
+    return jsonify(results)
+
+
+@app.route("/api/services/control", methods=["POST"])
+@login_required
+def control_service():
+    if not current_user.is_operator():
+        return jsonify({"error": "Insufficient permissions"}), 403
+    data = request.get_json(silent=True) or {}
+    unit = data.get("unit", "")
+    action = data.get("action", "")
+    if unit not in _ALLOWED_UNITS or action not in ("start", "stop", "restart"):
+        return jsonify({"error": "Invalid unit or action"}), 400
+    try:
+        r = subprocess.run(
+            ["sudo", "systemctl", action, unit],
+            capture_output=True, text=True, timeout=20,
+        )
+        if r.returncode != 0:
+            return jsonify({"error": (r.stderr or r.stdout).strip() or f"exit {r.returncode}"}), 500
+        return jsonify({"ok": True})
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "systemctl timed out"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/jenkins-status")
