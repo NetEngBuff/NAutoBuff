@@ -16,9 +16,9 @@
         <div class="form-group">
           <label class="form-label">Device Name</label>
           <select name="device_id" class="form-select" required onchange="onConfigDeviceSelect(this.value)">
-            <option value="" disabled selected>Select Device</option>
+            <option value="" disabled {% if not device_id %}selected{% endif %}>Select Device</option>
             {% for device in devices %}
-            <option value="{{ device }}">{{ device }}</option>
+            <option value="{{ device }}" {% if device == device_id %}selected{% endif %}>{{ device }}</option>
             {% endfor %}
           </select>
         </div>
@@ -285,22 +285,6 @@
       <!-- Expandable Protocol Sections -->
       <div id="protocol-sections" style="margin-top: var(--space-8);"></div>
 
-      {% if message %}
-      <div class="alert {% if '❌' in message or 'failed' in message|lower %}alert-error{% else %}alert-success{% endif %}">
-        <span class="alert-icon">{% if '❌' in message or 'failed' in message|lower %}✕{% else %}✓{% endif %}</span>
-        <div class="alert-content">{{ message }}</div>
-      </div>
-      {% if '✅' in message or ('failed' not in message|lower and '❌' not in message) %}
-      {{ next_steps([
-        {'url': '/tools',     'title': 'Tools & Backup',  'desc': 'Save golden config & run diagnostics', 'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>'},
-        {'url': '/dashboard', 'title': 'Dashboard',       'desc': 'Monitor live telemetry metrics',        'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'},
-        {'url': '/ipam',      'title': 'View IPAM',        'desc': 'Check interface IPs on all devices',    'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'}
-      ]) }}
-      {% endif %}
-      {% endif %}
-
-      <div id="push-message"></div>
-
       <div class="form-actions form-actions-center">
         <button type="submit" class="btn btn-primary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -323,8 +307,28 @@
       </button>
     </div>
     {% endif %}
+
+    {% if message %}
+    <div style="padding: 0 var(--space-6) var(--space-2);">
+      <div class="alert {% if '❌' in message or 'failed' in message|lower %}alert-error{% else %}alert-success{% endif %}">
+        <span class="alert-icon">{% if '❌' in message or 'failed' in message|lower %}✕{% else %}✓{% endif %}</span>
+        <div class="alert-content">{{ message }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div id="push-message" style="padding: 0 var(--space-6);"></div>
+
   </div>
 </div>
+
+{% if message and ('✅' in message or ('failed' not in message|lower and '❌' not in message)) %}
+{{ next_steps([
+  {'url': '/tools',     'title': 'Tools & Backup',  'desc': 'Save golden config & run diagnostics', 'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>'},
+  {'url': '/dashboard', 'title': 'Dashboard',       'desc': 'Monitor live telemetry metrics',        'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'},
+  {'url': '/ipam',      'title': 'View IPAM',        'desc': 'Check interface IPs on all devices',    'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'}
+]) }}
+{% endif %}
 
 <!-- Loading Overlay -->
 <div class="modal-overlay" id="loading-overlay" style="display: none;">
@@ -1564,7 +1568,10 @@ function getStaticRouteBlock() {
 }
 
 function showLoading() {
-  document.getElementById("loading-overlay").style.display = "flex";
+  const overlay = document.getElementById("loading-overlay");
+  overlay.style.display = "flex";
+  overlay.offsetHeight; // force reflow so transition fires
+  overlay.classList.add("visible");
   rotateTerms();
   return true;
 }
@@ -1605,6 +1612,7 @@ terms.sort(() => Math.random() - 0.5);
 
 async function pushConfig() {
   const deviceId = document.querySelector("select[name='device_id']").value;
+  showLoading();
   const response = await fetch("/push-config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

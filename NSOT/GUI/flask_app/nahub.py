@@ -6,6 +6,9 @@ import sys
 import time
 import docker
 import json
+import logging
+from logging.handlers import RotatingFileHandler
+from datetime import datetime
 from flask import (
     Flask,
     render_template,
@@ -55,6 +58,65 @@ topo_path = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../../../pilot-config/topo.yml")
 )
 
+
+# ── Application Logging Setup ────────────────────────────────────────────────
+_LOG_DIR = os.path.join(project_root, "NSOT", "logs")
+os.makedirs(_LOG_DIR, exist_ok=True)
+_LOG_FILE = os.path.join(_LOG_DIR, "nahub.log")
+
+# Routes whose access lines are just noise (polling / static assets)
+_NOISY_PATHS = (
+    "/clab-health",
+    "/static/",
+    "/api/services",
+)
+
+
+class _NoiseFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        return not any(p in msg for p in _NOISY_PATHS)
+
+
+_file_handler = RotatingFileHandler(
+    _LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
+)
+_file_handler.setLevel(logging.INFO)
+_file_handler.setFormatter(logging.Formatter(
+    "[%(asctime)s] %(levelname)-8s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+))
+_file_handler.addFilter(_NoiseFilter())
+
+# Attach to werkzeug so HTTP requests are logged to file (filtered)
+_werkzeug_log = logging.getLogger("werkzeug")
+_werkzeug_log.addHandler(_file_handler)
+_werkzeug_log.addFilter(_NoiseFilter())
+
+
+class _TeeStream:
+    """Tee sys.stdout so every print() also lands in the log file with a timestamp."""
+    def __init__(self, original):
+        self._original = original
+        self._log_file = open(_LOG_FILE, "a", encoding="utf-8", buffering=1)
+
+    def write(self, msg):
+        self._original.write(msg)
+        stripped = msg.rstrip("\n")
+        if stripped:
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self._log_file.write(f"[{ts}] APP      {stripped}\n")
+
+    def flush(self):
+        self._original.flush()
+        self._log_file.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._original, name)
+
+
+sys.stdout = _TeeStream(sys.stdout)
+# ─────────────────────────────────────────────────────────────────────────────
 
 # Import your custom modules from 'python-files'
 from create_hosts import write_hosts_csv
@@ -1075,6 +1137,7 @@ def configure_device():
                         "configure_device.html",
                         jenkins_result="jenkins_success",
                         device_id=device_id,
+                        devices=devices,
                         message="✅ Jenkins pipeline succeeded!",
                     )
                 else:
@@ -1082,6 +1145,7 @@ def configure_device():
                         "configure_device.html",
                         jenkins_result="jenkins_failure",
                         device_id=device_id,
+                        devices=devices,
                         message="❌ Jenkins pipeline failed.",
                     )
 
@@ -1091,6 +1155,7 @@ def configure_device():
                     "configure_device.html",
                     jenkins_result="jenkins_failure",
                     device_id=device_id,
+                    devices=devices,
                     message=str(pipeline_error),
                 )
 

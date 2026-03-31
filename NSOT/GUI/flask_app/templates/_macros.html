@@ -19,8 +19,9 @@
 
 <style>
 .nxt-section {
-  max-width: 800px;
-  margin: var(--space-6) auto 0;
+  max-width: 1200px;
+  margin: var(--space-8) auto 0;
+  padding: 0 var(--space-4);
 }
 .nxt-label {
   font-size: var(--font-size-xs);
@@ -31,11 +32,13 @@
   margin-bottom: var(--space-3);
 }
 .nxt-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
+  flex-direction: row;
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
 .nxt-card {
+  flex: 1 1 180px;
   display: flex;
   align-items: center;
   gap: var(--space-3);
