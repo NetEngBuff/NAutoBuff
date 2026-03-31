@@ -208,10 +208,19 @@ def rollback_to_golden_config(device_id, device_vendor):
         return False, f"Unsupported vendor: {device_vendor}"
 
     # ------------------------------------------------------------------
-    # 3. Patch golden config: strip old creds, inject current creds
+    # 3. Patch golden config: strip old creds, inject current creds from
+    #    hosts.csv using the same Jinja2 template, then write back to the
+    #    golden config file so it stays permanently in sync.
     # ------------------------------------------------------------------
     patched_config = _strip_cred_lines(golden_config)
     patched_config = _inject_creds(patched_config, device_type, username, password)
+
+    try:
+        with open(golden_config_path, "w") as f:
+            f.write(patched_config)
+        print(f"Updated golden config with current credentials: {golden_config_path}")
+    except Exception as e:
+        return False, f"Failed to update golden config file: {str(e)}"
 
     device = {
         "device_type": device_type,
@@ -272,7 +281,8 @@ def rollback_to_golden_config(device_id, device_vendor):
             output = net_connect.send_config_set(config_lines)
             print(f"Config push output:\n{output}")
 
-        net_connect.send_command_timing("write memory", delay_factor=3)
+        net_connect.clear_buffer()
+        net_connect.send_command("write memory", expect_string=r"#", read_timeout=30)
         net_connect.disconnect()
         return True, f"✅ Successfully rolled back {device_id} to golden configuration"
 
