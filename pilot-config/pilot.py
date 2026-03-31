@@ -556,10 +556,111 @@ WantedBy=multi-user.target
     deploy()
 
 
+def provision_jenkins_token():
+    """
+    Wait for Jenkins to be ready, generate an API token using the initial admin
+    password, and write it into run_nahub.sh automatically.
+    Skips gracefully if Jenkins is unreachable or already has a token set.
+    """
+    jenkins_url = "http://localhost:8080"
+    run_nahub = os.path.join(os.path.dirname(__file__), "run_nahub.sh")
+    token_marker = "JENKINS_TOKEN:-"
+
+    # Skip if a non-empty token is already baked into run_nahub.sh
+    if os.path.exists(run_nahub):
+        with open(run_nahub) as f:
+            content = f.read()
+        import re as _re
+        m = _re.search(r'JENKINS_TOKEN:-([^"}]+)', content)
+        if m and m.group(1).strip():
+            print(f"✅ Jenkins token already present in run_nahub.sh — skipping generation")
+            return
+
+    # Read the initial admin password
+    init_pass_path = "/var/lib/jenkins/secrets/initialAdminPassword"
+    try:
+        result = subprocess.run(
+            ["sudo", "cat", init_pass_path],
+            capture_output=True, text=True, check=True,
+        )
+        password = result.stdout.strip()
+    except Exception:
+        print("⚠️  Could not read Jenkins initial password — skipping token generation")
+        return
+
+    # Wait up to 90 s for Jenkins to respond
+    print("⏳ Waiting for Jenkins to be ready…")
+    auth_b64 = base64.b64encode(f"admin:{password}".encode()).decode()
+    headers = {"Authorization": f"Basic {auth_b64}", "Content-Type": "application/x-www-form-urlencoded"}
+    for _ in range(18):
+        try:
+            req = urllib.request.Request(f"{jenkins_url}/api/json", headers=headers)
+            urllib.request.urlopen(req, timeout=5)
+            break
+        except Exception:
+            time.sleep(5)
+    else:
+        print("⚠️  Jenkins did not become ready in time — skipping token generation")
+        return
+
+    # Fetch CSRF crumb
+    try:
+        req = urllib.request.Request(f"{jenkins_url}/crumbIssuer/api/json", headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as r:
+            crumb_data = json.loads(r.read())
+        crumb_header = crumb_data["crumbRequestField"]
+        crumb_value = crumb_data["crumb"]
+        headers[crumb_header] = crumb_value
+    except Exception as e:
+        print(f"⚠️  Could not fetch Jenkins crumb: {e} — skipping token generation")
+        return
+
+    # Generate API token
+    try:
+        body = "newTokenName=NAutoHUB".encode()
+        req = urllib.request.Request(
+            f"{jenkins_url}/user/admin/descriptorByName/jenkins.security.ApiTokenProperty/generateNewToken",
+            data=body, headers=headers, method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            resp = json.loads(r.read())
+        token = resp["data"]["tokenValue"]
+    except Exception as e:
+        print(f"⚠️  Could not generate Jenkins API token: {e}")
+        return
+
+    # Write token into run_nahub.sh
+    if not os.path.exists(run_nahub):
+        print(f"⚠️  {run_nahub} not found — cannot write token")
+        return
+
+    with open(run_nahub) as f:
+        content = f.read()
+
+    import re as _re
+    new_content = _re.sub(
+        r'(export JENKINS_TOKEN="\$\{JENKINS_TOKEN:-)[^"}]*("\}")',
+        rf'\g<1>{token}\2',
+        content,
+    )
+    # Handle the simpler no-default form too
+    new_content = _re.sub(
+        r'(export JENKINS_TOKEN="\$\{JENKINS_TOKEN:-)[^"]*(")',
+        rf'\g<1>{token}\2',
+        new_content,
+    )
+
+    with open(run_nahub, "w") as f:
+        f.write(new_content)
+
+    print(f"✅ Jenkins API token generated and saved to run_nahub.sh")
+
+
 if __name__ == "__main__":
     subprocess.run(["sudo", "systemctl", "enable", "jenkins"], check=True)
     subprocess.run(["sudo", "systemctl", "start", "jenkins"], check=True)
     print("✅ Jenkins enabled and started")
+    provision_jenkins_token()
     main()
     base = find_base_path()
     setup_monitoring(base)
