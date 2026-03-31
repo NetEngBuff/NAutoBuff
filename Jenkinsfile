@@ -2,13 +2,13 @@ pipeline {
     agent any
 
     environment {
-        PROJECT_ROOT = "${env.WORKSPACE}"       // Assuming Jenkinsfile is in project root
-        VIRTUAL_ENV = "${PROJECT_ROOT}/pilot-config/venv"
+        PROJECT_ROOT = "${env.WORKSPACE}"
+        VIRTUAL_ENV  = "${env.WORKSPACE}/.ci-venv"
     }
 
     options {
         skipDefaultCheckout(true)
-        buildDiscarder(logRotator(numToKeepStr: '1'))
+        buildDiscarder(logRotator(numToKeepStr: '5'))
     }
 
     stages {
@@ -16,6 +16,18 @@ pipeline {
             steps {
                 echo "📥 Checking out source code..."
                 checkout scm
+            }
+        }
+
+        stage('Setup CI Environment') {
+            steps {
+                echo "🐍 Creating lightweight CI virtualenv..."
+                sh """
+                python3 -m venv ${VIRTUAL_ENV}
+                . ${VIRTUAL_ENV}/bin/activate
+                pip install --quiet --upgrade pip
+                pip install --quiet flake8 yamllint
+                """
             }
         }
 
@@ -34,7 +46,12 @@ pipeline {
                 echo "📄 Linting YAML files..."
                 sh """
                 . ${VIRTUAL_ENV}/bin/activate
-                find ${PROJECT_ROOT} -path "*/venv" -prune -o -path "*/clab-Lab_AdvNet*" -prune -o \\( -name "*.yml" -o -name "*.yaml" \\) -print | xargs yamllint -d "{rules: {document-start: disable, truthy: disable}}"
+                find ${PROJECT_ROOT} \
+                  -path "*/venv" -prune -o \
+                  -path "*/.ci-venv" -prune -o \
+                  -path "*/clab-*" -prune -o \
+                  \\( -name "*.yml" -o -name "*.yaml" \\) -print \
+                  | xargs yamllint -d "{rules: {document-start: disable, truthy: disable}}"
                 """
             }
         }
@@ -44,6 +61,7 @@ pipeline {
                 echo "🧪 Running Unit Tests..."
                 sh """
                 . ${VIRTUAL_ENV}/bin/activate
+                pip install --quiet netmiko jinja2 requests
                 python3 -m unittest discover -s ${PROJECT_ROOT}/NSOT/python-files -p "test_suite.py"
                 """
             }
