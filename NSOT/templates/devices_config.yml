@@ -5,4 +5,4 @@ devices:
   clear_config: 'no'
   vlans:
   - id: '100'
-    name: Test
+    name: test
