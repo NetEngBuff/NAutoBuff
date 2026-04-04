@@ -22,10 +22,10 @@ sudo setcap cap_net_admin,cap_net_raw,cap_sys_admin+ep $(which containerlab)
 # Generate your API token: Jenkins → top-right username → Configure → API Token
 export JENKINS_USER="${JENKINS_USER:-admin}"
 export JENKINS_TOKEN="${JENKINS_TOKEN:-116cebc6637ad2eedcb5740b9f54bd6285}"
-export JENKINS_JOB_NAME="${JENKINS_JOB_NAME:-NAutoHUB}"
+export JENKINS_JOB_NAME="${JENKINS_JOB_NAME:-NAutoBuff}"
 
-echo "Launching NAutoHUB Flask App..."
+echo "Launching NAutoBuff Flask App..."
 echo "Running on http://0.0.0.0:5555"
 
 # Direct path to your Flask app
-python ~/projects/NAutoHUB/NSOT/GUI/flask_app/nahub.py
+python ~/projects/NAutoBuff/NSOT/GUI/flask_app/nautobuff.py

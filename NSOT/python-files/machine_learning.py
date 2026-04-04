@@ -7,7 +7,7 @@ from flask import jsonify
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 NSOT_DIR = os.path.dirname(BASE_DIR)
-NAutoHUB_DIR = os.path.dirname(NSOT_DIR)
+NAutoBuff_DIR = os.path.dirname(NSOT_DIR)
 MISC_DIR = os.path.join(NSOT_DIR, "misc")
 INSTRUCTIONS_FILE = os.path.join(MISC_DIR, "instructions.txt")
 IPAM_DIR = os.path.join(NSOT_DIR, "IPAM")

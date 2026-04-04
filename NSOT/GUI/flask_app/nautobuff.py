@@ -62,9 +62,9 @@ topo_path = os.path.abspath(
 
 
 # ── Application Logging Setup ────────────────────────────────────────────────
-_LOG_DIR = os.path.join(project_root, "NSOT", "logs")
+_LOG_DIR = os.path.join(project_root, "logs")
 os.makedirs(_LOG_DIR, exist_ok=True)
-_LOG_FILE = os.path.join(_LOG_DIR, "nahub.log")
+_LOG_FILE = os.path.join(_LOG_DIR, "nautobuff.log")
 
 # Routes whose access lines are just noise (polling / static assets)
 _NOISY_PATHS = (
@@ -271,7 +271,7 @@ ipam_reader = IPAMReader(file_path=ipam_file_path, update_interval=10)
 hosts_reader = HostsReader(BASE_DIR)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("NAHUB_SECRET_KEY", "nahub-dev-secret-change-in-prod")
+app.secret_key = os.environ.get("NAUTOBUFF_SECRET_KEY", "nautobuff-dev-secret-change-in-prod")
 socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
 
 # ── SSH console session registry (keyed by Socket.IO sid) ─────────────────────
@@ -788,7 +788,7 @@ def deploy_topology_route():
         update_gnmic_yaml_from_hosts()
 
         # System services still require sudo, ensure NOPASSWD is set in sudoers
-        subprocess.run(["sudo", "systemctl", "restart", "gnmic_nautohub.service"], check=True)
+        subprocess.run(["sudo", "systemctl", "restart", "gnmic_nautobuff.service"], check=True)
         subprocess.run(["sudo", "systemctl", "restart", "ipam.service"], check=True)
 
         print("[✔] Deploy output captured successfully.")
@@ -929,7 +929,7 @@ def add_device():
             _restore_golden_configs(existing_devices)
             update_gnmic_yaml_from_hosts()
             subprocess.run(
-                ["sudo", "systemctl", "restart", "gnmic_nautohub.service"], check=True
+                ["sudo", "systemctl", "restart", "gnmic_nautobuff.service"], check=True
             )
             subprocess.run(["sudo", "systemctl", "restart", "ipam.service"], check=True)
             print("[✔] Deploy output:")
@@ -1372,7 +1372,7 @@ GRAFANA_BASE_URL = os.environ.get("GRAFANA_BASE_URL", "http://localhost:3000")
 # Use env var if explicitly set; otherwise use the known UID created by pilot.py
 GRAFANA_DASHBOARD_URL = os.environ.get(
     "GRAFANA_DASHBOARD_URL",
-    f"{GRAFANA_BASE_URL}/d/nautohub-telemetry",
+    f"{GRAFANA_BASE_URL}/d/nautobuff-telemetry",
 )
 INFLUXDB_URL = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
 
@@ -1536,7 +1536,7 @@ def oob_network_info():
 
 _MANAGED_SERVICES = [
     {"unit": "ipam.service",                  "label": "IPAM (SNMP Polling)"},
-    {"unit": "gnmic_nautohub.service",         "label": "gNMI Telemetry"},
+    {"unit": "gnmic_nautobuff.service",         "label": "gNMI Telemetry"},
     {"unit": "device_health_check.timer",      "label": "Device Health Check"},
     {"unit": "password_update.service",        "label": "Password Rotation"},
     {"unit": "ngrok.service",                  "label": "Ngrok Tunnel"},
@@ -1596,7 +1596,7 @@ def jenkins_status():
     from git_jenkins import find_ngrok_log_file, get_latest_ngrok_url
     log_path = find_ngrok_log_file()
     ngrok_url = get_latest_ngrok_url(log_path) if log_path else None
-    job = os.environ.get("JENKINS_JOB_NAME", "NAutoHUB")
+    job = os.environ.get("JENKINS_JOB_NAME", "NAutoBuff")
     return jsonify({
         "ngrok_url": ngrok_url,
         "jenkins_url": f"{ngrok_url}/job/{job}" if ngrok_url else None,
@@ -1731,4 +1731,5 @@ if __name__ == "__main__":
     thread = Thread(target=ipam_reader.read_ipam_file, daemon=True)
     thread.start()
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+
     socketio.run(app, host="0.0.0.0", port=5555, debug=debug)

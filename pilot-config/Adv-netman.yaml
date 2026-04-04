@@ -4,7 +4,7 @@ topology:
     mgmt:
       kind: ceos
       image: ceos:4.33.2F
-      startup-config: ~/projects/NAutoHUB/NSOT/golden_configs/goldenconfigs_mgmt.cfg
+      startup-config: ~/projects/NAutoBuff/NSOT/golden_configs/goldenconfigs_mgmt.cfg
     S1:
       kind: ceos
       image: ceos:4.33.2F

@@ -44,7 +44,7 @@ def build_clab_topology(topo_name, devices, links):
     nodes["mgmt"] = {
         "kind": "ceos",
         "image": "ceos:4.33.2F",
-        "startup-config": "~/projects/NAutoHUB/NSOT/golden_configs/goldenconfigs_mgmt.cfg",
+        "startup-config": "~/projects/NAutoBuff/NSOT/golden_configs/goldenconfigs_mgmt.cfg",
     }
     interface_counts["mgmt"] = 0
 

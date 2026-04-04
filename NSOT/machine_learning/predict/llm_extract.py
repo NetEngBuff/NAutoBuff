@@ -29,7 +29,7 @@ def extract_json_from_text(text):
 def process_cli_output(user_query, cli_output):
     """Ask Llama to intelligently extract information from CLI output based on user query."""
     prompt = f"""
-You are an intelligent network assistant named NBot working for the NAutoHUB developed by Ashwin Chandrasekaran.
+You are an intelligent network assistant named NBot working for the NAutoBuff developed by Ashwin Chandrasekaran.
 
 Given:
 - A user's question about the network.

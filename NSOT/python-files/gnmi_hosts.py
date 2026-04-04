@@ -10,7 +10,7 @@ import os
 
 GRAFANA_URL = "http://localhost:3000"
 GRAFANA_AUTH = base64.b64encode(b"admin:admin").decode()
-DASHBOARD_UID = "nautohub-telemetry"  # set by pilot.py on first run; adwlqs9 legacy
+DASHBOARD_UID = "nautobuff-telemetry"  # set by pilot.py on first run; adwlqs9 legacy
 
 
 def _get_clab_mgmt_ips():
@@ -129,7 +129,7 @@ def update_gnmic_yaml_from_hosts():
 
 def _sync_grafana_dashboard(hostname_ip_map):
     """
-    Patch the NAutoHUB Grafana dashboard so the Device variable and Flux
+    Patch the NAutoBuff Grafana dashboard so the Device variable and Flux
     device-name mapper reflect the current hostname→IP mapping from hosts.csv
     + containerlab.  Safe to call repeatedly — skipped silently if Grafana
     is unreachable or the dashboard doesn't exist yet.

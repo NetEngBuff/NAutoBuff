@@ -4,7 +4,7 @@ import time
 import requests
 import os
 
-JENKINS_JOB_NAME = os.environ.get("JENKINS_JOB_NAME", "NAutoHUB")
+JENKINS_JOB_NAME = os.environ.get("JENKINS_JOB_NAME", "NAutoBuff")
 JENKINS_USER = os.environ.get("JENKINS_USER", "admin")
 JENKINS_TOKEN = os.environ.get("JENKINS_TOKEN", "")
 
@@ -44,7 +44,7 @@ def git_push():
 
 
 def find_ngrok_log_file(
-    search_root=os.path.expanduser("~/projects/NAutoHUB/NSOT/logs"),
+    search_root=os.path.expanduser("~/projects/NAutoBuff/NSOT/logs"),
 ):
     for root, dirs, files in os.walk(search_root):
         for file in files:

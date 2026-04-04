@@ -12,10 +12,10 @@ import base64
 def find_base_path():
     current_dir = pathlib.Path(__file__).parent.absolute()
     base_path = current_dir
-    while base_path.name != "NAutoHUB" and base_path.parent != base_path:
+    while base_path.name != "NAutoBuff" and base_path.parent != base_path:
         base_path = base_path.parent
-    if base_path.name != "NAutoHUB":
-        raise Exception("Could not find 'NAutoHUB' in the path hierarchy")
+    if base_path.name != "NAutoBuff":
+        raise Exception("Could not find 'NAutoBuff' in the path hierarchy")
     return base_path
 
 
@@ -53,7 +53,7 @@ def deploy():
         "device_health_check.service",
         "ipam.service",
         "ngrok.service",
-        "gnmic_nautohub.service",
+        "gnmic_nautobuff.service",
     ]
 
     for service in services:
@@ -67,7 +67,7 @@ def deploy():
 
 def _build_grafana_dashboard(ds_uid, hostname_ip_map=None):
     """
-    Return the full Grafana dashboard JSON for NAutoHUB telemetry.
+    Return the full Grafana dashboard JSON for NAutoBuff telemetry.
 
     hostname_ip_map: dict of {hostname: "IP:port"}, e.g. {"R1": "172.20.20.3:6030"}.
     Built dynamically from hosts.csv + containerlab IPs — nothing hardcoded.
@@ -133,7 +133,7 @@ def _build_grafana_dashboard(ds_uid, hostname_ip_map=None):
                 "gridPos": {"x": 0, "y": y, "w": 24, "h": 1},
                 "collapsed": False}
 
-    B = "NAutoHUB"
+    B = "NAutoBuff"
     SF = '|> filter(fn: (r) => r.source =~ /^${hostname:regex}$/)'
 
     # Build Flux inline device-name mapper from the live hostname→IP map.
@@ -237,9 +237,9 @@ def _build_grafana_dashboard(ds_uid, hostname_ip_map=None):
     var_query = ", ".join(f"{name} : {ip}" for name, ip in hostname_ip_map.items())
 
     return {
-        "uid": "nautohub-telemetry",
-        "title": "NAutoHUB Network Telemetry",
-        "tags": ["nautohub", "gnmi"],
+        "uid": "nautobuff-telemetry",
+        "title": "NAutoBuff Network Telemetry",
+        "tags": ["nautobuff", "gnmi"],
         "editable": True,
         "graphTooltip": 1,
         "time": {"from": "now-30m", "to": "now"},
@@ -284,15 +284,15 @@ def setup_monitoring(base_path):
     setup = subprocess.run(
         ["influx", "setup",
          "--username", "admin",
-         "--password", "NAutoHUB123!",
-         "--org", "NAutoHUB",
-         "--bucket", "NAutoHUB",
+         "--password", "NAutoBuff123!",
+         "--org", "NAutoBuff",
+         "--bucket", "NAutoBuff",
          "--retention", "0",
          "--force"],
         capture_output=True, text=True,
     )
     if setup.returncode == 0:
-        print("✅ InfluxDB initialized  (admin / NAutoHUB123!)")
+        print("✅ InfluxDB initialized  (admin / NAutoBuff123!)")
     else:
         print("ℹ️  InfluxDB already initialized, skipping setup")
 
@@ -300,7 +300,7 @@ def setup_monitoring(base_path):
     token = None
 
     list_result = subprocess.run(
-        ["influx", "auth", "list", "--org", "NAutoHUB", "--json"],
+        ["influx", "auth", "list", "--org", "NAutoBuff", "--json"],
         capture_output=True, text=True,
     )
     if list_result.returncode == 0:
@@ -316,9 +316,9 @@ def setup_monitoring(base_path):
     if not token:
         create = subprocess.run(
             ["influx", "auth", "create",
-             "--org", "NAutoHUB",
+             "--org", "NAutoBuff",
              "--all-access",
-             "--description", "gnmic-nautohub",
+             "--description", "gnmic-nautobuff",
              "--json"],
             capture_output=True, text=True,
         )
@@ -348,14 +348,14 @@ def setup_monitoring(base_path):
     time.sleep(6)
 
     ds_payload = json.dumps({
-        "name": "NAutoHUB-InfluxDB",
+        "name": "NAutoBuff-InfluxDB",
         "type": "influxdb",
         "access": "proxy",
         "url": "http://localhost:8086",
         "jsonData": {
             "version": "Flux",
-            "organization": "NAutoHUB",
-            "defaultBucket": "NAutoHUB",
+            "organization": "NAutoBuff",
+            "defaultBucket": "NAutoBuff",
         },
         "secureJsonData": {"token": token},
     }).encode()
@@ -371,7 +371,7 @@ def setup_monitoring(base_path):
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=8):
-            print("✅ Grafana datasource 'NAutoHUB-InfluxDB' created")
+            print("✅ Grafana datasource 'NAutoBuff-InfluxDB' created")
     except urllib.error.HTTPError as e:
         if e.code == 409:
             print("ℹ️  Grafana datasource already exists")
@@ -380,14 +380,14 @@ def setup_monitoring(base_path):
     except Exception as e:
         print(f"ℹ️  Grafana not reachable: {e}")
         print("   → After Grafana starts, add a Flux datasource pointing to http://localhost:8086")
-        print(f"   → Use org: NAutoHUB  bucket: NAutoHUB  token: {token[:20]}...")
+        print(f"   → Use org: NAutoBuff  bucket: NAutoBuff  token: {token[:20]}...")
 
     # ── 6. Create/update the Grafana telemetry dashboard ─────────────────────
     grafana_auth = base64.b64encode(b"admin:admin").decode()
     ds_uid = None
     try:
         req = urllib.request.Request(
-            "http://localhost:3000/api/datasources/name/NAutoHUB-InfluxDB",
+            "http://localhost:3000/api/datasources/name/NAutoBuff-InfluxDB",
             headers={"Authorization": "Basic " + grafana_auth},
         )
         with urllib.request.urlopen(req, timeout=8) as resp:
@@ -444,7 +444,7 @@ def setup_monitoring(base_path):
         print("ℹ️  Grafana datasource UID not found — skipping dashboard creation")
 
     print("\n✅ Monitoring setup complete.")
-    print("   InfluxDB : http://localhost:8086  (admin / NAutoHUB123!)")
+    print("   InfluxDB : http://localhost:8086  (admin / NAutoBuff123!)")
     print("   Grafana  : http://localhost:3000  (admin / admin)")
 
 
@@ -532,7 +532,7 @@ WantedBy=multi-user.target
 """,
         },
         {
-            "file_name": "gnmic_nautohub.service",
+            "file_name": "gnmic_nautobuff.service",
             "content": f"""[Unit]
 Description=gNMIc Stream Collector Service
 After=network.target docker.service
@@ -559,17 +559,17 @@ WantedBy=multi-user.target
 def _jenkins_get_creds():
     """
     Return (jenkins_url, user, credential) ready to use for API calls.
-    Prefers the token already saved in run_nahub.sh; falls back to the
+    Prefers the token already saved in run_nautobuff.sh; falls back to the
     initial admin password so callers work even before token generation.
     """
     import re as _re
     jenkins_url = "http://localhost:8080"
     user = "admin"
-    run_nahub = os.path.join(os.path.dirname(__file__), "run_nahub.sh")
+    run_nautobuff = os.path.join(os.path.dirname(__file__), "run_nautobuff.sh")
 
     # Try saved token first
-    if os.path.exists(run_nahub):
-        with open(run_nahub) as f:
+    if os.path.exists(run_nautobuff):
+        with open(run_nautobuff) as f:
             content = f.read()
         m = _re.search(r'JENKINS_TOKEN:-([^"}]+)', content)
         if m and m.group(1).strip():
@@ -613,12 +613,12 @@ def _jenkins_crumb(jenkins_url, headers):
 def provision_jenkins_token():
     """
     Wait for Jenkins to be ready, generate an API token using the initial admin
-    password, and write it into run_nahub.sh automatically.
+    password, and write it into run_nautobuff.sh automatically.
     Returns the token string, or empty string on failure.
     """
     import re as _re
     jenkins_url, user, cred = _jenkins_get_creds()
-    run_nahub = os.path.join(os.path.dirname(__file__), "run_nahub.sh")
+    run_nautobuff = os.path.join(os.path.dirname(__file__), "run_nautobuff.sh")
 
     # If we already have a token (not the initial password), skip generation
     init_pass = ""
@@ -630,7 +630,7 @@ def provision_jenkins_token():
         pass
 
     if cred and cred != init_pass:
-        print("✅ Jenkins token already present in run_nahub.sh — skipping generation")
+        print("✅ Jenkins token already present in run_nautobuff.sh — skipping generation")
         return cred
 
     if not cred:
@@ -651,7 +651,7 @@ def provision_jenkins_token():
         return ""
 
     try:
-        body = "newTokenName=NAutoHUB".encode()
+        body = "newTokenName=NAutoBuff".encode()
         req = urllib.request.Request(
             f"{jenkins_url}/user/{user}/descriptorByName/jenkins.security.ApiTokenProperty/generateNewToken",
             data=body, headers=headers, method="POST",
@@ -662,21 +662,21 @@ def provision_jenkins_token():
         print(f"⚠️  Could not generate Jenkins API token: {e}")
         return ""
 
-    if not os.path.exists(run_nahub):
-        print(f"⚠️  {run_nahub} not found — cannot write token")
+    if not os.path.exists(run_nautobuff):
+        print(f"⚠️  {run_nautobuff} not found — cannot write token")
         return token
 
-    with open(run_nahub) as f:
+    with open(run_nautobuff) as f:
         content = f.read()
     new_content = _re.sub(
         r'(export JENKINS_TOKEN="\$\{JENKINS_TOKEN:-)[^"]*(")',
         rf'\g<1>{token}\2',
         content,
     )
-    with open(run_nahub, "w") as f:
+    with open(run_nautobuff, "w") as f:
         f.write(new_content)
 
-    print("✅ Jenkins API token generated and saved to run_nahub.sh")
+    print("✅ Jenkins API token generated and saved to run_nautobuff.sh")
     return token
 
 
@@ -740,7 +740,7 @@ def provision_jenkins_plugins():
 
 def provision_jenkins_job():
     """
-    Create the NAutoHUB Pipeline job in Jenkins if it doesn't already exist.
+    Create the NAutoBuff Pipeline job in Jenkins if it doesn't already exist.
     Detects the git remote URL automatically from the local repo.
     """
     jenkins_url, user, cred = _jenkins_get_creds()
@@ -750,7 +750,7 @@ def provision_jenkins_job():
 
     auth_b64 = base64.b64encode(f"{user}:{cred}".encode()).decode()
     headers = {"Authorization": f"Basic {auth_b64}"}
-    job_name = "NAutoHUB"
+    job_name = "NAutoBuff"
 
     # Check if job already exists
     try:
@@ -778,12 +778,12 @@ def provision_jenkins_job():
         if not remote.endswith(".git"):
             remote += ".git"
     except Exception:
-        remote = "https://github.com/NetEngBuff/NAutoHUB.git"
+        remote = "https://github.com/NetEngBuff/NAutoBuff.git"
         print(f"⚠️  Could not detect git remote — using default: {remote}")
 
     job_xml = f"""<?xml version='1.1' encoding='UTF-8'?>
 <flow-definition plugin="workflow-job">
-  <description>NAutoHUB CI/CD Pipeline — auto-created by pilot.py</description>
+  <description>NAutoBuff CI/CD Pipeline — auto-created by pilot.py</description>
   <keepDependencies>false</keepDependencies>
   <properties>
     <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github">

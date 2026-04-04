@@ -237,7 +237,9 @@ def rollback_to_golden_config(device_id, device_vendor):
 
         config_lines = [
             line for line in patched_config.splitlines()
-            if line.strip() and not line.strip().startswith("!")
+            if line.strip()
+            and not line.strip().startswith("!")
+            and line.strip().lower() != "end"
         ]
 
         # ------------------------------------------------------------------
@@ -249,7 +251,7 @@ def rollback_to_golden_config(device_id, device_vendor):
         #     terminal' or 'end' — only our own session open/commit.
         # ------------------------------------------------------------------
         if device_type == "arista_eos":
-            session_name = "nahub_rollback"
+            session_name = "nautobuff_rollback"
             all_session_cmds = (
                 [f"configure session {session_name}", "rollback clean-config"]
                 + config_lines

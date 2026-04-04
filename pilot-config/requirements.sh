@@ -39,7 +39,7 @@ curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor --yes | sudo tee /etc
 echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
 sudo apt-get update && sudo apt-get install -y grafana
 
-# Allow Grafana to be embedded in iframes (required for the NAutoHUB dashboard page)
+# Allow Grafana to be embedded in iframes (required for the NAutoBuff dashboard page)
 sudo sed -i 's/;allow_embedding = .*/allow_embedding = true/' /etc/grafana/grafana.ini || true
 # Enable anonymous viewer access so the iframe loads without requiring a Grafana login
 sudo sed -i '/^\[auth\.anonymous\]/,/^\[/ s/;enabled = false/enabled = true/' /etc/grafana/grafana.ini || true
@@ -194,4 +194,4 @@ echo "  Next step:  cd pilot-config && python pilot.py"
 echo ""
 echo "  One manual step remains after pilot.py:"
 echo "  → Add GitHub webhook: repo Settings → Webhooks → <ngrok_url>/github-webhook/"
-echo "  → The current ngrok URL is shown in the NAutoHUB burger menu → External Links → Jenkins"
+echo "  → The current ngrok URL is shown in the NAutoBuff burger menu → External Links → Jenkins"

@@ -138,10 +138,10 @@ def rotate_passwords():
     # Keep gnmic credentials in sync with the new passwords
     update_gnmic_yaml_from_hosts()
     try:
-        subprocess.run(["sudo", "systemctl", "restart", "gnmic_nautohub.service"], check=True)
-        print("[✔] gnmic_nautohub.service restarted with updated credentials")
+        subprocess.run(["sudo", "systemctl", "restart", "gnmic_nautobuff.service"], check=True)
+        print("[✔] gnmic_nautobuff.service restarted with updated credentials")
     except subprocess.CalledProcessError:
-        print("[⚠] Could not restart gnmic_nautohub.service — restart it manually")
+        print("[⚠] Could not restart gnmic_nautobuff.service — restart it manually")
 
 
 def main():

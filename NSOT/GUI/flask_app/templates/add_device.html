@@ -1,11 +1,30 @@
 {% extends "base.html" %}
 {% from '_macros.html' import next_steps %}
-{% block title %}Add Device - NAutoHUB{% endblock %}
+{% block title %}Add Device - NAutoBuff{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Add Device</h1>
   <p class="page-description">Add a new device to your existing network topology</p>
+</div>
+
+<!-- ── Teardown warning ──────────────────────────────────────────────────── -->
+<div class="alert alert-warning" style="max-width:700px; margin: 0 auto 20px; display:flex; gap:12px; align-items:flex-start;">
+  <span style="font-size:18px; flex-shrink:0;">&#9888;</span>
+  <div style="flex:1;">
+    <strong>Adding a device triggers a full topology teardown and redeploy.</strong>
+    <ul style="margin: 6px 0 8px 0; padding-left: 18px; line-height: 1.7;">
+      <li>All existing devices will be destroyed and recreated.</li>
+      <li>Devices that have a golden config will be <strong>automatically restored</strong> after redeploy.</li>
+      <li>Devices <strong>without</strong> a golden config, or with a stale one (e.g. missing <code>Management0</code>), will boot with a <strong>default blank config</strong>.</li>
+    </ul>
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      <button type="button" id="snap-btn" class="btn btn-secondary" style="font-size:13px; padding:6px 14px;" onclick="snapshotAll()">
+        Snapshot All Devices Now
+      </button>
+      <span id="snap-status" style="font-size:13px;"></span>
+    </div>
+  </div>
 </div>
 
 <div class="card card-elevated" style="max-width: 700px; margin: 0 auto;">
@@ -263,7 +282,49 @@ function toggleExecOrConfig() {
   document.getElementById("exec-section").style.display = kind === "linux" ? "block" : "none";
 }
 
+function snapshotAll() {
+  const btn = document.getElementById('snap-btn');
+  const status = document.getElementById('snap-status');
+  btn.disabled = true;
+  btn.textContent = 'Snapshotting…';
+  status.style.color = '';
+  status.textContent = '';
+
+  fetch('/api/golden-config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ select_all: true })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      status.style.color = 'var(--color-success)';
+      status.textContent = '✔ Snapshots saved for all devices — safe to proceed.';
+    } else {
+      status.style.color = 'var(--color-error)';
+      status.textContent = '✖ ' + (res.message || 'Snapshot failed.');
+    }
+  })
+  .catch(e => {
+    status.style.color = 'var(--color-error)';
+    status.textContent = '✖ Error: ' + e.message;
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = 'Snapshot All Devices Now';
+  });
+}
+
 function handleSubmit() {
+  const confirmed = confirm(
+    "⚠️ Full Topology Teardown\n\n" +
+    "Adding this device will destroy and redeploy the entire topology.\n\n" +
+    "• Existing devices WITH a golden config will be auto-restored.\n" +
+    "• Existing devices WITHOUT a golden config will boot blank.\n\n" +
+    "Have you taken golden config snapshots for all devices?\n\n" +
+    "Click OK to continue, or Cancel to go take snapshots first."
+  );
+  if (!confirmed) return false;
   updateConnectionCount();
   showLoading();
   return true;

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-NAutoHUB is a Network Management and Automation System (NMAS) that serves as a centralized Network Source of Truth (NSoT). It combines a Flask web UI, Containerlab virtual topology management, AI-assisted operations via Ollama/Llama3.1, gNMI/SNMP telemetry, and Jenkins CI/CD into a unified platform.
+NAutoBuff is a Network Management and Automation System (NMAS) that serves as a centralized Network Source of Truth (NSoT). It combines a Flask web UI, Containerlab virtual topology management, AI-assisted operations via Ollama/Llama3.1, gNMI/SNMP telemetry, and Jenkins CI/CD into a unified platform.
 
 ## Setup & Running
 
@@ -18,7 +18,7 @@ chmod +x requirements.sh pilot.sh
 
 ### Running the Web UI
 ```bash
-./pilot-config/run_nahub.sh
+./pilot-config/run_nautobuff.sh
 # Flask app runs on http://0.0.0.0:5555
 ```
 
@@ -40,7 +40,7 @@ python -m unittest discover -s . -p "test_suite.py"
 
 ### Core Components
 
-**Web UI** (`NSOT/GUI/flask_app/nahub.py`): 850+ line Flask app on port 5555. All routes are defined here — topology management, device configuration, AI chat, health checks, config generation, file uploads. This is the main entry point that imports and calls all backend modules.
+**Web UI** (`NSOT/GUI/flask_app/nautobuff.py`): 850+ line Flask app on port 5555. All routes are defined here — topology management, device configuration, AI chat, health checks, config generation, file uploads. This is the main entry point that imports and calls all backend modules.
 
 **Backend Python modules** (`NSOT/python-files/`): Individual service scripts, each with a focused responsibility:
 - `config_Gen.py` / `push_config.py` — Generate configs from Jinja2 templates, deploy via Netmiko SSH
@@ -82,7 +82,7 @@ python -m unittest discover -s . -p "test_suite.py"
 ### Systemd Services (created by `pilot.py`)
 - `ipam.service` — Continuous SNMP polling
 - `device_health_check.timer` — Periodic health monitoring
-- `gnmic_nautohub.service` — gNMI telemetry collection
+- `gnmic_nautobuff.service` — gNMI telemetry collection
 - `ngrok.service` — Tunnel for Jenkins webhooks
 - `password_update.service` — Scheduled credential rotation
 
@@ -90,4 +90,4 @@ python -m unittest discover -s . -p "test_suite.py"
 The `Jenkinsfile` defines stages: flake8 linting, yamllint, then unit tests. Ngrok provides a public webhook URL pointing to the local Jenkins instance. GitHub Actions (`.github/workflows/pylint.yml`) also runs pylint on PRs.
 
 ### Containerlab Notes
-Containerlab commands in `nahub.py` require `sudo`. The `requirements.sh` script sets `cap_net_admin` capabilities but the codebase explicitly uses `sudo clab ...` for topology deploy/destroy operations.
+Containerlab commands in `nautobuff.py` require `sudo`. The `requirements.sh` script sets `cap_net_admin` capabilities but the codebase explicitly uses `sudo clab ...` for topology deploy/destroy operations.

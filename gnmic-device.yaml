@@ -43,7 +43,7 @@ outputs:
   influxdb:
     type: influxdb
     address: http://localhost:8086
-    org: NAutoHUB
+    org: NAutoBuff
     bucket: Device_status
     token: y_qrmQHLhBgwJBetEDYVESdJPJRcjnPdXFizxoduoZbveIbjDtGLjY_sQTmXfhNtl_Ukb083lwRdfwT9deY27g==
     override-timestamps: true
