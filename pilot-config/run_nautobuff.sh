@@ -18,11 +18,18 @@ fi
 # 3. Fix Containerlab permissions
 sudo setcap cap_net_admin,cap_net_raw,cap_sys_admin+ep $(which containerlab)
 
-# 4. Jenkins credentials
-# Generate your API token: Jenkins → top-right username → Configure → API Token
-export JENKINS_USER="${JENKINS_USER:-admin}"
-export JENKINS_TOKEN="${JENKINS_TOKEN:-116cebc6637ad2eedcb5740b9f54bd6285}"
-export JENKINS_JOB_NAME="${JENKINS_JOB_NAME:-NAutoBuff}"
+# 4. Jenkins credentials — loaded from .jenkins_creds (never committed to git)
+# To update: edit pilot-config/.jenkins_creds
+CREDS_FILE="$(dirname "$0")/.jenkins_creds"
+if [ -f "$CREDS_FILE" ]; then
+    source "$CREDS_FILE"
+else
+    echo "⚠️  Warning: $CREDS_FILE not found. Jenkins monitoring will not work."
+    echo "   Create it with:"
+    echo "     echo 'export JENKINS_USER=admin' > pilot-config/.jenkins_creds"
+    echo "     echo 'export JENKINS_TOKEN=<your_token>' >> pilot-config/.jenkins_creds"
+    echo "     echo 'export JENKINS_JOB_NAME=NAutoBuff' >> pilot-config/.jenkins_creds"
+fi
 
 echo "Launching NAutoBuff Flask App..."
 echo "Running on http://0.0.0.0:5555"

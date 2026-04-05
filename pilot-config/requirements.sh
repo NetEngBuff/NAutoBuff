@@ -121,6 +121,49 @@ fi
 sudo systemctl enable --now jenkins
 echo "✅ Jenkins ready (credentials: admin / admin)"
 
+# Auto-generate Jenkins API token and save to .jenkins_creds
+CREDS_FILE="$(dirname "$0")/.jenkins_creds"
+if [ -f "$CREDS_FILE" ]; then
+    echo "  ℹ️  $CREDS_FILE already exists — skipping token generation"
+else
+    echo "  Waiting for Jenkins to be ready..."
+    for i in $(seq 1 24); do
+        if curl -sf -u admin:admin http://localhost:8080/api/json > /dev/null 2>&1; then
+            break
+        fi
+        sleep 5
+    done
+
+    CRUMB=$(curl -sf -u admin:admin \
+        "http://localhost:8080/crumbIssuer/api/json" | \
+        python3 -c "import sys,json; d=json.load(sys.stdin); print(d['crumbRequestField']+':'+d['crumb'])" 2>/dev/null)
+
+    TOKEN_JSON=$(curl -sf -u admin:admin \
+        -H "$CRUMB" \
+        -X POST \
+        "http://localhost:8080/user/admin/descriptorByName/jenkins.security.ApiTokenProperty/generateNewToken" \
+        --data "newTokenName=nautobuff" 2>/dev/null)
+
+    TOKEN=$(echo "$TOKEN_JSON" | python3 -c \
+        "import sys,json; d=json.load(sys.stdin); print(d['data']['tokenValue'])" 2>/dev/null)
+
+    if [ -n "$TOKEN" ]; then
+        cat > "$CREDS_FILE" <<EOF
+export JENKINS_USER=admin
+export JENKINS_TOKEN=$TOKEN
+export JENKINS_JOB_NAME=NAutoBuff
+EOF
+        chmod 600 "$CREDS_FILE"
+        echo "✅ Jenkins API token saved to pilot-config/.jenkins_creds"
+    else
+        echo "⚠️  Could not auto-generate Jenkins token."
+        echo "   After setup, create pilot-config/.jenkins_creds manually:"
+        echo "     export JENKINS_USER=admin"
+        echo "     export JENKINS_TOKEN=<Jenkins → username → Configure → API Token>"
+        echo "     export JENKINS_JOB_NAME=NAutoBuff"
+    fi
+fi
+
 echo "[9/12] Setting up Python 3.12 via pyenv..."
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
