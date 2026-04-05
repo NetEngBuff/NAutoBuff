@@ -124,11 +124,12 @@ This means rollback never reverts a password rotation.
 > **Fork first.** The CI/CD pipeline watches *your* repo — Jenkins must point to your fork, not the original.
 
 1. Click **Fork** at the top-right of this page
-2. Clone your fork:
+2. Make sure you have an SSH key added to your GitHub account — [GitHub SSH setup guide](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
+3. Clone your fork:
 
 ```bash
 mkdir -p ~/projects && cd ~/projects
-git clone https://github.com/<your-username>/NAutoBuff.git
+git clone git@github.com:<your-username>/NAutoBuff.git
 cd NAutoBuff/pilot-config
 chmod +x requirements.sh pilot.sh run_nautobuff.sh
 ```
