@@ -1,6 +1,6 @@
 ---
 devices:
-- hostname: R2
+- hostname: R1
   vendor: arista
   clear_config: 'no'
   vlans:

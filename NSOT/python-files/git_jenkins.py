@@ -80,7 +80,7 @@ def get_latest_build_number(jenkins_base_url, user, token):
     try:
         time.sleep(7)
         url = (
-            f"{jenkins_base_url}/job/{JENKINS_JOB_NAME}/api/json?tree=lastBuild[number]"
+            f"{jenkins_base_url}/job/{JENKINS_JOB_NAME}/api/json?tree=lastBuild%5Bnumber%5D"
         )
         print("Fetching latest build number from URL:", url)
         auth = (user, token) if token else None
