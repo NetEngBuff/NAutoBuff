@@ -63,3 +63,6 @@ NSOT/misc/ngrok_config.yml
 *.pem
 *.key
 pilot-config/.jenkins_creds
+
+# ── Claude Code ───────────────────────────────────────────────────────────────
+CLAUDE.md
