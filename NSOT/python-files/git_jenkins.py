@@ -121,8 +121,9 @@ def check_build_result(build_number):
 # --- Combined Pipeline Monitor ---
 
 
-def monitor_jenkins_job():
-    pre_build = get_latest_build_number() or 0
+def monitor_jenkins_job(pre_build=None):
+    if pre_build is None:
+        pre_build = get_latest_build_number() or 0
 
     build_number = wait_for_new_build(pre_build)
     if not build_number:
@@ -148,8 +149,9 @@ def monitor_jenkins_job():
 
 
 def push_and_monitor_jenkins():
+    pre_build = get_latest_build_number() or 0
     if git_push():
-        return monitor_jenkins_job()
+        return monitor_jenkins_job(pre_build)
     return "Git push failed"
 
 
