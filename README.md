@@ -38,7 +38,6 @@ NAutoBuff's NSoT lives in the `NSOT/` directory:
 | **Device Health** | CPU, interface, route, and LLDP neighbor health checks |
 | **Telemetry** | gNMI streaming via gnmic → InfluxDB → Grafana dashboard |
 | **AI Assistant (NBot)** | Natural language queries AND configuration via Ollama LLM — full CI/CD pipeline triggered on configure |
-| **Model Selector** | Switch between any locally installed Ollama model from the chat UI |
 | **MCP Servers** | Claude/ChatGPT Desktop can query and configure devices via MCP tools |
 | **Service Health Check** | Start/stop/restart/nuke all project services from the burger menu |
 | **External Links** | Grafana, InfluxDB, and Jenkins URLs always accessible from the nav menu |
@@ -58,55 +57,6 @@ Every config change pushed through the web UI or AI chatbot goes through a full 
 3. Jenkins picks it up via GitHub webhook
 4. Pipeline runs: flake8 lint → YAML lint → unit tests
 5. On success, config deployed to the device via Netmiko SSH
-
----
-
-## AI Assistant — NBot
-
-NBot is a local AI assistant powered by **Ollama** (no cloud, no API keys, fully free).
-
-**Read-only queries:**
-```
-"Show BGP neighbors on R1"
-"What's the MAC address of R2?"
-"Get interface errors on Ethernet1 on R1"
-```
-
-**Configuration (triggers full CI/CD pipeline):**
-```
-"Configure VLAN 111 named test on R1"
-"Set up OSPF process 1 on R2 with network 10.0.0.0/24 area 0"
-"Add BGP neighbor 10.0.0.2 remote-as 65002 on R1"
-```
-
-### MCP Integration
-
-`NSOT/mcp/` contains two FastMCP servers for Claude Desktop or ChatGPT Desktop:
-- `dut_query.py` — query devices (list inventory, run show commands)
-- `dut_config.py` — configure devices (apply templates, rollback, backup)
-
-Credentials are read from `hosts.csv` — no credentials are passed as tool parameters.
-
----
-
-## How Rollback Works
-
-Rollback uses Arista's **configure session** with `rollback clean-config` — an atomic transaction that replaces the entire running config in one commit.
-
-Before every rollback:
-1. Current password is read from `hosts.csv`
-2. Credential lines in the golden config are patched with current credentials
-3. Patched config is pushed inside a configure session and committed atomically
-
-This means rollback never reverts a password rotation.
-
-> **Important:** Golden configs must include the `Management0` interface. Always retake golden configs while devices are reachable using **Tools → Golden Config Generator**.
-
----
-
-## Network OS Images
-
-Vendor images are not included in this repo. Download and import your image manually before running `pilot.sh`. Refer to the [containerlab supported kinds documentation](https://containerlab.dev/manual/kinds/) for download and import instructions for each vendor.
 
 ---
 
@@ -163,7 +113,13 @@ This installs everything the system needs (run once):
 
 ---
 
-### Step 3 — Bring up the environment
+### Step 3 — Download and import your network OS image
+
+Vendor images are not included in this repo. Download and import your image manually before running `pilot.sh`. Refer to the [containerlab supported kinds documentation](https://containerlab.dev/manual/kinds/) for download and import instructions for each vendor.
+
+---
+
+### Step 4 — Bring up the environment
 
 ```bash
 ./pilot.sh
@@ -171,7 +127,6 @@ This installs everything the system needs (run once):
 
 This configures and starts everything:
 - Builds Docker images for host containers
-- Imports the cEOS image into Docker
 - Applies Netplan network config
 - Runs `pilot.py` which:
   - Configures Jenkins (first-time setup, creates pipeline job pointing at your repo)
@@ -183,7 +138,7 @@ At the end, webhook setup instructions are printed with your current Ngrok URL.
 
 ---
 
-### Step 4 — Start the web UI
+### Step 5 — Start the web UI
 
 ```bash
 ./run_nautobuff.sh
@@ -193,7 +148,7 @@ Access at: `http://<your-ip>:5555`
 
 ---
 
-### Step 5 — Add the GitHub webhook (one-time)
+### Step 6 — Add the GitHub webhook (one-time)
 
 This is the only manual step. Jenkins needs GitHub to notify it when you push.
 
@@ -208,7 +163,7 @@ This is the only manual step. Jenkins needs GitHub to notify it when you push.
 
 ---
 
-### Step 6 — Deploy a topology and start streaming telemetry
+### Step 7 — Deploy a topology and start streaming telemetry
 
 1. Open the web UI → **Topology Builder** → deploy your lab
 2. Go to **IPAM** → click **Sync IPs from clab** to populate `hosts.csv`
