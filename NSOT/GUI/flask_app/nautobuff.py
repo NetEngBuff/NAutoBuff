@@ -935,16 +935,32 @@ def delete_topology_route():
     )
     print("[INFO] Deleting topology...")
 
+    # If topo.yml is missing, try to find the lab name from clab-*/topology-data.json
+    # and destroy by name — handles cases where the file was moved or gitignored away
+    destroy_cmd = ["sudo", "containerlab", "destroy", "-t", yaml_path]
     if not os.path.exists(yaml_path):
-        return render_template(
-            "build_topology.html",
-            docker_images=get_docker_images(),
-            message="⚠️ No topology is currently deployed (topo.yml not found)."
-        )
+        clab_dirs = sorted(Path(yaml_path).parent.glob("clab-*/topology-data.json"))
+        lab_name = None
+        for td in clab_dirs:
+            try:
+                with open(td) as f:
+                    lab_name = json.load(f).get("name")
+                if lab_name:
+                    break
+            except Exception:
+                pass
+        if lab_name:
+            destroy_cmd = ["sudo", "containerlab", "destroy", "--name", lab_name, "--cleanup"]
+        else:
+            return render_template(
+                "build_topology.html",
+                docker_images=get_docker_images(),
+                message="⚠️ No topology is currently deployed."
+            )
 
     try:
         result = subprocess.run(
-            ["sudo", "containerlab", "destroy", "-t", yaml_path],
+            destroy_cmd,
             capture_output=True,
             text=True,
             check=True
