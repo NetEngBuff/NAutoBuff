@@ -119,10 +119,14 @@ This means rollback never reverts a password rotation, and the golden config fil
 
 ### Prerequisites
 
-- Ubuntu 22.04+ (or WSL2 on Windows)
+- **Linux** — Ubuntu 22.04+ (native)
+- **macOS** — [OrbStack](https://orbstack.dev) (lightweight Linux VM with full systemd + Docker support)
+- **Windows** — WSL2 with Ubuntu
 - Git + Git LFS installed
 - Internet connection
 - A free [Ngrok account](https://dashboard.ngrok.com) (for CI/CD webhook tunneling)
+
+> Containerlab requires a Linux kernel — OrbStack and WSL2 both provide this transparently.
 
 ### Step 1 — Clone
 
@@ -230,7 +234,7 @@ All managed from **burger menu → Health Check** in the UI, or via the command 
 
 ## Troubleshooting
 
-**WSL: user not in sudoers**
+**Windows/WSL: user not in sudoers**
 ```powershell
 # In PowerShell as Administrator:
 wsl -u root
