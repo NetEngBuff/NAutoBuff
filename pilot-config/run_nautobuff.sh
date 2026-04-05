@@ -28,4 +28,4 @@ echo "Launching NAutoBuff Flask App..."
 echo "Running on http://0.0.0.0:5555"
 
 # Direct path to your Flask app
-python ~/projects/NAutoBuff/NSOT/GUI/flask_app/nautobuff.py
+"$(dirname "$0")/venv/bin/python" ~/projects/NAutoBuff/NSOT/GUI/flask_app/nautobuff.py

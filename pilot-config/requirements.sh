@@ -148,12 +148,68 @@ echo "[11/12] Installing Python packages..."
 CFLAGS="-Wno-error=incompatible-pointer-types" ./venv/bin/pip install easysnmp
 ./venv/bin/pip install -r requirements.txt
 
-echo "[12/12] Finalizing Permissions..."
+echo "[12/13] Finalizing Permissions..."
 sudo usermod -aG docker $USER || true
 sudo usermod -aG docker jenkins || true
 # The "Magic" fix for sudo-less Containerlab in the Web UI
 sudo setcap cap_net_admin,cap_net_raw,cap_sys_admin+ep $(which containerlab)
 sudo chmod o+rx $HOME
+
+echo "[13/14] MCP HTTP Servers — Optional..."
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  MCP servers let Claude Desktop (or other remote AI"
+echo "  clients) reach NAutoBuff devices over the network."
+echo ""
+echo "  This opens two ports on this machine:"
+echo "    - 8001  MCP Query  (show commands)"
+echo "    - 8002  MCP Config (push config, rollback, backup)"
+echo ""
+echo "  Enable this if you want to use it with Claude Desktop,"
+echo "  ChatGPT, or any AI client running on a remote machine."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+read -rp "  Enable MCP HTTP servers? [y/N]: " ENABLE_MCP_HTTP
+SCRIPT_DIR_MCP="$(cd "$(dirname "$0")" && pwd)"
+if [[ "${ENABLE_MCP_HTTP,,}" == "y" ]]; then
+    touch "${SCRIPT_DIR_MCP}/../NSOT/misc/.mcp_http_enabled"
+    echo "✅ MCP HTTP servers will be started by pilot.sh"
+else
+    rm -f "${SCRIPT_DIR_MCP}/../NSOT/misc/.mcp_http_enabled"
+    echo "⚠️  MCP HTTP servers skipped — Claude Code over SSH still works via .mcp.json"
+fi
+
+echo "[14/14] AI Chatbot (NBot) — Optional..."
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  NBot is an AI assistant that lets you query your"
+echo "  network in plain English (e.g. 'show BGP neighbors"
+echo "  on R1', 'get interface errors on Ethernet1')."
+echo ""
+echo "  This will install:"
+echo "    - Ollama  (local AI runtime, ~50MB binary)"
+echo "    - llama3.1:8b model  (~5GB download)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+read -rp "  Enable AI chatbot? [y/N]: " ENABLE_CHATBOT
+if [[ "${ENABLE_CHATBOT,,}" == "y" ]]; then
+    echo "  Installing Ollama runtime..."
+    # zstd is required by the Ollama installer — install from source if not in apt
+    if ! command -v zstd &>/dev/null; then
+        echo "  Installing zstd (required by Ollama installer)..."
+        TMP_ZSTD=$(mktemp -d)
+        curl -fsSL https://github.com/facebook/zstd/releases/download/v1.5.6/zstd-1.5.6.tar.gz | tar -xz -C "${TMP_ZSTD}" --strip-components=1
+        make -C "${TMP_ZSTD}" -j$(nproc) -s && sudo make -C "${TMP_ZSTD}" install -s
+        rm -rf "${TMP_ZSTD}"
+    fi
+    curl -fsSL https://ollama.com/install.sh | sh
+    echo "  Pulling llama3.1:8b model (~5GB — this may take a few minutes)..."
+    ollama pull llama3.1:8b
+    echo "✅ AI chatbot enabled — NBot will be available in the web UI"
+else
+    echo "⚠️  AI chatbot skipped."
+    echo "   To enable later:"
+    echo "     curl -fsSL https://ollama.com/install.sh | sh"
+    echo "     ollama pull llama3.1:8b"
+fi
 
 # ── Ngrok configuration ──────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

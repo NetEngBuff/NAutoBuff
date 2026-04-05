@@ -4,19 +4,13 @@ from netmiko import ConnectHandler
 
 # Always locate relative to this script
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Assuming hosts.csv is under NSOT/IPAM/hosts.csv
-csv_path = os.path.join(current_dir, "..", "..", "IPAM", "hosts.csv")
-
-# Resolve absolute path
-csv_path = os.path.abspath(csv_path)
-
-# Load CSV once
-hosts_df = pd.read_csv(csv_path)
+csv_path = os.path.abspath(os.path.join(current_dir, "..", "..", "IPAM", "hosts.csv"))
 
 
 def connect_and_run_command(device_name, command):
     """Connects to a device via SSH using Netmiko and runs a command."""
+    # Read hosts.csv fresh each call so IPAM sync changes are picked up immediately
+    hosts_df = pd.read_csv(csv_path)
     matched_row = hosts_df[hosts_df["hostname"] == device_name]
 
     if matched_row.empty:

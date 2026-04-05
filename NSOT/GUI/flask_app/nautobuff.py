@@ -19,6 +19,7 @@ from flask import (
     stream_with_context,
     Response,
     flash,
+    session,
 )
 from flask_login import (
     LoginManager,
@@ -35,7 +36,6 @@ from jinja2 import Environment, FileSystemLoader
 import subprocess
 from threading import Thread
 from pathlib import Path
-import asyncio
 import socket
 import netifaces
 
@@ -497,127 +497,241 @@ def homepage():
     return render_template("homepage.html", devices=devices)
 
 
+def _llm_params_to_pipeline(device, template, params):
+    """
+    Adapter: converts LLM-extracted template + params into kwargs for
+    create_yaml_from_form_data() so the chatbot reuses the same pipeline
+    as the web UI (conf_gen → git → Jenkins).
+
+    Returns (kwargs_dict, None) on success.
+    Returns (None, "dhcp_direct") for DHCP (not supported by build_device_data).
+    Returns (None, error_str) on failure.
+    """
+    import re as _re
+
+    # Look up vendor from hosts.csv
+    csv_path = os.path.join(current_dir, "..", "..", "IPAM", "hosts.csv")
+    vendor = "arista"
+    try:
+        with open(csv_path, encoding="utf-8-sig") as f:
+            for row in csv.DictReader(f):
+                if row["hostname"].strip() == device:
+                    vendor = row.get("vendor", "arista").strip().lower()
+                    break
+    except Exception:
+        pass
+
+    kwargs = {"device_id": device, "device_vendor": vendor, "interfaces": []}
+
+    if template == "vlan_template.j2":
+        kwargs["vlans"] = params.get("vlans", [])
+
+    elif template == "interfaces_template.j2":
+        mapped = []
+        for iface in params.get("interfaces", []):
+            name = iface.get("name", "")
+            m = _re.match(r"([A-Za-z]+)(\d+.*)", name)
+            if m:
+                mapped.append({
+                    "type": m.group(1),
+                    "number": m.group(2),
+                    "ip": iface.get("ip_address"),
+                    "mask": iface.get("subnet_mask"),
+                })
+        kwargs["interfaces"] = mapped
+
+    elif template == "bgp_template.j2":
+        bgp = params.get("bgp", {})
+        for af in bgp.get("address_families", []):
+            af.setdefault("type", "ipv4")
+        kwargs["bgp"] = bgp
+
+    elif template == "ospf_template.j2":
+        redistribute = params.get("ospf_redistribute") or {}
+        kwargs["ospf"] = {
+            "process_id": params.get("ospf_process"),
+            "networks": params.get("ospf_networks", []),
+            "redistribute_connected": redistribute.get("connected", False),
+            "redistribute_bgp": redistribute.get("bgp", False),
+        }
+
+    elif template == "rip_template.j2":
+        kwargs["rip"] = {
+            "version": params.get("rip_version", 2),
+            "networks": [{"ip": n} for n in params.get("rip_networks", [])],
+            "redistribute": {
+                "bgp": params.get("bgp_redistribute", False),
+                "metric": params.get("bgp_metric") or 1,
+            },
+        }
+
+    elif template == "subinterface_template.j2":
+        kwargs["subinterfaces"] = params.get("subinterfaces", [])
+
+    elif template == "dhcp_template.j2":
+        return None, "dhcp_direct"
+
+    else:
+        return None, f"No pipeline mapping for template '{template}'"
+
+    return kwargs, None
+
+
+def _ollama_available():
+    """Return True if the Ollama daemon is reachable on localhost."""
+    try:
+        import urllib.request as _ur
+        _ur.urlopen("http://localhost:11434", timeout=2)
+        return True
+    except Exception:
+        return False
+
+
+def _get_installed_models():
+    """Return list of installed Ollama model names, empty list on failure."""
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen("http://localhost:11434/api/tags", timeout=3) as r:
+            data = json.loads(r.read())
+        return [m["name"] for m in data.get("models", [])]
+    except Exception:
+        return []
+
+
+@app.route("/api/ollama/models")
+@login_required
+def get_ollama_models():
+    """List all models currently installed in Ollama."""
+    models = _get_installed_models()
+    # Use session model if set and still installed, otherwise first available
+    selected = session.get("ollama_model")
+    if not selected or selected not in models:
+        selected = models[0] if models else None
+    return jsonify({"models": models, "selected": selected})
+
+
+@app.route("/api/ollama/model", methods=["POST"])
+@login_required
+def set_ollama_model():
+    """Save the user's chosen model to their session."""
+    model = (request.json or {}).get("model", "").strip()
+    if model:
+        session["ollama_model"] = model
+    return jsonify({"model": session.get("ollama_model")})
+
+
 @app.route("/chat-query", methods=["POST"])
 @login_required
 def chat_query():
+    if not shutil.which("ollama"):
+        return Response(
+            stream_with_context(iter(["⚠️ AI chatbot is not installed. Run requirements.sh and choose to enable NBot."])),
+            content_type="text/event-stream",
+        )
+
+    if not _ollama_available():
+        return Response(
+            stream_with_context(iter(["⚠️ Ollama is not running. Start it with: sudo systemctl start ollama"])),
+            content_type="text/event-stream",
+        )
+
     data = request.json
-    user_input = data.get("message")
+    user_input = (data.get("message") or "").strip()
+    history = data.get("history") or []
+    model = session.get("ollama_model")
+    if not model:
+        installed = _get_installed_models()
+        model = installed[0] if installed else None
+    if not model:
+        return Response(
+            stream_with_context(iter(["⚠️ No Ollama models installed. Run: ollama pull llama3.1:8b"])),
+            content_type="text/event-stream",
+        )
 
-    def generate_sync():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    def generate():
+        from llm_extract import extract_and_plan, interpret_output
+        from fetch_show import connect_and_run_command
+        from generate_config import render_device_config
 
-        async def inner():
-            # Step 1: Smalltalk detection
-            smalltalk_keywords = [
-                "hi",
-                "hello",
-                "thanks",
-                "thank you",
-                "bye",
-                "who are you",
-                "goodbye",
-            ]
-            if any(kw in user_input.lower() for kw in smalltalk_keywords):
-                yield "👋 Hi there! I'm NBot, your friendly network assistant."
-                return
+        if not user_input:
+            yield "⚠️ Please enter a message."
+            return
 
-            import ollama
+        actions = extract_and_plan(user_input, history=history, model=model)
+        if not actions:
+            yield "⚠️ Sorry, I could not understand that request."
+            return
 
-            response = ollama.chat(
-                model="llama3.1",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are an intelligent, helpful network automation assistant. 
-If the user's input is a casual greeting, question about yourself, or a non-technical sentence, reply only with 'SMALLTALK'. 
-If the user's input is technical (related to networking, configs, interfaces, protocols, etc), reply only with 'TECHNICAL'.""",
-                    },
-                    {"role": "user", "content": user_input},
-                ],
-            )
+        multi = len([a for a in actions if a.get("type") != "smalltalk"]) > 1
 
-            mode = response["message"]["content"].strip()
-            if mode == "SMALLTALK":
-                yield "🧠 Hello! How can I assist with your network today?"
-                return
-            elif mode != "TECHNICAL":
-                yield "⚠️ I couldn't determine if this was a technical query. Please try rephrasing."
-                return
+        for action in actions:
+            action_type = action.get("type")
+            device = action.get("device")
 
-            # Step 2: LLM extraction and response
-            from llm_extract import real_llm_extract, process_cli_output
-            from predict_specific import predict_specific_output
-            from predict_genericshow import predict_generic_show_command
-            from fetch_show import connect_and_run_command
-            from generate_show import generate_show_command
-            from generate_config import render_device_config
+            if action_type == "smalltalk":
+                yield action.get("response") or "👋 Hi! How can I help with your network today?"
 
-            extracted_actions = real_llm_extract(user_input)
-            if not extracted_actions:
-                yield "⚠️ Sorry, could not understand the request."
-                return
+            elif action_type == "monitor":
+                cli_command = action.get("cli_command")
+                if not cli_command or not device:
+                    yield "⚠️ Missing command or device for this action."
+                    continue
 
-            for action in extracted_actions:
-                intent = action.get("intent")
-                device = action.get("device")
-                monitor = action.get("monitor")
-                configure = action.get("configure")
+                if multi:
+                    yield f"\n{device}:\n"
 
-                if (configure is None or configure == {}) and monitor is None:
-                    if intent is None:
-                        yield "⚠️ Intent is missing."
-                        return
+                cli_output = connect_and_run_command(device, cli_command)
+                if cli_output:
+                    # Scope the question to this device only so the LLM
+                    # doesn't try to answer for all devices with partial data
+                    device_question = f"Running '{cli_command}' on {device} — what does the output show?"
+                    answer = interpret_output(device_question, cli_output, model=model)
+                    yield answer or "⚠️ Could not interpret device output."
+                else:
+                    yield f"⚠️ No output from {device}. Check the device is reachable."
 
-                    cli_command = predict_generic_show_command(intent)
-                    cli_output = connect_and_run_command(device, cli_command)
+            elif action_type == "configure":
+                template = action.get("template")
+                params = action.get("params") or {}
 
-                    if cli_output:
-                        answer = process_cli_output(user_input, cli_output)
-                        for token in answer:
-                            yield token
-                    else:
-                        yield "⚠️ No output from device."
+                if not template or not device:
+                    yield "⚠️ Missing template or device for configuration."
+                    continue
 
-                elif configure is None or configure == {}:
-                    predicted_show_type = predict_specific_output(intent)
-                    final_command = generate_show_command(predicted_show_type, monitor)
-                    cli_output = connect_and_run_command(device, final_command)
+                yield f"🔧 Generating config for {device}...\n"
 
-                    if cli_output:
-                        answer = process_cli_output(user_input, cli_output)
-                        for token in answer:
-                            yield token
-                    else:
-                        yield "⚠️ No output from device."
+                kwargs, err = _llm_params_to_pipeline(device, template, params)
 
-                elif monitor is None:
-                    predicted_template = predict_specific_output(intent)
-
-                    if isinstance(configure, dict):
-                        params = configure
-                    else:
-                        params = {"raw": configure}
-
-                    config_text = render_device_config(
-                        device, predicted_template, params
-                    )
-
+                if err == "dhcp_direct":
+                    # DHCP not wired into build_device_data — render directly
+                    config_text = render_device_config(device, template, params)
                     if config_text:
-                        yield f"✅ Configuration generated for {device}:\n\n{config_text}"
+                        yield f"✅ DHCP config generated for {device}:\n\n```\n{config_text}\n```"
                     else:
-                        yield "⚠️ Failed to generate configuration."
+                        yield f"⚠️ Failed to generate DHCP configuration."
+                    continue
 
-        async_gen = inner()
-        while True:
-            try:
-                token = loop.run_until_complete(async_gen.__anext__())
-                yield token
-            except StopAsyncIteration:
-                break
+                if kwargs is None:
+                    yield f"⚠️ {err}"
+                    continue
+
+                try:
+                    create_yaml_from_form_data(**kwargs)
+                    conf_gen()
+                    yield f"📤 Pushing to Git and triggering Jenkins...\n"
+                    result = push_and_monitor_jenkins()
+                    if result == "SUCCESS":
+                        yield f"✅ Jenkins passed — config deployed to {device}!"
+                    else:
+                        yield f"❌ Jenkins pipeline returned: {result}. Check Jenkins for details."
+                except Exception as e:
+                    yield f"⚠️ Pipeline error: {e}"
+
+            else:
+                yield f"⚠️ Unknown action type: '{action_type}'"
 
     return Response(
-        stream_with_context(generate_sync()), content_type="text/event-stream"
+        stream_with_context(generate()), content_type="text/event-stream"
     )
 
 
@@ -626,7 +740,7 @@ If the user's input is technical (related to networking, configs, interfaces, pr
 @operator_required
 def shutdown_ollama_route():
     try:
-        stop_ollama_model("llama3.1")
+        stop_ollama_model("llama3.2:3b")
         return jsonify({"status": "success", "message": "Ollama stopped."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
@@ -1545,6 +1659,18 @@ _MANAGED_SERVICES = [
     {"unit": "grafana-server",                 "label": "Grafana"},
     {"unit": "docker",                         "label": "Docker"},
 ]
+
+# Include Ollama in managed services only if it is installed on this host
+if shutil.which("ollama"):
+    _MANAGED_SERVICES.append({"unit": "ollama", "label": "AI Chatbot (Ollama)"})
+
+# MCP HTTP services only appear in the panel if the user opted them in during setup
+_MCP_FLAG = os.path.join(project_root, "NSOT", "misc", ".mcp_http_enabled")
+if os.path.exists(_MCP_FLAG):
+    _MANAGED_SERVICES += [
+        {"unit": "nautobuff_mcp_query.service",  "label": "MCP Query Server (port 8001)"},
+        {"unit": "nautobuff_mcp_config.service", "label": "MCP Config Server (port 8002)"},
+    ]
 _ALLOWED_UNITS = {s["unit"] for s in _MANAGED_SERVICES}
 
 

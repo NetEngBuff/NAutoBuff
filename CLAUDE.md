@@ -25,9 +25,9 @@ chmod +x requirements.sh pilot.sh
 ### Linting & Code Quality
 ```bash
 cd NSOT/python-files
-flake8 .             # Python linting (also runs in Jenkinsfile CI)
-yamllint .           # YAML linting
-black .              # Auto-format Python
+flake8 . --max-line-length=150    # Match CI (Jenkinsfile enforces 150)
+yamllint .                        # YAML linting
+black .                           # Auto-format Python
 ```
 
 ### Tests
@@ -40,7 +40,7 @@ python -m unittest discover -s . -p "test_suite.py"
 
 ### Core Components
 
-**Web UI** (`NSOT/GUI/flask_app/nautobuff.py`): 850+ line Flask app on port 5555. All routes are defined here — topology management, device configuration, AI chat, health checks, config generation, file uploads. This is the main entry point that imports and calls all backend modules.
+**Web UI** (`NSOT/GUI/flask_app/nautobuff.py`): 1700+ line Flask app on port 5555. All routes are defined here — topology management, device configuration, AI chat, health checks, config generation, file uploads. This is the main entry point that imports and calls all backend modules.
 
 **Backend Python modules** (`NSOT/python-files/`): Individual service scripts, each with a focused responsibility:
 - `config_Gen.py` / `push_config.py` — Generate configs from Jinja2 templates, deploy via Netmiko SSH
@@ -50,12 +50,15 @@ python -m unittest discover -s . -p "test_suite.py"
 - `clab_builder.py` / `clab_push.py` — Generates Containerlab YAML, manages Docker images
 - `git_jenkins.py` — Commits config changes to Git and monitors Jenkins builds via API
 - `update_hosts.py` / `create_hosts.py` — Manage the `hosts.csv` device inventory
+- `user_db.py` — Flask-Login user store (SQLite `users.db` in `NSOT/IPAM/`)
+- `password_reset.py` — Rotates credentials on all devices and updates `hosts.csv`
 
 **ML Pipeline** (`NSOT/machine_learning/`):
 - `run_pipeline.py` — Orchestrates the AI query workflow
-- `llm_extract.py` — Ollama/Llama3.1 for intent extraction and CLI output interpretation
-- `predict_specific.py` / `predict_genericshow.py` — Template selection and show command generation
+- `predict/llm_extract.py` — Ollama/Llama3.1 for intent extraction and CLI output interpretation
+- `predict/predict_specific.py` / `predict/predict_genericshow.py` — Template selection and show command generation
 - `helper/ollama_utils.py` — Manages local Ollama model lifecycle
+- `helper/fetch_show.py` / `helper/generate_config.py` / `helper/generate_show.py` — Netmiko execution helpers
 
 **Configuration Templates** (`NSOT/templates/`): Jinja2 `.j2` templates for BGP, OSPF, interfaces, VLANs, DHCP, and vendor-specific variants (Cisco/Juniper). `devices_config.yml` maps devices to templates.
 
@@ -88,6 +91,9 @@ python -m unittest discover -s . -p "test_suite.py"
 
 ### CI/CD
 The `Jenkinsfile` defines stages: flake8 linting, yamllint, then unit tests. Ngrok provides a public webhook URL pointing to the local Jenkins instance. GitHub Actions (`.github/workflows/pylint.yml`) also runs pylint on PRs.
+
+### Rollback Mechanism
+Rollback uses Arista `configure session` with `rollback clean-config` — an atomic full-config replace (not line-by-line merge). Before each rollback, `goldenConfig.py` reads the current password from `hosts.csv`, patches credential lines in the golden config via Jinja2, writes it back to disk, then pushes it inside the configure session. This keeps the golden config permanently in sync with rotated credentials. Golden configs **must** include the `Management0` interface or management connectivity will be lost after rollback.
 
 ### Containerlab Notes
 Containerlab commands in `nautobuff.py` require `sudo`. The `requirements.sh` script sets `cap_net_admin` capabilities but the codebase explicitly uses `sudo clab ...` for topology deploy/destroy operations.

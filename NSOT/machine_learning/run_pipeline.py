@@ -1,83 +1,62 @@
-from predict.llm_extract import real_llm_extract, process_cli_output
-from predict.predict_specific import predict_specific_output
-from predict.predict_genericshow import predict_generic_show_command
-from helper.generate_show import generate_show_command
-from helper.generate_config import render_device_config
+from predict.llm_extract import extract_and_plan, interpret_output
 from helper.fetch_show import connect_and_run_command
+from helper.generate_config import render_device_config
 
 
 def run_pipeline(user_input):
-    extracted_actions = real_llm_extract(user_input)
+    actions = extract_and_plan(user_input)
 
-    if not extracted_actions:
+    if not actions:
+        print("⚠️  Could not understand the request.")
         return
 
-    for action in extracted_actions:
-        intent = action.get("intent")
+    for action in actions:
+        action_type = action.get("type")
         device = action.get("device")
-        monitor = action.get("monitor")
-        configure = action.get("configure")
 
-        if (configure is None or configure == {}) and monitor is None:
-            print("\nGeneric Show Command Prediction...")
+        if action_type == "smalltalk":
+            print(f"\n🤖 NBot: {action.get('response')}")
 
-            if intent:
-                cli_command = predict_generic_show_command(intent)
-                print(f"\n CLI Command: {cli_command}")
-                output = connect_and_run_command(device, cli_command)
+        elif action_type == "monitor":
+            cli_command = action.get("cli_command")
+            if not cli_command or not device:
+                print("⚠️  Missing command or device for monitor action.")
+                continue
 
-                if output:
-                    final_answer = process_cli_output(user_input, output)
-                    print(f"\nLLM Final Answer:\n{final_answer}")
+            print(f"\n📡 [{device}] Running: {cli_command}")
+            output = connect_and_run_command(device, cli_command)
 
-        elif configure is None or configure == {}:
-            print("\n Specific Show Command..")
-
-            predicted_show_type = predict_specific_output(intent)
-            print(f"\nThe predicted show type is : {predicted_show_type}")
-
-            final_command = generate_show_command(predicted_show_type, monitor)
-
-            if final_command:
-                print(f"\n Final Show Command: {final_command}")
-                output = connect_and_run_command(device, final_command)
-
-                if output:
-                    final_answer = process_cli_output(user_input, output)
-                    print(f"\n LLM Final Answer:\n{final_answer}")
-
-        elif monitor is None:
-            print("\n Configuration mode...")
-
-            # Predict the correct template based on intent
-            predicted_output = predict_specific_output(intent)
-
-            if not predicted_output.endswith(".j2"):
-                # print(f"❌ Prediction Error: Expected a template file, but got '{predicted_output}'")
-                return
-
-            template_file = predicted_output
-
-            # Example: parse known structure into dict
-            params = {}
-            if isinstance(configure, dict):
-                params = configure
+            if output:
+                answer = interpret_output(user_input, output)
+                print(f"\n🤖 NBot: {answer}")
             else:
-                print("⚠️ Warning: config data not parsed properly. Using fallback.")
-                params = {"raw": configure}
+                print(f"⚠️  No output from {device}. Check the device is reachable.")
 
-            # Render the final config using template
-            config_text = render_device_config(device, template_file, params)
+        elif action_type == "configure":
+            template = action.get("template")
+            params = action.get("params") or {}
 
+            if not template or not device:
+                print("⚠️  Missing template or device for configure action.")
+                continue
+
+            config_text = render_device_config(device, template, params)
             if config_text:
-                print(f"\n Final Config for {device}:\n{config_text}")
+                print(f"\n✅ Config generated for {device}:\n{config_text}")
+            else:
+                print(f"⚠️  Failed to generate config for {device}.")
+
+        else:
+            print(f"⚠️  Unknown action type: '{action_type}'")
 
 
 if __name__ == "__main__":
-    print(" Starting continuous assistant. Type 'exit' to quit.\n")
+    print("🤖 NBot — NAutoBuff Network Assistant")
+    print("Type 'exit' to quit.\n")
     while True:
-        user_query = input("Enter your query (or 'exit' to quit): ").strip()
+        user_query = input("You: ").strip()
         if user_query.lower() in ["exit", "quit"]:
-            print("👋 Exiting pipeline. Goodbye!")
+            print("👋 Goodbye!")
             break
-        run_pipeline(user_query)
+        if user_query:
+            run_pipeline(user_query)

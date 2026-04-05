@@ -1,6 +1,7 @@
 easysnmp
 netmiko
 flask
+pyyaml
 requests
 docker
 flake8
@@ -8,9 +9,8 @@ black
 yamllint
 pandas
 ollama
-scikit-learn
+fastmcp
 jinja2
-tensorflow[and-cuda]
 netifaces
 flask-login
 flask-socketio

@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "nautobuff-query": {
+      "command": "pilot-config/venv/bin/python",
+      "args": ["NSOT/mcp/dut_query.py"],
+      "env": {
+        "PYTHONPATH": "NSOT/mcp"
+      }
+    },
+    "nautobuff-config": {
+      "command": "pilot-config/venv/bin/python",
+      "args": ["NSOT/mcp/dut_config.py"],
+      "env": {
+        "PYTHONPATH": "NSOT/mcp"
+      }
+    }
+  }
+}

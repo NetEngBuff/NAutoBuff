@@ -433,6 +433,12 @@
         </button>
       </div>
     </div>
+    <div class="chat-model-bar">
+      <span class="chat-model-label">Model:</span>
+      <select class="chat-model-select" id="modelSelect" onchange="setOllamaModel(this.value)" title="Select Ollama model">
+        <option value="">Loading...</option>
+      </select>
+    </div>
     <div class="chat-messages" id="chatMessages"></div>
     <div class="chat-input">
       <input type="text" class="chat-input-field" id="chatInput" placeholder="Ask me anything..." onkeypress="handleChatKeypress(event)">
@@ -522,7 +528,40 @@
       container.classList.toggle('visible');
       if (container.classList.contains('visible')) {
         document.getElementById('chatInput').focus();
+        loadOllamaModels();
       }
+    }
+
+    function loadOllamaModels() {
+      fetch('/api/ollama/models')
+        .then(r => r.json())
+        .then(data => {
+          const select = document.getElementById('modelSelect');
+          select.innerHTML = '';
+          if (!data.models.length) {
+            select.innerHTML = '<option value="">No models found</option>';
+            return;
+          }
+          data.models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            if (m === data.selected) opt.selected = true;
+            select.appendChild(opt);
+          });
+        })
+        .catch(() => {
+          document.getElementById('modelSelect').innerHTML = '<option value="">Ollama unavailable</option>';
+        });
+    }
+
+    function setOllamaModel(model) {
+      if (!model) return;
+      fetch('/api/ollama/model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model })
+      });
     }
 
     function closeChatbot() {
@@ -563,12 +602,13 @@
       `;
       messages.appendChild(userDiv);
 
-      // Add bot message placeholder
+      // Add bot message placeholder with a unique ID per message
+      const responseId = 'botResponse_' + Date.now();
       const botDiv = document.createElement('div');
       botDiv.className = 'chat-message chat-message-bot';
       botDiv.innerHTML = `
         <span class="chat-message-label">Assistant</span>
-        <div class="chat-message-content" id="botResponse">
+        <div class="chat-message-content" id="${responseId}">
           <div class="chat-typing">
             <span class="chat-typing-dot"></span>
             <span class="chat-typing-dot"></span>
@@ -581,15 +621,17 @@
 
       chatHistory.push(`You: ${message}`);
 
+      // Capture the specific element now — before any async work
+      const botResponseEl = document.getElementById(responseId);
+
       fetch('/chat-query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message, history: chatHistory })
+        body: JSON.stringify({ message: message, history: chatHistory.slice(0, -1) })
       })
       .then(response => {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        const botResponseEl = document.getElementById('botResponse');
         botResponseEl.innerHTML = '';
         let fullResponse = '';
 
@@ -613,7 +655,7 @@
         readChunk();
       })
       .catch(() => {
-        document.getElementById('botResponse').textContent = 'Error contacting assistant.';
+        botResponseEl.textContent = 'Error contacting assistant.';
         input.disabled = false;
         sendBtn.disabled = false;
       });

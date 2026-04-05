@@ -3,7 +3,8 @@
 import os
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
-TEMPLATE_DIR = "templates"
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_DIR = os.path.abspath(os.path.join(_current_dir, "..", "..", "templates"))
 
 
 def render_device_config(device_name, template_file, params):

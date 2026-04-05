@@ -1,5 +1,6 @@
 import os
 import pathlib
+import shutil
 import subprocess
 import getpass
 import json
@@ -554,6 +555,62 @@ WantedBy=multi-user.target
         create_service_or_timer_file(item["file_name"], item["content"])
 
     deploy()
+
+    # MCP HTTP servers — only if user opted in during requirements.sh
+    mcp_flag = base_path / "NSOT" / "misc" / ".mcp_http_enabled"
+    if mcp_flag.exists():
+        print("\n[INFO] MCP HTTP mode enabled — creating services...")
+        mcp_services = [
+            {
+                "file_name": "nautobuff_mcp_query.service",
+                "script": "NSOT/mcp/dut_query.py",
+                "port": 8001,
+                "description": "NAutoBuff MCP Query Server",
+            },
+            {
+                "file_name": "nautobuff_mcp_config.service",
+                "script": "NSOT/mcp/dut_config.py",
+                "port": 8002,
+                "description": "NAutoBuff MCP Config Server",
+            },
+        ]
+        python_bin = f"{base_path}/pilot-config/venv/bin/python"
+        for svc in mcp_services:
+            content = f"""[Unit]
+Description={svc['description']}
+After=network.target
+
+[Service]
+ExecStart={python_bin} {base_path}/{svc['script']} --http --port {svc['port']}
+WorkingDirectory={base_path}
+Restart=on-failure
+User={service_user}
+Environment=PYTHONPATH={base_path}/NSOT/mcp
+
+[Install]
+WantedBy=multi-user.target
+"""
+            create_service_or_timer_file(svc["file_name"], content)
+            try:
+                subprocess.run(["sudo", "systemctl", "enable", svc["file_name"]], check=True)
+                subprocess.run(["sudo", "systemctl", "start", svc["file_name"]], check=True)
+                print(f"✅ Enabled & started: {svc['file_name']} (port {svc['port']})")
+            except subprocess.CalledProcessError:
+                print(f"⚠️  Failed to start {svc['file_name']}")
+    else:
+        print("\nℹ️  MCP HTTP servers not enabled — Claude Code via SSH uses .mcp.json (no ports needed)")
+
+    # Optional: enable Ollama service if it was installed
+    if shutil.which("ollama"):
+        print("\n[INFO] Ollama detected — enabling ollama.service...")
+        try:
+            subprocess.run(["sudo", "systemctl", "enable", "ollama"], check=True)
+            subprocess.run(["sudo", "systemctl", "start", "ollama"], check=True)
+            print("✅ Enabled & started: ollama.service (AI chatbot)")
+        except subprocess.CalledProcessError:
+            print("⚠️  Could not enable ollama.service — start it manually with: sudo systemctl start ollama")
+    else:
+        print("\nℹ️  Ollama not installed — AI chatbot will be disabled in the web UI")
 
 
 def _jenkins_get_creds():
