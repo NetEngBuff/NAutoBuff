@@ -77,29 +77,32 @@ def get_latest_ngrok_url(log_file_path):
 
 
 def get_latest_build_number(jenkins_base_url, user, token):
+    url = f"{jenkins_base_url}/job/{JENKINS_JOB_NAME}/api/json?tree=lastBuild%5Bnumber%5D"
+    auth = (user, token) if token else None
     try:
-        time.sleep(7)
-        url = (
-            f"{jenkins_base_url}/job/{JENKINS_JOB_NAME}/api/json?tree=lastBuild%5Bnumber%5D"
-        )
-        print("Fetching latest build number from URL:", url)
-        auth = (user, token) if token else None
         response = requests.get(url, auth=auth, headers=NGROK_HEADERS, timeout=15)
         if response.status_code != 200:
             print(f"Jenkins API returned HTTP {response.status_code}. "
                   f"Response: {response.text[:300]}")
             return None
-        response_data = response.json()
-        latest_build_number = response_data.get("lastBuild", {}).get("number")
-        if latest_build_number:
-            print("Latest Build Number:", latest_build_number)
-            return latest_build_number
-        else:
-            print("Failed to retrieve the latest build number from response.")
-            return None
+        return response.json().get("lastBuild", {}).get("number")
     except Exception as e:
         print(f"Error fetching latest build number: {e}")
         return None
+
+
+def wait_for_new_build(jenkins_base_url, user, token, pre_build, timeout=120):
+    """Poll until a build number greater than pre_build appears, then return it."""
+    print(f"Waiting for new Jenkins build (previous was #{pre_build})...")
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(5)
+        number = get_latest_build_number(jenkins_base_url, user, token)
+        if number and (pre_build is None or number > pre_build):
+            print(f"New build detected: #{number}")
+            return number
+    print("Timed out waiting for a new Jenkins build — webhook may not be configured.")
+    return None
 
 
 def check_build_result(jenkins_base_url, latest_build_number, user, token):
@@ -123,7 +126,7 @@ def check_build_result(jenkins_base_url, latest_build_number, user, token):
 # --- Combined Pipeline Monitor ---
 
 
-def monitor_jenkins_job():
+def monitor_jenkins_job(pre_build=None):
     log_file_path = find_ngrok_log_file()
     if not log_file_path:
         print("Unable to find ngrok.log file.")
@@ -134,8 +137,8 @@ def monitor_jenkins_job():
         print("Unable to retrieve ngrok URL for Jenkins.")
         return "Failed"
 
-    latest_build_number = get_latest_build_number(
-        jenkins_base_url, JENKINS_USER, JENKINS_TOKEN
+    latest_build_number = wait_for_new_build(
+        jenkins_base_url, JENKINS_USER, JENKINS_TOKEN, pre_build
     )
     if not latest_build_number:
         return "Failed to retrieve the latest build number"
@@ -162,9 +165,18 @@ def monitor_jenkins_job():
 
 
 def push_and_monitor_jenkins():
-    if git_push():
-        return monitor_jenkins_job()
-    return "Git push failed"
+    # Capture current latest build number before pushing
+    log_file_path = find_ngrok_log_file()
+    pre_build = None
+    if log_file_path:
+        jenkins_base_url = get_latest_ngrok_url(log_file_path)
+        if jenkins_base_url:
+            pre_build = get_latest_build_number(jenkins_base_url, JENKINS_USER, JENKINS_TOKEN)
+
+    if not git_push():
+        return "Git push failed"
+
+    return monitor_jenkins_job(pre_build=pre_build)
 
 
 # For CLI testing

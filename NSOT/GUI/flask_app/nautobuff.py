@@ -721,7 +721,12 @@ def chat_query():
                     yield f"📤 Pushing to Git and triggering Jenkins...\n"
                     result = push_and_monitor_jenkins()
                     if result == "SUCCESS":
-                        yield f"✅ Jenkins passed — config deployed to {device}!"
+                        yield f"✅ Jenkins passed — pushing config to {device}...\n"
+                        push_result = push_configuration(device)
+                        if "successfully" in push_result:
+                            yield f"✅ Config deployed to {device}!"
+                        else:
+                            yield f"⚠️ Jenkins passed but device push failed: {push_result}"
                     else:
                         yield f"❌ Jenkins pipeline returned: {result}. Check Jenkins for details."
                 except Exception as e:
