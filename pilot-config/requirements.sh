@@ -184,6 +184,40 @@ EOF
     fi
 fi
 
+# ── MCP health check — write .mcp.json if both server files are present ──────
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MCP_JSON="${REPO_ROOT}/.mcp.json"
+DUT_QUERY="${REPO_ROOT}/NSOT/mcp/dut_query.py"
+DUT_CONFIG="${REPO_ROOT}/NSOT/mcp/dut_config.py"
+
+if [[ -f "${DUT_QUERY}" && -f "${DUT_CONFIG}" ]]; then
+    cat > "${MCP_JSON}" <<'EOF'
+{
+  "mcpServers": {
+    "nautobuff-query": {
+      "command": "pilot-config/venv/bin/python",
+      "args": ["NSOT/mcp/dut_query.py"],
+      "env": {
+        "PYTHONPATH": "NSOT/mcp"
+      }
+    },
+    "nautobuff-config": {
+      "command": "pilot-config/venv/bin/python",
+      "args": ["NSOT/mcp/dut_config.py"],
+      "env": {
+        "PYTHONPATH": "NSOT/mcp"
+      }
+    }
+  }
+}
+EOF
+    echo "✅ .mcp.json written — nautobuff-query and nautobuff-config registered"
+else
+    echo "⚠️  MCP server files not found — .mcp.json not updated"
+    [[ ! -f "${DUT_QUERY}" ]] && echo "   Missing: NSOT/mcp/dut_query.py"
+    [[ ! -f "${DUT_CONFIG}" ]] && echo "   Missing: NSOT/mcp/dut_config.py"
+fi
+
 echo ""
 echo "✅ Setup Complete. Please log out and back in for group changes."
 echo ""
