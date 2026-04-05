@@ -616,15 +616,25 @@ WantedBy=multi-user.target
 def _jenkins_get_creds():
     """
     Return (jenkins_url, user, credential) ready to use for API calls.
-    Prefers the token already saved in run_nautobuff.sh; falls back to the
-    initial admin password so callers work even before token generation.
+    Checks .jenkins_creds first, then run_nautobuff.sh, then falls back
+    to the initial admin password so callers work even before token generation.
     """
     import re as _re
     jenkins_url = "http://localhost:8080"
     user = "admin"
-    run_nautobuff = os.path.join(os.path.dirname(__file__), "run_nautobuff.sh")
+    script_dir = os.path.dirname(__file__)
 
-    # Try saved token first
+    # 1. Check .jenkins_creds (preferred — written by requirements.sh)
+    creds_file = os.path.join(script_dir, ".jenkins_creds")
+    if os.path.exists(creds_file):
+        with open(creds_file) as f:
+            content = f.read()
+        m = _re.search(r'JENKINS_TOKEN=([^\s]+)', content)
+        if m and m.group(1).strip():
+            return jenkins_url, user, m.group(1).strip()
+
+    # 2. Legacy: token saved inline in run_nautobuff.sh
+    run_nautobuff = os.path.join(script_dir, "run_nautobuff.sh")
     if os.path.exists(run_nautobuff):
         with open(run_nautobuff) as f:
             content = f.read()
@@ -632,7 +642,7 @@ def _jenkins_get_creds():
         if m and m.group(1).strip():
             return jenkins_url, user, m.group(1).strip()
 
-    # Fall back to initial admin password
+    # 3. Fall back to initial admin password (first-run only)
     try:
         r = subprocess.run(["sudo", "cat", "/var/lib/jenkins/secrets/initialAdminPassword"],
                            capture_output=True, text=True, check=True)
