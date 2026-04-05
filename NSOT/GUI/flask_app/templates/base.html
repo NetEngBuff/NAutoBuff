@@ -153,6 +153,52 @@
     </div>
   </div>
 
+  <!-- Claude Desktop MCP Modal -->
+  <div class="modal-overlay" id="mcpSetupModal" onclick="closeMcpSetup(event)">
+    <div class="rollback-modal" style="max-width:640px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+          Claude Desktop Integration
+        </h2>
+        <button onclick="closeMcpSetup()" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);font-size:20px;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding:16px 20px 20px;">
+
+        <p style="margin:0 0 14px;color:var(--color-text-muted);font-size:13px;">
+          Add NAutoBuff MCP servers to Claude Desktop so you can query and configure devices directly from Claude.
+        </p>
+
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Option 1 — Same machine (OrbStack / local)</div>
+          <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 8px;">Paste this into <code style="background:var(--color-surface-raised);padding:1px 4px;border-radius:3px;">~/Library/Application Support/Claude/claude_desktop_config.json</code></p>
+          <div style="position:relative;">
+            <pre id="mcpConfigLocal" style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:12px;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-all;"></pre>
+            <button onclick="copyMcpConfig('mcpConfigLocal')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-surface);cursor:pointer;color:var(--color-text-muted);">Copy</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Option 2 — Remote server (SSH tunnel)</div>
+          <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 6px;">First, open a tunnel from your laptop (keep it running):</p>
+          <div style="position:relative;margin-bottom:8px;">
+            <pre id="mcpSshTunnel" style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:12px;font-size:11px;overflow-x:auto;margin:0;"></pre>
+            <button onclick="copyMcpConfig('mcpSshTunnel')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-surface);cursor:pointer;color:var(--color-text-muted);">Copy</button>
+          </div>
+          <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 6px;">Then use this config in Claude Desktop:</p>
+          <div style="position:relative;">
+            <pre id="mcpConfigRemote" style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:12px;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-all;"></pre>
+            <button onclick="copyMcpConfig('mcpConfigRemote')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-surface);cursor:pointer;color:var(--color-text-muted);">Copy</button>
+          </div>
+        </div>
+
+        <div style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--color-text-muted);">
+          <strong style="color:var(--color-text);">Note:</strong> MCP HTTP servers (ports 8001/8002) must be enabled. Check <em>Health Check</em> in this menu. To enable: <code style="background:var(--color-surface);padding:1px 4px;border-radius:3px;">touch NSOT/misc/.mcp_http_enabled &amp;&amp; python3 pilot-config/pilot.py</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Health Check Modal -->
   <div class="modal-overlay" id="healthCheckModal" onclick="closeHealthCheck(event)">
     <div class="rollback-modal" style="max-width:640px;" onclick="event.stopPropagation()">
@@ -370,6 +416,14 @@
       <div class="side-menu-section">
         <span class="side-menu-section-title">Help</span>
       </div>
+      <nav class="side-menu-nav">
+        <a href="#" class="side-menu-link" onclick="openMcpSetup(event)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/>
+          </svg>
+          Claude Desktop Setup
+        </a>
+      </nav>
       <nav class="side-menu-nav">
         <a href="{{ url_for('about') }}" class="side-menu-link">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -717,6 +771,47 @@
 
     // ========== Health Check Modal ==========
     let _hcInterval = null;
+
+    function openMcpSetup(e) {
+      if (e) e.preventDefault();
+      const host = window.location.hostname;
+      const user = '{{ current_user.get_id() if current_user.is_authenticated else "your-user" }}';
+
+      document.getElementById('mcpConfigLocal').textContent = JSON.stringify({
+        mcpServers: {
+          "nautobuff-query": { url: "http://localhost:8001/mcp" },
+          "nautobuff-config": { url: "http://localhost:8002/mcp" }
+        }
+      }, null, 2);
+
+      document.getElementById('mcpSshTunnel').textContent =
+        `ssh -N -L 8001:localhost:8001 -L 8002:localhost:8002 ${user}@${host}`;
+
+      document.getElementById('mcpConfigRemote').textContent = JSON.stringify({
+        mcpServers: {
+          "nautobuff-query": { url: `http://${host}:8001/mcp` },
+          "nautobuff-config": { url: `http://${host}:8002/mcp` }
+        }
+      }, null, 2);
+
+      document.getElementById('mcpSetupModal').classList.add('visible');
+      document.getElementById('sideMenu').classList.remove('open');
+      document.getElementById('menuOverlay').classList.remove('visible');
+    }
+
+    function closeMcpSetup(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('mcpSetupModal').classList.remove('visible');
+    }
+
+    function copyMcpConfig(id) {
+      const text = document.getElementById(id).textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector(`#${id} + button`) ||
+                    document.querySelector(`[onclick="copyMcpConfig('${id}')"]`);
+        if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1500); }
+      });
+    }
 
     function openHealthCheck(e) {
       if (e) e.preventDefault();
