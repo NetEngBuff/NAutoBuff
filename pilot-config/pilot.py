@@ -285,7 +285,7 @@ def setup_monitoring(base_path):
     setup = subprocess.run(
         ["influx", "setup",
          "--username", "admin",
-         "--password", "NAutoBuff123!",
+         "--password", "admin",
          "--org", "NAutoBuff",
          "--bucket", "NAutoBuff",
          "--retention", "0",
@@ -293,7 +293,7 @@ def setup_monitoring(base_path):
         capture_output=True, text=True,
     )
     if setup.returncode == 0:
-        print("✅ InfluxDB initialized  (admin / NAutoBuff123!)")
+        print("✅ InfluxDB initialized  (admin / admin)")
     else:
         print("ℹ️  InfluxDB already initialized, skipping setup")
 
@@ -445,7 +445,7 @@ def setup_monitoring(base_path):
         print("ℹ️  Grafana datasource UID not found — skipping dashboard creation")
 
     print("\n✅ Monitoring setup complete.")
-    print("   InfluxDB : http://localhost:8086  (admin / NAutoBuff123!)")
+    print("   InfluxDB : http://localhost:8086  (admin / admin)")
     print("   Grafana  : http://localhost:3000  (admin / admin)")
 
 

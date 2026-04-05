@@ -38,8 +38,8 @@ outputs:
   influxdb:
     type: influxdb
     address: http://localhost:8086
-    org: NAutoHUB
-    bucket: NAutoHUB
+    org: NAutoBuff
+    bucket: NAutoBuff
     token: INFLUXDB_TOKEN_HERE
     override-timestamps: true
     timestamp-precision: ns

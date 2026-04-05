@@ -9,7 +9,7 @@ venv/
 .venv/
 env/
 
-# ── NAutoHUB runtime data ──────────────────────────────────────────────────────
+# ── NAutoBuff runtime data ──────────────────────────────────────────────────────
 # Hosts inventory — contains live credentials, rotated by password_update.service
 NSOT/IPAM/hosts.csv
 

@@ -206,7 +206,7 @@ After this, every config change from the web UI or AI chatbot triggers the full 
 |---|---|---|
 | NAutoBuff Web UI | `http://<host>:5555` | admin / admin |
 | Grafana | `http://<host>:3000` | admin / admin |
-| InfluxDB | `http://<host>:8086` | admin / NAutoBuff123! |
+| InfluxDB | `http://<host>:8086` | admin / admin |
 | Jenkins | via Ngrok URL (burger menu) | admin / admin |
 
 Live telemetry log:
