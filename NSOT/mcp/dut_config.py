@@ -47,6 +47,7 @@ def configure_dut(
     ]
     try:
         connection = ConnectHandler(**creds)
+        connection.enable()
         out.append("✓ Connected\n")
 
         out.append("Commands to apply:")
@@ -54,12 +55,17 @@ def configure_dut(
         out.extend(f"  {cmd}" for cmd in config_commands)
         out.append("")
 
-        output = connection.send_config_set(config_commands)
+        connection.send_command_timing("configure terminal", delay_factor=2)
+        output_lines = []
+        for cmd in config_commands:
+            output_lines.append(connection.send_command_timing(cmd, delay_factor=2))
+        connection.send_command_timing("end", delay_factor=2)
+        output = "\n".join(output_lines)
         out += ["✓ Configuration applied\n", "Output:", "-" * 60, output, ""]
 
         if save_config:
-            save_out = connection.send_command("write memory")
-            out += [f"✓ Configuration saved", save_out, ""]
+            save_out = connection.send_command_timing("write memory", delay_factor=2)
+            out += ["✓ Configuration saved", save_out, ""]
 
         connection.disconnect()
         out += ["=" * 60, "✓ Configuration completed successfully"]
@@ -99,7 +105,7 @@ def rollback_dut(
         out.append("✓ Connected\n")
 
         output = connection.send_command(
-            f"configure replace {checkpoint}", read_timeout=60, expect_string=r"#"
+            f"configure replace {checkpoint}", read_timeout=60
         )
         out += [output, "", "✓ Rollback completed\n"]
 
