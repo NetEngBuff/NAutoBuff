@@ -934,6 +934,14 @@ def delete_topology_route():
         )
     )
     print("[INFO] Deleting topology...")
+
+    if not os.path.exists(yaml_path):
+        return render_template(
+            "build_topology.html",
+            docker_images=get_docker_images(),
+            message="⚠️ No topology is currently deployed (topo.yml not found)."
+        )
+
     try:
         result = subprocess.run(
             ["sudo", "containerlab", "destroy", "-t", yaml_path],
