@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-NAutoBuff is a Network Management and Automation System (NMAS) that serves as a centralized Network Source of Truth (NSoT). It combines a Flask web UI, Containerlab virtual topology management, AI-assisted operations via Ollama/Llama3.1, gNMI/SNMP telemetry, and Jenkins CI/CD into a unified platform.
+NAutoBuff is a Network Management and Automation System (NMAS) that serves as a centralized Network Source of Truth (NSoT). It combines a Flask web UI, Containerlab virtual topology management, AI-assisted operations via Ollama (llama3.1:8b), gNMI/SNMP telemetry, Jenkins CI/CD, and MCP servers into a unified open-source platform.
+
+**Platform support:** Linux (native), macOS (via OrbStack), Windows (via WSL2). Containerlab requires a Linux kernel — OrbStack and WSL2 provide this.
 
 ## Setup & Running
 
@@ -13,6 +15,7 @@ NAutoBuff is a Network Management and Automation System (NMAS) that serves as a 
 cd pilot-config
 chmod +x requirements.sh pilot.sh
 ./requirements.sh    # Installs system deps: Docker, Containerlab, InfluxDB, Grafana, Ngrok, Jenkins, Python 3.12
+                     # Also prompts to install Ollama + llama3.1:8b (AI chatbot) and MCP HTTP servers
 ./pilot.sh           # Pulls LFS files, builds Docker images, imports cEOS image, creates systemd services
 ```
 
@@ -24,10 +27,9 @@ chmod +x requirements.sh pilot.sh
 
 ### Linting & Code Quality
 ```bash
-cd NSOT/python-files
-flake8 . --max-line-length=150    # Match CI (Jenkinsfile enforces 150)
-yamllint .                        # YAML linting
-black .                           # Auto-format Python
+# Jenkins CI only lints NSOT/python-files/ — always run this before pushing
+pilot-config/venv/bin/python -m flake8 NSOT/python-files/ --max-line-length=150
+yamllint .
 ```
 
 ### Tests
@@ -40,47 +42,66 @@ python -m unittest discover -s . -p "test_suite.py"
 
 ### Core Components
 
-**Web UI** (`NSOT/GUI/flask_app/nautobuff.py`): 1700+ line Flask app on port 5555. All routes are defined here — topology management, device configuration, AI chat, health checks, config generation, file uploads. This is the main entry point that imports and calls all backend modules.
+**Web UI** (`NSOT/GUI/flask_app/nautobuff.py`): Flask app on port 5555. All routes are defined here — topology management, device configuration, AI chat, health checks, config generation, file uploads. Main entry point that imports all backend modules.
 
-**Backend Python modules** (`NSOT/python-files/`): Individual service scripts, each with a focused responsibility:
+**Backend Python modules** (`NSOT/python-files/`):
 - `config_Gen.py` / `push_config.py` — Generate configs from Jinja2 templates, deploy via Netmiko SSH
+- `generate_yaml.py` — Converts form data / LLM params into `devices_config.yml` for `conf_gen()`
 - `goldenConfig.py` / `config_backup.py` — Fetch running configs and enable rollback
 - `ipam.py` — Polls devices via SNMP every 10 seconds, writes to `NSOT/IPAM/ipam_output.csv`
 - `health_checks.py` — Monitors CPU, interfaces, routes, LLDP neighbors
 - `clab_builder.py` / `clab_push.py` — Generates Containerlab YAML, manages Docker images
-- `git_jenkins.py` — Commits config changes to Git and monitors Jenkins builds via API
-- `update_hosts.py` / `create_hosts.py` — Manage the `hosts.csv` device inventory
+- `git_jenkins.py` — Commits config changes to Git, triggers Jenkins via webhook, monitors build via localhost:8080
 - `user_db.py` — Flask-Login user store (SQLite `users.db` in `NSOT/IPAM/`)
 - `password_reset.py` — Rotates credentials on all devices and updates `hosts.csv`
 
-**ML Pipeline** (`NSOT/machine_learning/`):
-- `run_pipeline.py` — Orchestrates the AI query workflow
-- `predict/llm_extract.py` — Ollama/Llama3.1 for intent extraction and CLI output interpretation
-- `predict/predict_specific.py` / `predict/predict_genericshow.py` — Template selection and show command generation
-- `helper/ollama_utils.py` — Manages local Ollama model lifecycle
-- `helper/fetch_show.py` / `helper/generate_config.py` / `helper/generate_show.py` — Netmiko execution helpers
+**AI Pipeline** (`NSOT/machine_learning/`):
+- `run_pipeline.py` — CLI entrypoint for the AI pipeline (standalone testing)
+- `predict/llm_extract.py` — Two Ollama calls: `extract_and_plan()` (intent → JSON actions) and `interpret_output()` (CLI output → human answer). Both accept a `model` parameter.
+- `helper/ollama_utils.py` — Ollama model lifecycle management
+- `helper/fetch_show.py` — Netmiko SSH execution; reads hosts.csv fresh on each call
+- `helper/generate_config.py` — Jinja2 template rendering; `TEMPLATE_DIR` is resolved to absolute path
 
-**Configuration Templates** (`NSOT/templates/`): Jinja2 `.j2` templates for BGP, OSPF, interfaces, VLANs, DHCP, and vendor-specific variants (Cisco/Juniper). `devices_config.yml` maps devices to templates.
-
-**Golden Configs** (`NSOT/golden_configs/`): Pre-validated device configurations that serve as the source of truth for rollback.
+**MCP Servers** (`NSOT/mcp/`):
+- `dut_query.py` — FastMCP server for querying devices (list inventory, run show commands)
+- `dut_config.py` — FastMCP server for configuring devices (apply templates, rollback, backup)
+- `_device_lookup.py` — Shared helper; reads credentials from `hosts.csv` (no credential params exposed)
+- `.mcp.json` at project root — Claude Code / Claude Desktop MCP config (stdio transport)
 
 ### Data Flow
 
-**Config generation:** Web form → `config_Gen.py` → Jinja2 templates → config file → `push_config.py` → Netmiko SSH → device
+**Chatbot configure:** Natural language → `extract_and_plan()` → `_llm_params_to_pipeline()` adapter → `create_yaml_from_form_data()` → `conf_gen()` → `push_and_monitor_jenkins()` (git push → webhook → Jenkins CI) → `push_configuration()` → Netmiko SSH → device
 
-**AI query:** Natural language → Ollama intent extraction → show command generation → Netmiko SSH → CLI output parsing → response
+**Web UI configure:** Same pipeline from `create_yaml_from_form_data()` onward — chatbot and web UI share identical code paths
+
+**Chatbot monitor:** Natural language → `extract_and_plan()` → `connect_and_run_command()` → `interpret_output()` → response
 
 **Monitoring:** Containerlab devices ← SNMP ← `ipam.py` → CSV; devices ← gNMI ← gnmic service → InfluxDB → Grafana
+
+### Jenkins Integration
+- Jenkins is monitored via `localhost:8080` directly (not Ngrok) — reliable regardless of Ngrok URL changes
+- Build triggering relies on GitHub webhook → Ngrok → Jenkins
+- Pre-build number is captured BEFORE git push so `wait_for_new_build()` correctly detects the new build
+- Credentials stored in `pilot-config/.jenkins_creds` (gitignored, auto-generated by `requirements.sh`)
+- `pilot.py` reads credentials from `.jenkins_creds` via `_jenkins_get_creds()`
+
+### Model Selection
+- Default model: `llama3.1:8b` (falls back to first installed model if session is empty)
+- Users can switch models via dropdown in chat UI → saved to Flask session
+- `/api/ollama/models` returns installed models; `/api/ollama/model` saves selection
+- Both `extract_and_plan()` and `interpret_output()` accept a `model` parameter
 
 ### Key Config Files
 | File | Purpose |
 |------|---------|
-| `NSOT/IPAM/hosts.csv` | Device inventory with Fernet-encrypted credentials (hostname, IP, username, password) |
-| `pilot-config/topo.yml` | Containerlab topology (3 nodes: mgmt, R1, R2 as cEOS containers) |
-| `gnmic-stream.yaml` | gNMI telemetry subscriptions (interfaces, CPU, device info) |
-| `NSOT/templates/devices_config.yml` | Maps devices to their Jinja2 config templates |
-| `NSOT/misc/ngrok_config.yml` | Ngrok auth token for Jenkins webhook tunneling |
-| `pilot-config/requirements.txt` | Python dependencies (14 packages: flask, netmiko, easysnmp, ollama, scikit-learn, etc.) |
+| `NSOT/IPAM/hosts.csv` | Device inventory (hostname, IP, username, password, vendor) — gitignored |
+| `pilot-config/.jenkins_creds` | Jenkins API token — gitignored, auto-generated by requirements.sh |
+| `pilot-config/topo.yml` | Containerlab topology (mgmt, R1, R2 as cEOS containers) — gitignored |
+| `gnmic-stream.yaml` | gNMI telemetry subscriptions — gitignored, generated by pilot.py |
+| `NSOT/templates/devices_config.yml` | Maps devices to Jinja2 config templates |
+| `NSOT/misc/ngrok_config.yml` | Ngrok auth token — gitignored |
+| `pilot-config/requirements.txt` | Python dependencies |
+| `.mcp.json` | MCP server definitions for Claude Code / Claude Desktop |
 
 ### Systemd Services (created by `pilot.py`)
 - `ipam.service` — Continuous SNMP polling
@@ -88,12 +109,13 @@ python -m unittest discover -s . -p "test_suite.py"
 - `gnmic_nautobuff.service` — gNMI telemetry collection
 - `ngrok.service` — Tunnel for Jenkins webhooks
 - `password_update.service` — Scheduled credential rotation
+- `ollama.service` — Local LLM runtime (only if Ollama is installed)
 
 ### CI/CD
-The `Jenkinsfile` defines stages: flake8 linting, yamllint, then unit tests. Ngrok provides a public webhook URL pointing to the local Jenkins instance. GitHub Actions (`.github/workflows/pylint.yml`) also runs pylint on PRs.
+Jenkinsfile lints `NSOT/python-files/` with flake8 (max-line-length=150), runs yamllint, then unit tests. Ngrok tunnels GitHub webhooks to local Jenkins. Jenkins job is auto-created by `pilot.py` with repo URL detected from `git remote get-url origin`.
 
 ### Rollback Mechanism
-Rollback uses Arista `configure session` with `rollback clean-config` — an atomic full-config replace (not line-by-line merge). Before each rollback, `goldenConfig.py` reads the current password from `hosts.csv`, patches credential lines in the golden config via Jinja2, writes it back to disk, then pushes it inside the configure session. This keeps the golden config permanently in sync with rotated credentials. Golden configs **must** include the `Management0` interface or management connectivity will be lost after rollback.
+Rollback uses Arista `configure session` with `rollback clean-config` — atomic full-config replace. Before each rollback, `goldenConfig.py` reads the current password from `hosts.csv`, patches credential lines via Jinja2, writes back to disk, then pushes inside a configure session. Golden configs **must** include `Management0` or management connectivity will be lost.
 
 ### Containerlab Notes
-Containerlab commands in `nautobuff.py` require `sudo`. The `requirements.sh` script sets `cap_net_admin` capabilities but the codebase explicitly uses `sudo clab ...` for topology deploy/destroy operations.
+Containerlab commands in `nautobuff.py` require `sudo`. Uses `sudo clab ...` for topology deploy/destroy operations.
