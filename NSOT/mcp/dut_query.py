@@ -51,7 +51,7 @@ def _get_config(connection, keyword: str) -> tuple[str, dict]:
         log = "Getting full running configuration...\n"
 
     try:
-        output = connection.send_command(cmd, read_timeout=30, expect_string=r"#")
+        output = connection.send_command(cmd, read_timeout=30)
         if output.strip():
             return log + "Configuration retrieved\n\n", {cmd: output}
         return log + "No configuration found\n\n", {}
@@ -72,7 +72,7 @@ def _find_and_run(connection, path: str, keywords: list) -> dict:
 
         if not keywords and can_execute:
             try:
-                result = connection.send_command(path, read_timeout=30, expect_string=r"#")
+                result = connection.send_command(path, read_timeout=30)
                 return {"log": f"  Found: {path}\n", "output": {path: result}}
             except Exception as e:
                 return {"log": f"  Failed: {e}\n", "output": None}
