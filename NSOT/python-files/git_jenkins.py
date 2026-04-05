@@ -94,15 +94,15 @@ def get_latest_build_number():
 
 def wait_for_new_build(pre_build, timeout=120):
     """Poll localhost until a build number greater than pre_build appears."""
-    print(f"Waiting for new Jenkins build (previous was #{pre_build})...")
+    print("Waiting for Jenkins build to start...")
     deadline = time.time() + timeout
     while time.time() < deadline:
         time.sleep(5)
         number = get_latest_build_number()
-        if number and (pre_build is None or number > pre_build):
-            print(f"New build detected: #{number}")
+        if number and number > pre_build:
+            print(f"Jenkins build #{number} started.")
             return number
-    print("Timed out waiting for a new Jenkins build — check GitHub webhook points to current Ngrok URL.")
+    print("Timed out waiting for Jenkins — check GitHub webhook points to current Ngrok URL.")
     return None
 
 
@@ -110,13 +110,9 @@ def check_build_result(build_number):
     """Check build result via localhost."""
     try:
         url = f"http://localhost:8080/job/{JENKINS_JOB_NAME}/{build_number}/api/json"
-        print(f"Checking build result: {url}")
         resp = requests.get(url, auth=_auth(), timeout=15)
         if resp.status_code == 200:
-            result = resp.json().get("result")
-            print(f"Build #{build_number} result: {result}")
-            return result
-        print(f"HTTP {resp.status_code} checking build result")
+            return resp.json().get("result")
     except Exception as e:
         print(f"Error checking build result: {e}")
     return None
@@ -127,13 +123,6 @@ def check_build_result(build_number):
 
 def monitor_jenkins_job():
     pre_build = get_latest_build_number() or 0
-
-    # Ngrok URL is still used to update GitHub webhook — print it for reference
-    log_file_path = find_ngrok_log_file()
-    if log_file_path:
-        ngrok_url = get_latest_ngrok_url(log_file_path)
-        if ngrok_url:
-            print(f"GitHub webhook should point to: {ngrok_url}/github-webhook/")
 
     build_number = wait_for_new_build(pre_build)
     if not build_number:
@@ -148,7 +137,7 @@ def monitor_jenkins_job():
             print("Jenkins job failed.")
             return "FAILURE"
         elif result is None:
-            print("Build still in progress, checking again in 10 seconds...")
+            print("Build in progress, checking again in 10 seconds...")
             time.sleep(10)
         else:
             print(f"Unexpected result: {result}")
