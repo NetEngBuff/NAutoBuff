@@ -1746,6 +1746,29 @@ def control_service():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/services/nuke", methods=["POST"])
+@login_required
+def nuke_services():
+    if not current_user.is_operator():
+        return jsonify({"error": "Insufficient permissions"}), 403
+    errors = []
+    for svc in _MANAGED_SERVICES:
+        unit = svc["unit"]
+        for action in ("stop", "disable"):
+            subprocess.run(["sudo", "systemctl", action, unit],
+                           capture_output=True, timeout=20)
+        r = subprocess.run(
+            ["sudo", "find", "/etc/systemd/system", "-name", unit, "-delete"],
+            capture_output=True, timeout=10,
+        )
+        if r.returncode != 0:
+            errors.append(unit)
+    subprocess.run(["sudo", "systemctl", "daemon-reload"], capture_output=True, timeout=15)
+    if errors:
+        return jsonify({"error": f"Could not remove: {', '.join(errors)}"}), 500
+    return jsonify({"ok": True})
+
+
 @app.route("/api/jenkins-status")
 @login_required
 def jenkins_status():

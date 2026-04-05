@@ -60,11 +60,6 @@ def update_gnmic_yaml_from_hosts():
         print(f"[⚠] gnmic-stream.yaml not found at {gnmic_yaml} — skipping gNMI update")
         return
 
-    if not os.path.exists(hosts_csv):
-        print("[⚠] hosts.csv not found — skipping gNMI update")
-        return
-
-    # Prefer containerlab management IPs (Management0) over hosts.csv in-band IPs
     clab_ips = _get_clab_mgmt_ips()
     if clab_ips:
         print(f"[✔] Using containerlab management IPs for {list(clab_ips.keys())}")
@@ -76,29 +71,39 @@ def update_gnmic_yaml_from_hosts():
             config = yaml.safe_load(f) or {}
 
         config["targets"] = {}
+        subscription_keys = list((config.get("subscriptions") or {}).keys())
 
-        with open(hosts_csv, newline="") as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                hostname = row.get("hostname", "").strip()
-                mgmt_ip = row.get("management_ip", "").strip()
-                username = row.get("username", "").strip()
-                password = row.get("password", "").strip()
-                if not hostname:
-                    continue
-                # Use containerlab mgmt IP if available, else fall back to hosts.csv
-                ip = clab_ips.get(hostname) or mgmt_ip
-                if not ip:
-                    continue
-                target = {
-                    "subscriptions": list((config.get("subscriptions") or {}).keys()),
+        if os.path.exists(hosts_csv):
+            with open(hosts_csv, newline="") as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    hostname = row.get("hostname", "").strip()
+                    mgmt_ip = row.get("management_ip", "").strip()
+                    username = row.get("username", "").strip()
+                    password = row.get("password", "").strip()
+                    if not hostname:
+                        continue
+                    ip = clab_ips.get(hostname) or mgmt_ip
+                    if not ip:
+                        continue
+                    target = {"subscriptions": subscription_keys}
+                    if username:
+                        target["username"] = username
+                    if password:
+                        target["password"] = password
+                    config["targets"][f"{ip}:6030"] = target
+        elif clab_ips:
+            # hosts.csv not yet populated — use containerlab IPs with default cEOS credentials
+            print("[ℹ] hosts.csv not found — using containerlab IPs with default credentials")
+            for hostname, ip in clab_ips.items():
+                config["targets"][f"{ip}:6030"] = {
+                    "subscriptions": subscription_keys,
+                    "username": "admin",
+                    "password": "admin",
                 }
-                if username:
-                    target["username"] = username
-                if password:
-                    target["password"] = password
-                # gnmic uses the map key as the address — use IP:port directly
-                config["targets"][f"{ip}:6030"] = target
+        else:
+            print("[⚠] No hosts.csv and no containerlab IPs — skipping gNMI update")
+            return
 
         # Remove stale processors section if present
         config.pop("processors", None)
@@ -112,15 +117,18 @@ def update_gnmic_yaml_from_hosts():
 
         # Build hostname→IP:port map from what we just wrote, then sync Grafana
         hostname_ip_map = {}
-        with open(hosts_csv, newline="") as csvfile2:
-            for row in csv.DictReader(csvfile2):
-                hostname = row.get("hostname", "").strip()
-                mgmt_ip = row.get("management_ip", "").strip()
-                if not hostname:
-                    continue
-                ip = clab_ips.get(hostname) or mgmt_ip
-                if ip:
-                    hostname_ip_map[hostname] = f"{ip}:6030"
+        if os.path.exists(hosts_csv):
+            with open(hosts_csv, newline="") as csvfile2:
+                for row in csv.DictReader(csvfile2):
+                    hostname = row.get("hostname", "").strip()
+                    mgmt_ip = row.get("management_ip", "").strip()
+                    if not hostname:
+                        continue
+                    ip = clab_ips.get(hostname) or mgmt_ip
+                    if ip:
+                        hostname_ip_map[hostname] = f"{ip}:6030"
+        else:
+            hostname_ip_map = {h: f"{ip}:6030" for h, ip in clab_ips.items()}
         _sync_grafana_dashboard(hostname_ip_map)
 
     except Exception as e:

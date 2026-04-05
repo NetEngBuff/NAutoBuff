@@ -60,109 +60,7 @@ echo "[8/12] Installing Jenkins..."
 sudo wget -O /etc/apt/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
 echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
 sudo apt-get update && sudo apt-get install -y jenkins
-
-# ── Automate Jenkins first-time configuration (no wizard, no manual steps) ──
-
-# Stop so we can configure before Jenkins writes anything
-sudo systemctl stop jenkins || true
-
-# 1. Skip the setup wizard by writing the installed version into both state files
-JENKINS_VER=$(dpkg -l jenkins 2>/dev/null | awk '/^ii/{print $3}' | head -1)
-for f in /var/lib/jenkins/jenkins.install.UpgradeWizard.state \
-          /var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion; do
-    sudo bash -c "echo '${JENKINS_VER}' > ${f}"
-    sudo chown jenkins:jenkins "${f}"
-done
-
-# 2. Groovy init script — creates admin/admin and marks setup complete
-sudo mkdir -p /var/lib/jenkins/init.groovy.d
-sudo tee /var/lib/jenkins/init.groovy.d/01-security.groovy > /dev/null <<'GROOVY'
-import jenkins.model.*
-import hudson.security.*
-import jenkins.install.InstallState
-
-def instance = Jenkins.get()
-if (instance.getSecurityRealm() instanceof HudsonPrivateSecurityRealm &&
-    instance.getSecurityRealm().getAllUsers().find { it.id == "admin" }) {
-    println("ℹ️  Jenkins admin already configured — skipping")
-    return
-}
-def realm = new HudsonPrivateSecurityRealm(false)
-realm.createAccount("admin", "admin")
-instance.setSecurityRealm(realm)
-def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
-strategy.setAllowAnonymousRead(false)
-instance.setAuthorizationStrategy(strategy)
-instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
-instance.save()
-println("✅ Jenkins admin user and security configured")
-GROOVY
-sudo chown -R jenkins:jenkins /var/lib/jenkins/init.groovy.d/
-
-# 3. Install required plugins BEFORE first start using the Plugin Installation Manager
-echo "  Installing Jenkins plugins (git, pipeline, github)..."
-PLUGIN_JAR="/tmp/jenkins-plugin-manager.jar"
-if [ ! -f "${PLUGIN_JAR}" ]; then
-    curl -fsSL -o "${PLUGIN_JAR}" \
-      "https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.12.15/jenkins-plugin-manager-2.12.15.jar" \
-      || echo "  ⚠️  Could not download plugin manager — will install via REST API on first run"
-fi
-if [ -f "${PLUGIN_JAR}" ]; then
-    sudo java -jar "${PLUGIN_JAR}" \
-        --war /usr/share/jenkins/jenkins.war \
-        --plugin-download-directory /var/lib/jenkins/plugins \
-        --plugins "git:latest workflow-aggregator:latest github:latest pipeline-stage-view:latest" \
-        2>&1 | tail -5 \
-      && echo "  ✅ Plugins installed" \
-      || echo "  ⚠️  Plugin install had warnings — pilot.py will retry via API"
-    sudo chown -R jenkins:jenkins /var/lib/jenkins/plugins/ || true
-fi
-
-sudo systemctl enable --now jenkins
-echo "✅ Jenkins ready (credentials: admin / admin)"
-
-# Auto-generate Jenkins API token and save to .jenkins_creds
-CREDS_FILE="$(dirname "$0")/.jenkins_creds"
-if [ -f "$CREDS_FILE" ]; then
-    echo "  ℹ️  $CREDS_FILE already exists — skipping token generation"
-else
-    echo "  Waiting for Jenkins to be ready..."
-    for i in $(seq 1 24); do
-        if curl -sf -u admin:admin http://localhost:8080/api/json > /dev/null 2>&1; then
-            break
-        fi
-        sleep 5
-    done
-
-    CRUMB=$(curl -sf -u admin:admin \
-        "http://localhost:8080/crumbIssuer/api/json" | \
-        python3 -c "import sys,json; d=json.load(sys.stdin); print(d['crumbRequestField']+':'+d['crumb'])" 2>/dev/null)
-
-    TOKEN_JSON=$(curl -sf -u admin:admin \
-        -H "$CRUMB" \
-        -X POST \
-        "http://localhost:8080/user/admin/descriptorByName/jenkins.security.ApiTokenProperty/generateNewToken" \
-        --data "newTokenName=nautobuff" 2>/dev/null)
-
-    TOKEN=$(echo "$TOKEN_JSON" | python3 -c \
-        "import sys,json; d=json.load(sys.stdin); print(d['data']['tokenValue'])" 2>/dev/null)
-
-    if [ -n "$TOKEN" ]; then
-        cat > "$CREDS_FILE" <<EOF
-export JENKINS_USER=admin
-export JENKINS_TOKEN=$TOKEN
-export JENKINS_JOB_NAME=NAutoBuff
-EOF
-        chmod 600 "$CREDS_FILE"
-        echo "✅ Jenkins API token saved to pilot-config/.jenkins_creds"
-    else
-        echo "⚠️  Could not auto-generate Jenkins token."
-        echo "   After setup, create pilot-config/.jenkins_creds manually:"
-        echo "     export JENKINS_USER=admin"
-        echo "     export JENKINS_TOKEN=<Jenkins → username → Configure → API Token>"
-        echo "     export JENKINS_JOB_NAME=NAutoBuff"
-    fi
-fi
+echo "✅ Jenkins installed — first-time configuration handled by pilot.py"
 
 echo "[9/12] Setting up Python 3.12 via pyenv..."
 export PYENV_ROOT="$HOME/.pyenv"
@@ -289,8 +187,4 @@ fi
 echo ""
 echo "✅ Setup Complete. Please log out and back in for group changes."
 echo ""
-echo "  Next step:  cd pilot-config && python pilot.py"
-echo ""
-echo "  One manual step remains after pilot.py:"
-echo "  → Add GitHub webhook: repo Settings → Webhooks → <ngrok_url>/github-webhook/"
-echo "  → The current ngrok URL is shown in the NAutoBuff burger menu → External Links → Jenkins"
+echo "  Next step:  cd pilot-config && ./pilot.sh"

@@ -234,6 +234,12 @@
           </thead>
           <tbody id="hc-tbody"></tbody>
         </table>
+        <div style="padding:12px 20px;border-top:1px solid var(--color-border);text-align:right;">
+          <button onclick="nukeAllServices(this)"
+            style="padding:6px 14px;font-size:12px;border-radius:var(--radius-sm);border:1px solid #ef4444;background:rgba(239,68,68,.08);color:#ef4444;cursor:pointer;font-weight:600;">
+            Nuke All Services
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -911,6 +917,31 @@
         btns.forEach(b => { b.disabled = false; b.style.opacity = '1'; });
         btn.textContent = orig;
       });
+    }
+
+    function nukeAllServices(btn) {
+      if (!confirm('Stop and remove all NAutoBuff services? This cannot be undone without re-running pilot.sh.')) return;
+      btn.disabled = true;
+      btn.textContent = '…';
+      fetch('/api/services/nuke', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.error) {
+            _hcToast('error', d.error);
+            btn.disabled = false;
+            btn.textContent = 'Nuke All Services';
+          } else {
+            _hcToast('ok', 'All services stopped and removed.');
+            setTimeout(loadHealthCheck, 1500);
+            btn.disabled = false;
+            btn.textContent = 'Nuke All Services';
+          }
+        })
+        .catch(e => {
+          _hcToast('error', `Request failed: ${e.message}`);
+          btn.disabled = false;
+          btn.textContent = 'Nuke All Services';
+        });
     }
 
     function _hcToast(type, msg) {

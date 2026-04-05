@@ -1,16 +1,16 @@
 # NAutoBuff — Network Management & Automation System
 
-NAutoBuff is an **NMAS (Network Management and Automation System)** that acts as a centralized **Network Source of Truth (NSoT)**. It combines a Flask web UI, Containerlab virtual topology management, AI-assisted network operations, gNMI/SNMP telemetry, and a Jenkins CI/CD pipeline into a single open-source platform.
+NAutoBuff is a **Network Management and Automation System (NMAS)** that acts as a centralized **Network Source of Truth (NSoT)**. It combines a Flask web UI, Containerlab virtual topology management, AI-assisted network operations, gNMI/SNMP telemetry, and a Jenkins CI/CD pipeline into a single open-source platform.
 
 ![Architecture](pictures/nhub-arch.jpeg)
 
 ---
 
-## What is NSOT?
+## What is a Network Source of Truth?
 
-A Network Source of Truth provides a single, reliable reference for all network data — configurations, states, IPs, and inventory.
+A Network Source of Truth (NSoT) is a single, reliable reference for all network data — configurations, device states, IP addresses, and inventory. Instead of managing devices individually, everything flows through one place.
 
-NSOT is the core of NAutoBuff. It includes:
+NAutoBuff's NSoT lives in the `NSOT/` directory:
 
 | Directory | Purpose |
 |---|---|
@@ -21,23 +21,7 @@ NSOT is the core of NAutoBuff. It includes:
 | `templates/` | Jinja2 templates for building device configs |
 | `machine_learning/` | AI pipeline — intent extraction, CLI interpretation, config generation |
 | `mcp/` | MCP servers for Claude/ChatGPT Desktop integration |
-| `logs/` | Application log file (`nautobuff.log`), ngrok tunnel log |
-
----
-
-## Why CI/CD?
-
-CI/CD pipelines are the foundation for Infrastructure as Code (IaC), enabling automated, consistent, and auditable network deployments.
-
-![cicd](pictures/nautobuff-cicd.png)
-
-Every config change pushed through the web UI or AI chatbot is:
-1. Rendered from a Jinja2 template
-2. Committed to Git automatically
-3. Pushed to GitHub
-4. Picked up by Jenkins via GitHub webhook
-5. Validated by the pipeline (flake8 lint → YAML lint → unit tests)
-6. Deployed to the device via Netmiko SSH
+| `logs/` | Application log (`nautobuff.log`) and ngrok tunnel log |
 
 ---
 
@@ -54,64 +38,69 @@ Every config change pushed through the web UI or AI chatbot is:
 | **Device Health** | CPU, interface, route, and LLDP neighbor health checks |
 | **Telemetry** | gNMI streaming via gnmic → InfluxDB → Grafana dashboard |
 | **AI Assistant (NBot)** | Natural language queries AND configuration via Ollama LLM — full CI/CD pipeline triggered on configure |
-| **Model Selector** | Users can choose any installed Ollama model from the chat UI |
+| **Model Selector** | Switch between any locally installed Ollama model from the chat UI |
 | **MCP Servers** | Claude/ChatGPT Desktop can query and configure devices via MCP tools |
-| **Service Health Check** | Start/stop/restart all project systemd services from the burger menu |
+| **Service Health Check** | Start/stop/restart/nuke all project services from the burger menu |
 | **External Links** | Grafana, InfluxDB, and Jenkins URLs always accessible from the nav menu |
 | **Password Rotation** | Automatic credential rotation on all devices every 30 minutes |
-| **App Logging** | Timestamped log at `NSOT/logs/nautobuff.log` — noisy polling filtered out |
+| **App Logging** | Timestamped log at `NSOT/logs/nautobuff.log` |
+
+---
+
+## CI/CD Pipeline
+
+Every config change pushed through the web UI or AI chatbot goes through a full CI/CD pipeline:
+
+![cicd](pictures/nautobuff-cicd.png)
+
+1. Config rendered from a Jinja2 template
+2. Committed to Git and pushed to GitHub automatically
+3. Jenkins picks it up via GitHub webhook
+4. Pipeline runs: flake8 lint → YAML lint → unit tests
+5. On success, config deployed to the device via Netmiko SSH
 
 ---
 
 ## AI Assistant — NBot
 
-NBot is a local AI assistant powered by **Ollama** (no cloud, no API keys, fully free). It understands natural language and handles both read and write operations:
+NBot is a local AI assistant powered by **Ollama** (no cloud, no API keys, fully free).
 
-**Monitor (read-only):**
+**Read-only queries:**
 ```
 "Show BGP neighbors on R1"
 "What's the MAC address of R2?"
 "Get interface errors on Ethernet1 on R1"
 ```
 
-**Configure (full CI/CD pipeline):**
+**Configuration (triggers full CI/CD pipeline):**
 ```
 "Configure VLAN 111 named test on R1"
 "Set up OSPF process 1 on R2 with network 10.0.0.0/24 area 0"
 "Add BGP neighbor 10.0.0.2 remote-as 65002 on R1"
 ```
 
-When a configure request is made:
-1. LLM extracts intent and parameters
-2. Parameters are rendered through the appropriate **Jinja2 template**
-3. Config is committed to **Git** and pushed to **GitHub**
-4. **Jenkins** runs lint + unit tests
-5. On success, config is deployed to the device via **Netmiko SSH**
-
-The model dropdown in the chat lets users switch between any locally installed Ollama model.
-
 ### MCP Integration
 
-`NSOT/mcp/` contains two FastMCP servers for use with Claude Desktop or ChatGPT Desktop:
+`NSOT/mcp/` contains two FastMCP servers for Claude Desktop or ChatGPT Desktop:
 - `dut_query.py` — query devices (list inventory, run show commands)
 - `dut_config.py` — configure devices (apply templates, rollback, backup)
 
-Credentials are read from `hosts.csv` — no credentials are passed as parameters.
+Credentials are read from `hosts.csv` — no credentials are passed as tool parameters.
 
 ---
 
 ## How Rollback Works
 
-Rollback uses Arista's **configure session** with `rollback clean-config` — an atomic transaction that replaces the entire running config in one commit (not a line-by-line merge). Before every rollback:
+Rollback uses Arista's **configure session** with `rollback clean-config` — an atomic transaction that replaces the entire running config in one commit.
 
-1. The current password is read from `hosts.csv`
-2. Any credential lines in the golden config are replaced with the current credentials via a Jinja2 template
-3. The patched golden config is written back to disk (so it stays permanently in sync)
-4. The patched config is pushed inside a configure session and committed atomically
+Before every rollback:
+1. Current password is read from `hosts.csv`
+2. Credential lines in the golden config are patched with current credentials
+3. Patched config is pushed inside a configure session and committed atomically
 
-This means rollback never reverts a password rotation, and the golden config file is always deployable at the current credential state.
+This means rollback never reverts a password rotation.
 
-> **Important:** Golden configs must include the `Management0` interface to preserve management connectivity after rollback. Always retake golden configs while devices are fully reachable using **Tools → Golden Config Generator**.
+> **Important:** Golden configs must include the `Management0` interface. Always retake golden configs while devices are reachable using **Tools → Golden Config Generator**.
 
 ---
 
@@ -119,106 +108,118 @@ This means rollback never reverts a password rotation, and the golden config fil
 
 ### Prerequisites
 
-- **Linux** — Ubuntu 22.04+ (native)
-- **macOS** — [OrbStack](https://orbstack.dev) (lightweight Linux VM with full systemd + Docker support)
+- **Linux** — Ubuntu 22.04+ (recommended)
+- **macOS** — [OrbStack](https://orbstack.dev) (lightweight Linux VM with full systemd + Docker)
 - **Windows** — WSL2 with Ubuntu
 - Git + Git LFS installed
 - Internet connection
 - A free [Ngrok account](https://dashboard.ngrok.com) (for CI/CD webhook tunneling)
 
-> Containerlab requires a Linux kernel — OrbStack and WSL2 both provide this transparently.
+> Containerlab requires a Linux kernel. OrbStack and WSL2 both provide this transparently.
 
-### Step 1 — Fork this repo, then clone your fork
+---
 
-Click **Fork** at the top-right of this page to create your own copy of NAutoBuff under your GitHub account. The CI/CD pipeline watches *your* repo — Jenkins receives webhook notifications from GitHub when you push config changes, so it must point to your fork, not the original.
+### Step 1 — Fork and clone
+
+> **Fork first.** The CI/CD pipeline watches *your* repo — Jenkins must point to your fork, not the original.
+
+1. Click **Fork** at the top-right of this page
+2. Clone your fork:
 
 ```bash
 mkdir -p ~/projects && cd ~/projects
 git clone https://github.com/<your-username>/NAutoBuff.git
 cd NAutoBuff/pilot-config
-chmod +x requirements.sh pilot.sh
+chmod +x requirements.sh pilot.sh run_nautobuff.sh
 ```
 
-### Step 2 — Install dependencies
+---
+
+### Step 2 — Install system dependencies
 
 ```bash
 ./requirements.sh
 ```
 
-`requirements.sh` fully automates:
+This installs everything the system needs (run once):
 - Docker, Containerlab, InfluxDB, Grafana, Ngrok, Java, Jenkins
-- Python 3.12 (via pyenv) + all required packages
-- Jenkins first-time setup (wizard bypassed, `admin/admin` created, plugins installed)
-- Jenkins API token auto-generated → saved to `pilot-config/.jenkins_creds` (gitignored)
-- **Prompts for Ngrok auth token** → writes `NSOT/misc/ngrok_config.yml`
-- **Optional: AI chatbot** → installs Ollama + pulls `llama3.1:8b` (~5GB)
-- **Optional: MCP HTTP servers** → enables Claude/ChatGPT Desktop integration
+- Python 3.12 via pyenv + virtual environment + all Python packages
+- Prompts you for: **Ngrok auth token**, optional **AI chatbot (Ollama)**, optional **MCP HTTP servers**
 
-> After this step completes, **log out and back in** so Docker group changes take effect.
+> **After it finishes — log out and back in** (or open a new terminal) so Docker group changes take effect.
 
-### Step 3 — Bringup
+---
+
+### Step 3 — Bring up the environment
 
 ```bash
 ./pilot.sh
 ```
 
-`pilot.sh` handles:
-- Pulling LFS assets (cEOS image, Docker images)
-- Building Docker images
-- Applying network interface config (Netplan)
-- Running `pilot.py` which:
-  - Creates all systemd services (IPAM, health check, gNMI, ngrok, password rotation, Ollama)
-  - Sets up InfluxDB (org, bucket, API token)
+This configures and starts everything:
+- Builds Docker images for host containers
+- Imports the cEOS image into Docker
+- Applies Netplan network config
+- Runs `pilot.py` which:
+  - Configures Jenkins (first-time setup, creates pipeline job pointing at your repo)
+  - Generates an InfluxDB API token and writes `gnmic-stream.yaml`
   - Creates Grafana datasource and telemetry dashboard
-  - Creates the Jenkins `NAutoBuff` pipeline job pointing at this repo (repo URL auto-detected from git remote)
+  - Creates all systemd services (IPAM, gNMI, ngrok, health check, password rotation)
+
+At the end, webhook setup instructions are printed with your current Ngrok URL.
+
+---
 
 ### Step 4 — Start the web UI
 
 ```bash
 ./run_nautobuff.sh
-# Access at http://<your-ip>:5555
 ```
 
-Default login: `admin / admin`
+Access at: `http://<your-ip>:5555`
 
 ---
 
-## CI/CD — One Manual Step
+### Step 5 — Add the GitHub webhook (one-time)
 
-Everything in the CI/CD pipeline is automated **except** adding the GitHub webhook (this requires GitHub credentials that only you own).
+This is the only manual step. Jenkins needs GitHub to notify it when you push.
 
-**Add the webhook once:**
+1. Go to your GitHub repo → **Settings → Webhooks → Add webhook**
+2. **Payload URL:** `https://<ngrok-url>/github-webhook/`
+   - Your current ngrok URL is printed at the end of `./pilot.sh`
+   - It's also always visible in the burger menu → **External Links → Jenkins**
+3. **Content type:** `application/json`
+4. Click **Add webhook**
 
-1. Open the NAutoBuff burger menu → **External Links → Jenkins** — the webhook URL is shown there
-2. Go to your GitHub repo → **Settings → Webhooks → Add webhook**
-3. Paste the URL (format: `https://xxxx.ngrok-free.app/github-webhook/`)
-4. Content type: `application/json` → **Add webhook**
-
-After this, every config change from the web UI or AI chatbot triggers the full Jenkins pipeline automatically.
-
-> **Note:** The Ngrok URL changes each time `ngrok.service` restarts (free tier). Update the GitHub webhook when that happens — the current URL is always visible in the burger menu.
+> The Ngrok URL changes on free tier when the service restarts. Update the webhook when that happens.
 
 ---
 
-## Monitoring
+### Step 6 — Deploy a topology and start streaming telemetry
 
-| Service | URL | Credentials |
-|---|---|---|
-| NAutoBuff Web UI | `http://<host>:5555` | admin / admin |
-| Grafana | `http://<host>:3000` | admin / admin |
-| InfluxDB | `http://<host>:8086` | admin / admin |
-| Jenkins | via Ngrok URL (burger menu) | admin / admin |
+1. Open the web UI → **Topology Builder** → deploy your lab
+2. Go to **IPAM** → click **Sync IPs from clab** to populate `hosts.csv`
+3. Telemetry starts flowing automatically: devices → gnmic → InfluxDB → Grafana
 
-Live telemetry log:
-```bash
-tail -f ~/projects/NAutoBuff/NSOT/logs/nautobuff.log
-```
+---
+
+## Default Credentials
+
+| Service | URL | Username | Password |
+|---|---|---|---|
+| NAutoBuff Web UI | `http://<host>:5555` | `admin` | `admin` |
+| Grafana | `http://<host>:3000` | `admin` | `admin` |
+| InfluxDB | `http://<host>:8086` | `admin` | `admin123` |
+| Jenkins | Ngrok URL (burger menu) | `admin` | `admin` |
+| cEOS devices | — | `admin` | `admin` |
+
+> Change these after setup, especially on any internet-exposed machine.
 
 ---
 
 ## Systemd Services
 
-All managed from **burger menu → Health Check** in the UI, or via the command line:
+Managed from **burger menu → Health Check** or via the command line:
 
 | Service | Purpose |
 |---|---|
@@ -227,14 +228,77 @@ All managed from **burger menu → Health Check** in the UI, or via the command 
 | `device_health_check.timer` | Periodic CPU/interface/route checks |
 | `password_update.service` | Credential rotation every 30 min |
 | `ngrok.service` | Jenkins webhook tunnel |
-| `ollama.service` | Local LLM runtime for NBot AI assistant |
+| `ollama.service` | Local LLM runtime for NBot (if installed) |
 | `jenkins` | CI/CD pipeline server |
 | `influxdb` | Time-series telemetry database |
 | `grafana-server` | Telemetry dashboards |
 
 ---
 
+## Monitoring
+
+Live telemetry log:
+```bash
+tail -f ~/projects/NAutoBuff/NSOT/logs/nautobuff.log
+```
+
+Check a specific service:
+```bash
+sudo journalctl -u gnmic_nautobuff.service -f
+sudo journalctl -u ngrok.service -f
+sudo journalctl -u jenkins -f
+```
+
+---
+
 ## Troubleshooting
+
+**Docker permission denied after requirements.sh**
+```bash
+# Log out and back in, or run:
+newgrp docker
+```
+
+**IPAM shows "file not found"**
+- No topology is deployed yet — deploy a lab first, then click **Sync IPs from clab** in the IPAM page
+
+**Telemetry not showing in Grafana**
+```bash
+# Check gnmic is streaming
+sudo journalctl -u gnmic_nautobuff.service -n 30
+# Re-sync devices after deploying topology
+cd ~/projects/NAutoBuff && python3 NSOT/python-files/gnmi_hosts.py
+sudo systemctl restart gnmic_nautobuff.service
+```
+
+**Jenkins job not triggering on push**
+- Check the GitHub webhook is set and the ngrok URL is current
+- Ngrok URL is always shown in burger menu → External Links → Jenkins
+```bash
+sudo systemctl restart ngrok.service
+```
+
+**Jenkins API token invalid**
+```bash
+# Edit pilot-config/.jenkins_creds with a new token from:
+# Jenkins → top-right username → Configure → API Token → Add new token
+```
+
+**Re-run Jenkins job provisioning manually**
+```bash
+cd ~/projects/NAutoBuff/pilot-config
+python3 -c "from pilot import provision_jenkins_job; provision_jenkins_job()"
+```
+
+**Config push fails — wrong management IP**
+- Open IPAM page → click **Sync IPs from clab**
+
+**Rollback loses management connectivity**
+- Golden config didn't include `Management0` when saved
+- Fix: while devices are reachable, re-run **Tools → Golden Config Generator → All devices**
+
+**Rollback fails after topology redeploy**
+- Containerlab reassigns IPs on redeploy — open IPAM → **Sync IPs from clab**, then retry
 
 **Windows/WSL: user not in sudoers**
 ```powershell
@@ -243,51 +307,11 @@ wsl -u root
 usermod -aG sudo <your_wsl_username>
 ```
 
-**Docker permission denied after requirements.sh**
+**Reset InfluxDB (if credentials or bucket are wrong)**
 ```bash
-# Log out and back in, or run:
-newgrp docker
+sudo systemctl stop influxdb
+sudo rm -rf /var/lib/influxdb/
+rm -f ~/.influxdbv2/configs
+sudo systemctl start influxdb
+./pilot.sh
 ```
-
-**Jenkins job returns 404 or doesn't trigger**
-```bash
-# Re-run job provisioning:
-cd ~/projects/NAutoBuff
-python3 -c "
-import sys; sys.path.insert(0, 'pilot-config')
-from pilot import provision_jenkins_job; provision_jenkins_job()
-"
-```
-
-**Ngrok tunnel not running**
-```bash
-sudo systemctl restart ngrok.service
-# New URL appears in NSOT/logs/ngrok.log and the burger menu within ~10s
-```
-
-**Jenkins API token expired or invalid**
-```bash
-# Regenerate token — stored in pilot-config/.jenkins_creds (never committed to git)
-# Jenkins → top-right username → Configure → API Token → Add new token
-# Then update pilot-config/.jenkins_creds:
-#   export JENKINS_TOKEN=<new_token>
-```
-
-**AI chatbot not responding**
-```bash
-sudo systemctl status ollama.service
-sudo systemctl start ollama.service
-# Check installed models:
-ollama list
-```
-
-**Config push fails — wrong management IP**
-- Open IPAM page → click **Sync IPs from clab** to pull the correct Containerlab-assigned IPs into `hosts.csv`
-
-**Rollback loses management connectivity**
-- The golden config didn't include the `Management0` interface when it was saved
-- Fix: while devices are reachable, re-run **Golden Config Generator → All devices**
-
-**Rollback fails — device unreachable after topology redeploy**
-- Containerlab reassigns management IPs on redeploy; `hosts.csv` has stale IPs
-- Open IPAM page → click **Sync IPs from clab**, then retry the rollback

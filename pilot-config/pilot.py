@@ -8,6 +8,7 @@ import time
 import urllib.request
 import urllib.error
 import base64
+import http.cookiejar
 
 
 def find_base_path():
@@ -285,7 +286,7 @@ def setup_monitoring(base_path):
     setup = subprocess.run(
         ["influx", "setup",
          "--username", "admin",
-         "--password", "admin",
+         "--password", "admin123",
          "--org", "NAutoBuff",
          "--bucket", "NAutoBuff",
          "--retention", "0",
@@ -293,7 +294,7 @@ def setup_monitoring(base_path):
         capture_output=True, text=True,
     )
     if setup.returncode == 0:
-        print("✅ InfluxDB initialized  (admin / admin)")
+        print("✅ InfluxDB initialized  (admin / admin123)")
     else:
         print("ℹ️  InfluxDB already initialized, skipping setup")
 
@@ -308,8 +309,18 @@ def setup_monitoring(base_path):
         try:
             for auth in json.loads(list_result.stdout or "[]"):
                 if "gnmic" in auth.get("description", "").lower():
-                    token = auth.get("token")
-                    print("ℹ️  Reusing existing gnmic token")
+                    candidate = auth.get("token")
+                    # Validate the token actually works before reusing it
+                    check = subprocess.run(
+                        ["influx", "bucket", "list", "--org", "NAutoBuff",
+                         "--token", candidate],
+                        capture_output=True, text=True,
+                    )
+                    if check.returncode == 0:
+                        token = candidate
+                        print("ℹ️  Reusing existing gnmic token")
+                    else:
+                        print("ℹ️  Existing gnmic token is invalid — generating a new one")
                     break
         except (json.JSONDecodeError, KeyError):
             pass
@@ -445,7 +456,7 @@ def setup_monitoring(base_path):
         print("ℹ️  Grafana datasource UID not found — skipping dashboard creation")
 
     print("\n✅ Monitoring setup complete.")
-    print("   InfluxDB : http://localhost:8086  (admin / admin)")
+    print("   InfluxDB : http://localhost:8086  (admin / admin123)")
     print("   Grafana  : http://localhost:3000  (admin / admin)")
 
 
@@ -613,6 +624,90 @@ WantedBy=multi-user.target
         print("\nℹ️  Ollama not installed — AI chatbot will be disabled in the web UI")
 
 
+def provision_jenkins_firsttime():
+    """
+    Idempotent first-time Jenkins setup:
+      1. Stops Jenkins
+      2. Writes wizard-skip state files
+      3. Writes Groovy init script to create admin/admin
+      4. Enables and starts Jenkins
+    Safe to re-run — skips if admin account already exists.
+    """
+    groovy_dir = "/var/lib/jenkins/init.groovy.d"
+    groovy_file = os.path.join(groovy_dir, "01-security.groovy")
+
+    # Skip if already configured
+    try:
+        r = subprocess.run(
+            ["sudo", "test", "-f", groovy_file],
+            capture_output=True
+        )
+        if r.returncode == 0:
+            print("ℹ️  Jenkins first-time config already applied — skipping")
+            subprocess.run(["sudo", "systemctl", "enable", "--now", "jenkins"], check=True)
+            return
+    except Exception:
+        pass
+
+    print("⏳ Configuring Jenkins for first-time setup...")
+
+    # Stop Jenkins so we can configure before it writes anything
+    subprocess.run(["sudo", "systemctl", "stop", "jenkins"], capture_output=True)
+
+    # 1. Skip the setup wizard
+    jenkins_ver = subprocess.run(
+        ["dpkg", "-l", "jenkins"],
+        capture_output=True, text=True
+    ).stdout
+    ver = ""
+    for line in jenkins_ver.splitlines():
+        if line.startswith("ii"):
+            ver = line.split()[2]
+            break
+    if ver:
+        for state_file in [
+            "/var/lib/jenkins/jenkins.install.UpgradeWizard.state",
+            "/var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion",
+        ]:
+            subprocess.run(
+                ["sudo", "bash", "-c", f"echo '{ver}' > {state_file} && chown jenkins:jenkins {state_file}"],
+                check=True
+            )
+
+    # 2. Write Groovy init script to create admin/admin
+    groovy_script = """\
+import jenkins.model.*
+import hudson.security.*
+import jenkins.install.InstallState
+
+def instance = Jenkins.get()
+if (instance.getSecurityRealm() instanceof HudsonPrivateSecurityRealm &&
+    instance.getSecurityRealm().getAllUsers().find { it.id == "admin" }) {
+    println("INFO: Jenkins admin already configured — skipping")
+    return
+}
+def realm = new HudsonPrivateSecurityRealm(false)
+realm.createAccount("admin", "admin")
+instance.setSecurityRealm(realm)
+def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+strategy.setAllowAnonymousRead(false)
+instance.setAuthorizationStrategy(strategy)
+instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
+instance.save()
+println("OK: Jenkins admin user and security configured")
+"""
+    subprocess.run(["sudo", "mkdir", "-p", groovy_dir], check=True)
+    subprocess.run(
+        ["sudo", "bash", "-c", f"cat > {groovy_file}"],
+        input=groovy_script, text=True, check=True
+    )
+    subprocess.run(["sudo", "chown", "-R", "jenkins:jenkins", groovy_dir], check=True)
+
+    # 3. Enable and start Jenkins
+    subprocess.run(["sudo", "systemctl", "enable", "--now", "jenkins"], check=True)
+    print("✅ Jenkins first-time configuration complete (credentials: admin / admin)")
+
+
 def _jenkins_get_creds():
     """
     Return (jenkins_url, user, credential) ready to use for API calls.
@@ -633,47 +728,42 @@ def _jenkins_get_creds():
         if m and m.group(1).strip():
             return jenkins_url, user, m.group(1).strip()
 
-    # 2. Legacy: token saved inline in run_nautobuff.sh
-    run_nautobuff = os.path.join(script_dir, "run_nautobuff.sh")
-    if os.path.exists(run_nautobuff):
-        with open(run_nautobuff) as f:
-            content = f.read()
-        m = _re.search(r'JENKINS_TOKEN:-([^"}]+)', content)
-        if m and m.group(1).strip():
-            return jenkins_url, user, m.group(1).strip()
+    # 2. Fall back to admin:admin (set by Groovy init script)
+    return jenkins_url, user, "admin"
 
-    # 3. Fall back to initial admin password (first-run only)
-    try:
-        r = subprocess.run(["sudo", "cat", "/var/lib/jenkins/secrets/initialAdminPassword"],
-                           capture_output=True, text=True, check=True)
-        return jenkins_url, user, r.stdout.strip()
-    except Exception:
-        return jenkins_url, user, ""
+
+def _jenkins_opener(auth_b64):
+    """Return a urllib opener that maintains cookies (required for Jenkins CSRF crumb)."""
+    cj = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+    return opener
 
 
 def _jenkins_wait_ready(jenkins_url, auth_b64, timeout=90):
     """Poll Jenkins /api/json until it responds or timeout expires. Returns True if ready."""
+    opener = _jenkins_opener(auth_b64)
     headers = {"Authorization": f"Basic {auth_b64}"}
     for _ in range(timeout // 5):
         try:
             req = urllib.request.Request(f"{jenkins_url}/api/json", headers=headers)
-            urllib.request.urlopen(req, timeout=5)
+            opener.open(req, timeout=5)
             return True
         except Exception:
             time.sleep(5)
     return False
 
 
-def _jenkins_crumb(jenkins_url, headers):
-    """Return a dict with the crumb header added, or the original headers if crumbs are disabled."""
+def _jenkins_crumb(opener, jenkins_url, auth_b64):
+    """Fetch crumb using the shared opener (preserves session cookie). Returns crumb header dict."""
+    headers = {"Authorization": f"Basic {auth_b64}"}
     try:
-        req = urllib.request.Request(f"{jenkins_url}/crumbIssuer/api/json", headers=dict(headers))
-        with urllib.request.urlopen(req, timeout=10) as r:
+        req = urllib.request.Request(f"{jenkins_url}/crumbIssuer/api/json", headers=headers)
+        with opener.open(req, timeout=10) as r:
             d = json.loads(r.read())
-        return {**headers, d["crumbRequestField"]: d["crumb"]}
+        return {d["crumbRequestField"]: d["crumb"]}
     except urllib.error.HTTPError as e:
         if e.code == 404:  # crumb issuer disabled
-            return headers
+            return {}
         raise
 
 
@@ -687,22 +777,10 @@ def provision_jenkins_token():
     jenkins_url, user, cred = _jenkins_get_creds()
     run_nautobuff = os.path.join(os.path.dirname(__file__), "run_nautobuff.sh")
 
-    # If we already have a token (not the initial password), skip generation
-    init_pass = ""
-    try:
-        r = subprocess.run(["sudo", "cat", "/var/lib/jenkins/secrets/initialAdminPassword"],
-                           capture_output=True, text=True, check=True)
-        init_pass = r.stdout.strip()
-    except Exception:
-        pass
-
-    if cred and cred != init_pass:
-        print("✅ Jenkins token already present in run_nautobuff.sh — skipping generation")
+    # If we already have a real API token (not the plain password), skip generation
+    if cred and cred != "admin":
+        print("✅ Jenkins token already present — skipping generation")
         return cred
-
-    if not cred:
-        print("⚠️  Could not read Jenkins initial password — skipping token generation")
-        return ""
 
     auth_b64 = base64.b64encode(f"{user}:{cred}".encode()).decode()
     print("⏳ Waiting for Jenkins to be ready…")
@@ -710,9 +788,10 @@ def provision_jenkins_token():
         print("⚠️  Jenkins did not become ready in time — skipping token generation")
         return ""
 
-    headers = {"Authorization": f"Basic {auth_b64}", "Content-Type": "application/x-www-form-urlencoded"}
+    opener = _jenkins_opener(auth_b64)
+    base_headers = {"Authorization": f"Basic {auth_b64}", "Content-Type": "application/x-www-form-urlencoded"}
     try:
-        headers = _jenkins_crumb(jenkins_url, headers)
+        crumb_headers = _jenkins_crumb(opener, jenkins_url, auth_b64)
     except Exception as e:
         print(f"⚠️  Could not fetch Jenkins crumb: {e}")
         return ""
@@ -721,29 +800,22 @@ def provision_jenkins_token():
         body = "newTokenName=NAutoBuff".encode()
         req = urllib.request.Request(
             f"{jenkins_url}/user/{user}/descriptorByName/jenkins.security.ApiTokenProperty/generateNewToken",
-            data=body, headers=headers, method="POST",
+            data=body, headers={**base_headers, **crumb_headers}, method="POST",
         )
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with opener.open(req, timeout=10) as r:
             token = json.loads(r.read())["data"]["tokenValue"]
     except Exception as e:
         print(f"⚠️  Could not generate Jenkins API token: {e}")
         return ""
 
-    if not os.path.exists(run_nautobuff):
-        print(f"⚠️  {run_nautobuff} not found — cannot write token")
-        return token
+    creds_file = os.path.join(os.path.dirname(__file__), ".jenkins_creds")
+    with open(creds_file, "w") as f:
+        f.write(f"export JENKINS_USER=admin\n")
+        f.write(f"export JENKINS_TOKEN={token}\n")
+        f.write(f"export JENKINS_JOB_NAME=NAutoBuff\n")
+    os.chmod(creds_file, 0o600)
 
-    with open(run_nautobuff) as f:
-        content = f.read()
-    new_content = _re.sub(
-        r'(export JENKINS_TOKEN="\$\{JENKINS_TOKEN:-)[^"]*(")',
-        rf'\g<1>{token}\2',
-        content,
-    )
-    with open(run_nautobuff, "w") as f:
-        f.write(new_content)
-
-    print("✅ Jenkins API token generated and saved to run_nautobuff.sh")
+    print("✅ Jenkins API token generated and saved to pilot-config/.jenkins_creds")
     return token
 
 
@@ -752,21 +824,22 @@ def provision_jenkins_plugins():
     Ensure the required Jenkins plugins are installed.
     Skips gracefully if already installed or Jenkins is unreachable.
     """
-    required = ["git", "workflow-aggregator", "github", "pipeline-stage-view"]
+    required = ["git", "workflow-job", "workflow-cps", "workflow-aggregator", "github", "pipeline-stage-view"]
     jenkins_url, user, cred = _jenkins_get_creds()
     if not cred:
         return
 
     auth_b64 = base64.b64encode(f"{user}:{cred}".encode()).decode()
-    headers = {"Authorization": f"Basic {auth_b64}"}
+    opener = _jenkins_opener(auth_b64)
+    base_headers = {"Authorization": f"Basic {auth_b64}"}
 
     # Check which plugins are already active
     try:
         req = urllib.request.Request(
             f"{jenkins_url}/pluginManager/api/json?depth=1&tree=plugins[shortName,active]",
-            headers=headers,
+            headers=base_headers,
         )
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with opener.open(req, timeout=10) as r:
             data = json.loads(r.read())
         installed = {p["shortName"] for p in data.get("plugins", []) if p.get("active")}
     except Exception as e:
@@ -779,9 +852,8 @@ def provision_jenkins_plugins():
         return
 
     print(f"⏳ Installing Jenkins plugins: {missing}")
-    headers_xml = {**headers, "Content-Type": "text/xml"}
     try:
-        headers_xml = _jenkins_crumb(jenkins_url, headers_xml)
+        crumb_headers = _jenkins_crumb(opener, jenkins_url, auth_b64)
     except Exception as e:
         print(f"⚠️  Could not fetch crumb for plugin install: {e}")
         return
@@ -793,13 +865,15 @@ def provision_jenkins_plugins():
     try:
         req = urllib.request.Request(
             f"{jenkins_url}/pluginManager/installNecessaryPlugins",
-            data=xml.encode(), headers=headers_xml, method="POST",
+            data=xml.encode(),
+            headers={**base_headers, "Content-Type": "text/xml", **crumb_headers},
+            method="POST",
         )
-        urllib.request.urlopen(req, timeout=20)
+        opener.open(req, timeout=20)
         print(f"✅ Plugin install queued — Jenkins will restart automatically")
-        # Wait for Jenkins to restart
-        time.sleep(15)
-        _jenkins_wait_ready(jenkins_url, auth_b64, timeout=90)
+        time.sleep(30)
+        _jenkins_wait_ready(jenkins_url, auth_b64, timeout=120)
+        time.sleep(30)  # allow plugins to fully initialize after restart
         print(f"✅ Jenkins back up after plugin install")
     except Exception as e:
         print(f"⚠️  Plugin install request failed: {e}")
@@ -815,14 +889,21 @@ def provision_jenkins_job():
         print("⚠️  No Jenkins credentials available — skipping job creation")
         return
 
+    # Restart Jenkins to ensure all plugin class loaders are fully initialized
+    print("⏳ Restarting Jenkins to ensure plugins are fully loaded…")
+    subprocess.run(["sudo", "systemctl", "restart", "jenkins"], check=True)
     auth_b64 = base64.b64encode(f"{user}:{cred}".encode()).decode()
-    headers = {"Authorization": f"Basic {auth_b64}"}
+    _jenkins_wait_ready(jenkins_url, auth_b64, timeout=120)
+    time.sleep(10)  # extra settle time for class loaders
+
+    opener = _jenkins_opener(auth_b64)
+    base_headers = {"Authorization": f"Basic {auth_b64}"}
     job_name = "NAutoBuff"
 
     # Check if job already exists
     try:
-        req = urllib.request.Request(f"{jenkins_url}/job/{job_name}/api/json", headers=headers)
-        urllib.request.urlopen(req, timeout=10)
+        req = urllib.request.Request(f"{jenkins_url}/job/{job_name}/api/json", headers=base_headers)
+        opener.open(req, timeout=10)
         print(f"✅ Jenkins job '{job_name}' already exists — skipping creation")
         return
     except urllib.error.HTTPError as e:
@@ -885,33 +966,43 @@ def provision_jenkins_job():
   <disabled>false</disabled>
 </flow-definition>"""
 
-    headers_xml = {**headers, "Content-Type": "application/xml"}
     try:
-        headers_xml = _jenkins_crumb(jenkins_url, headers_xml)
+        crumb_headers = _jenkins_crumb(opener, jenkins_url, auth_b64)
     except Exception as e:
         print(f"⚠️  Could not fetch Jenkins crumb for job creation: {e}")
         return
 
-    try:
-        body = job_xml.encode("utf-8")
-        req = urllib.request.Request(
-            f"{jenkins_url}/createItem?name={job_name}",
-            data=body, headers=headers_xml, method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            _ = r.read()
-        print(f"✅ Jenkins job '{job_name}' created successfully (repo: {remote})")
-    except urllib.error.HTTPError as e:
-        body = e.read().decode(errors="replace")[:300]
-        print(f"⚠️  Failed to create Jenkins job: HTTP {e.code} — {body}")
-    except Exception as e:
-        print(f"⚠️  Failed to create Jenkins job: {e}")
+    for attempt in range(1, 4):
+        try:
+            # Refresh opener and crumb each attempt (session may have expired)
+            opener = _jenkins_opener(auth_b64)
+            crumb_headers = _jenkins_crumb(opener, jenkins_url, auth_b64)
+            body = job_xml.encode("utf-8")
+            req = urllib.request.Request(
+                f"{jenkins_url}/createItem?name={job_name}",
+                data=body,
+                headers={**base_headers, "Content-Type": "application/xml", **crumb_headers},
+                method="POST",
+            )
+            with opener.open(req, timeout=15) as r:
+                _ = r.read()
+            print(f"✅ Jenkins job '{job_name}' created successfully (repo: {remote})")
+            return
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode(errors="replace")[:200]
+            if e.code == 500 and attempt < 3:
+                print(f"⚠️  Jenkins returned 500 (plugins still loading) — retrying in 15s… (attempt {attempt}/3)")
+                time.sleep(15)
+            else:
+                print(f"⚠️  Failed to create Jenkins job: HTTP {e.code} — {err_body}")
+                return
+        except Exception as e:
+            print(f"⚠️  Failed to create Jenkins job: {e}")
+            return
 
 
 if __name__ == "__main__":
-    subprocess.run(["sudo", "systemctl", "enable", "jenkins"], check=True)
-    subprocess.run(["sudo", "systemctl", "start", "jenkins"], check=True)
-    print("✅ Jenkins enabled and started")
+    provision_jenkins_firsttime()
     provision_jenkins_token()
     provision_jenkins_plugins()
     provision_jenkins_job()
