@@ -966,14 +966,16 @@ def delete_topology_route():
             check=True
         )
 
-        # Re-verify lab name for folder cleanup
-        with open(yaml_path) as f:
-            data = yaml.safe_load(f)
-        lab_name = data.get("name", "unknown")
-        lab_dir = Path(yaml_path).parent / f"clab-{lab_name}"
-        
-        if lab_dir.exists() and lab_dir.is_dir():
-            shutil.rmtree(lab_dir)
+        # Clean up clab-* folder if it still exists
+        if os.path.exists(yaml_path):
+            with open(yaml_path) as f:
+                data = yaml.safe_load(f)
+            lab_name = data.get("name", "unknown")
+        # lab_name may already be set from the --name fallback path above
+        if lab_name:
+            lab_dir = Path(yaml_path).parent / f"clab-{lab_name}"
+            if lab_dir.exists() and lab_dir.is_dir():
+                shutil.rmtree(lab_dir)
 
         message = "✅ Topology deleted successfully."
         print("[✔] Topology destroyed and folder cleaned.")
