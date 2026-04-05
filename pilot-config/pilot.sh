@@ -10,15 +10,8 @@ pyenv shell 3.12.8
 # 2. Activate the existing VENV
 source venv/bin/activate
 
-echo "Pulling big files (LFS)..."
-git lfs install
-git lfs pull
-
 echo "Building Docker images for hosts..."
 sudo docker build -f Dockerfile_Hosts -t hosts:latest .
-
-echo "Importing cEOS image..."
-sudo docker import ../NSOT/disc_images/cEOS64-lab-4.33.2F.tar.xz ceos:4.33.2F || true
 
 echo "Applying Netplan configurations..."
 sudo cp netcfg.yaml /etc/netplan/100-netcfg.yaml

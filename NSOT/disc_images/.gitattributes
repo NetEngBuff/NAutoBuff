@@ -1,1 +1,2 @@
-cEOS64-lab-4.33.2F.tar.xz filter=lfs diff=lfs merge=lfs -text
+# Vendor images are not tracked in git — download manually.
+# See README.md → "Network OS Images" for instructions.

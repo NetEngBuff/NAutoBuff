@@ -104,6 +104,44 @@ This means rollback never reverts a password rotation.
 
 ---
 
+## Network OS Images
+
+Vendor images are **not included in this repo** — they must be downloaded directly from the vendor and imported into Docker manually. This is a one-time step per machine.
+
+NAutoBuff currently uses **Arista cEOS** for virtual labs.
+
+### Arista cEOS (required)
+
+1. Create a free account at [arista.com](https://www.arista.com/en/login)
+2. Go to **Software Downloads → EOS → cEOS-lab**
+3. Download the version matching your topology (e.g. `cEOS64-lab-4.33.2F.tar.xz`)
+4. Import it into Docker:
+
+```bash
+docker import cEOS64-lab-4.33.2F.tar.xz ceos:4.33.2F
+```
+
+Verify it imported:
+```bash
+docker images | grep ceos
+```
+
+> The image tag (`ceos:4.33.2F`) must match what's in your topology YAML file.
+
+### Other vendors (optional)
+
+If you want to use other NOS images, containerlab supports many vendors out of the box. Refer to the official containerlab documentation for download and import instructions for each:
+
+| Vendor | Docs |
+|---|---|
+| Cisco IOS-XR (XRd) | [containerlab.dev/manual/kinds/xrd](https://containerlab.dev/manual/kinds/xrd/) |
+| Cisco IOS-XE (Cat8000v) | [containerlab.dev/manual/kinds/vr-cat8000v](https://containerlab.dev/manual/kinds/vr-cat8000v/) |
+| Juniper vJunos | [containerlab.dev/manual/kinds/juniper_vjunosswitch](https://containerlab.dev/manual/kinds/juniper_vjunosswitch/) |
+| Nokia SR Linux | [containerlab.dev/manual/kinds/srl](https://containerlab.dev/manual/kinds/srl/) |
+| Nokia SR OS | [containerlab.dev/manual/kinds/vr-sros](https://containerlab.dev/manual/kinds/vr-sros/) |
+
+---
+
 ## Setup
 
 ### Prerequisites
