@@ -117,11 +117,15 @@ Vendor images are not included in this repo. Download and import your image manu
 - **Linux** — Ubuntu 22.04+ (recommended)
 - **macOS** — [OrbStack](https://orbstack.dev) (lightweight Linux VM with full systemd + Docker)
 - **Windows** — WSL2 with Ubuntu
-- Git + Git LFS installed
 - Internet connection
-- A free [Ngrok account](https://dashboard.ngrok.com) (for CI/CD webhook tunneling)
+- A free [Ngrok account](https://dashboard.ngrok.com) — needed during `requirements.sh` for CI/CD webhook tunneling
 
 > Containerlab requires a Linux kernel. OrbStack and WSL2 both provide this transparently.
+
+**Before you start — get your Ngrok auth token:**
+1. Sign up at [dashboard.ngrok.com](https://dashboard.ngrok.com)
+2. Go to **Your Authtoken** in the left sidebar
+3. Copy the token — `requirements.sh` will prompt you for it and write it to `NSOT/misc/ngrok_config.yml` automatically
 
 ---
 
@@ -151,7 +155,9 @@ chmod +x requirements.sh pilot.sh run_nautobuff.sh
 This installs everything the system needs (run once):
 - Docker, Containerlab, InfluxDB, Grafana, Ngrok, Java, Jenkins
 - Python 3.12 via pyenv + virtual environment + all Python packages
-- Prompts you for: **Ngrok auth token**, optional **AI chatbot (Ollama)**, optional **MCP HTTP servers**
+- Prompts you for your **Ngrok auth token** (see Prerequisites above)
+- Optional: **AI chatbot** (Ollama + llama3.1:8b, ~5GB download)
+- Optional: **MCP HTTP servers** for Claude/ChatGPT Desktop integration
 
 > **After it finishes — log out and back in** (or open a new terminal) so Docker group changes take effect.
 
