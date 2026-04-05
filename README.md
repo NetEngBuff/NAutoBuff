@@ -128,11 +128,13 @@ This means rollback never reverts a password rotation, and the golden config fil
 
 > Containerlab requires a Linux kernel — OrbStack and WSL2 both provide this transparently.
 
-### Step 1 — Clone
+### Step 1 — Fork this repo, then clone your fork
+
+Click **Fork** at the top-right of this page to create your own copy of NAutoBuff under your GitHub account. The CI/CD pipeline watches *your* repo — Jenkins receives webhook notifications from GitHub when you push config changes, so it must point to your fork, not the original.
 
 ```bash
 mkdir -p ~/projects && cd ~/projects
-git clone https://github.com/NetEngBuff/NAutoBuff.git
+git clone https://github.com/<your-username>/NAutoBuff.git
 cd NAutoBuff/pilot-config
 chmod +x requirements.sh pilot.sh
 ```
