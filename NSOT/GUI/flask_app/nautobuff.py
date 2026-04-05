@@ -1695,9 +1695,11 @@ _MANAGED_SERVICES = [
 if shutil.which("ollama"):
     _MANAGED_SERVICES.append({"unit": "ollama", "label": "AI Chatbot (Ollama)"})
 
-# MCP HTTP services only appear in the panel if the user opted them in during setup
-_MCP_FLAG = os.path.join(project_root, "NSOT", "misc", ".mcp_http_enabled")
-if os.path.exists(_MCP_FLAG):
+# MCP services appear in the health panel whenever both server files are present
+# Note: project_root resolves to NAutoBuff/NSOT (two levels up from flask_app)
+_MCP_QUERY_FILE  = os.path.join(project_root, "mcp", "dut_query.py")
+_MCP_CONFIG_FILE = os.path.join(project_root, "mcp", "dut_config.py")
+if os.path.exists(_MCP_QUERY_FILE) and os.path.exists(_MCP_CONFIG_FILE):
     _MANAGED_SERVICES += [
         {"unit": "nautobuff_mcp_query.service",  "label": "MCP Query Server (port 8001)"},
         {"unit": "nautobuff_mcp_config.service", "label": "MCP Config Server (port 8002)"},
