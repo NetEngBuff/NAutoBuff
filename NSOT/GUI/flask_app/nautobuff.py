@@ -359,6 +359,27 @@ def _cidr_value(value):
     return prefix[1:] if prefix.startswith("/") else prefix
 
 
+def _wildcard_to_prefix(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if value.startswith("/") or value.isdigit():
+        return _cidr_value(value)
+    parts = value.split(".")
+    if len(parts) != 4:
+        return value
+    try:
+        octets = [int(part) for part in parts]
+    except ValueError:
+        return value
+    if any(octet < 0 or octet > 255 for octet in octets):
+        return value
+    mask_bits = "".join(f"{255 - octet:08b}" for octet in octets)
+    if "01" in mask_bits:
+        return value
+    return str(mask_bits.count("1"))
+
+
 def _split_ip_prefix(ip_with_prefix, default_prefix="24"):
     value = (ip_with_prefix or "").strip()
     if not value:
@@ -1614,6 +1635,7 @@ def configure_device():
                         {
                             "ip": ospf_networks[i],
                             "wildcard": ospf_wildcards[i],
+                            "prefix": _wildcard_to_prefix(ospf_wildcards[i]),
                             "area": ospf_areas[i],
                         }
                         for i in range(len(ospf_networks))
@@ -1676,6 +1698,17 @@ def configure_device():
                         "redistribute_ospf": redistribute_ospf_into_bgp,
                         "redistribute_rip": redistribute_rip_into_bgp,
                     }
+
+            if bgp_asn and not bgp:
+                return render_template(
+                    "configure_device.html",
+                    devices=devices,
+                    device_ids=device_ids,
+                    device_id=device_id,
+                    submitted_form=submitted_form,
+                    jenkins_result="jenkins_failure",
+                    message="⚠️ BGP needs at least one neighbor, advertised network, or redistribution option.",
+                )
 
             custom_config = "\n".join(
                 line_block.strip()

@@ -56,9 +56,10 @@ def build_device_data(
                 "name": iface["type"] + iface["number"],
                 "ip_address": iface.get("ip"),
                 "subnet_mask": iface.get("mask"),
+                "switchport": iface.get("switchport", False),
             }
             for iface in interfaces
-            if iface.get("ip") and iface.get("mask")
+            if iface.get("switchport") or (iface.get("ip") and iface.get("mask"))
         ]
 
     if subinterfaces:
@@ -92,6 +93,7 @@ def build_device_data(
                 {
                     "ip": net["ip"],
                     "wildcard": net["wildcard"],
+                    "prefix": net.get("prefix"),
                     "area": net["area"],
                 }
                 for net in ospf["networks"]

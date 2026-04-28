@@ -484,6 +484,7 @@ function toggleProtocol(protocol) {
       </div>`;
     container.appendChild(section);
     if (!protocolCounts[protocol]) protocolCounts[protocol] = 0;
+    addProtocolConfig(protocol);
     updateBadge(protocol);
   }
 }
@@ -556,7 +557,7 @@ function restoreProtocol(protocol, names) {
   const count = submittedCount(names);
   if (!count) return;
   if (!activeProtocols.has(protocol)) toggleProtocol(protocol);
-  for (let i = 0; i < count; i++) addProtocolConfig(protocol);
+  for (let i = protocolCounts[protocol] || 0; i < count; i++) addProtocolConfig(protocol);
 }
 
 function restoreFieldValues(name) {

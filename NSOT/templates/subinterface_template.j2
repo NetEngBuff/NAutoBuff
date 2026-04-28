@@ -1,11 +1,12 @@
 {% for sub in subinterfaces %}
 interface {{ sub.parent }}
+   shutdown
    no switchport
    no shutdown
 
 interface {{ sub.parent }}.{{ sub.id }}
-   encapsulation dot1Q {{ sub.vlan }}
-   ip address {{ sub.ip }} {{ sub.mask }}
+   encapsulation dot1Q vlan {{ sub.vlan }}
+   ip address {{ sub.ip }}/{{ sub.mask }}
    no shutdown
 
 {% endfor %}

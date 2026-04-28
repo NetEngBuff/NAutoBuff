@@ -4,6 +4,7 @@ interface {{ interface.name }}
  switchport
  no shutdown
 {% else %}
+ shutdown
  no switchport
  ip address {{ interface.ip_address }}/{{ interface.subnet_mask }}
  no shutdown

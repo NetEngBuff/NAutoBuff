@@ -19,6 +19,26 @@ def _has_l3_config(device):
     )
 
 
+def _wildcard_to_prefix(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if value.startswith("/"):
+        return value[1:]
+    if value.isdigit():
+        return value
+    try:
+        octets = [int(part) for part in value.split(".")]
+    except ValueError:
+        return value
+    if len(octets) != 4 or any(octet < 0 or octet > 255 for octet in octets):
+        return value
+    mask_bits = "".join(f"{255 - octet:08b}" for octet in octets)
+    if "01" in mask_bits:
+        return value
+    return str(mask_bits.count("1"))
+
+
 def generate_device_configs():
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     yaml_file = os.path.join(base_dir, "templates", "devices_config.yml")
@@ -99,13 +119,22 @@ def generate_device_configs():
         # OSPF
         if "ospf" in device:
             ospf_data = device["ospf"]
+            ospf_networks = []
+            for network in ospf_data.get("networks", []):
+                ospf_networks.append(
+                    {
+                        **network,
+                        "prefix": network.get("prefix")
+                        or _wildcard_to_prefix(network.get("wildcard", "")),
+                    }
+                )
             if clear_config == "yes":
                 config += f"no router ospf {ospf_data['process_id']}\n"
             else:
                 template_key = "ospf_cisco" if vendor == "cisco" else "ospf"
                 config += templates[template_key].render(
                     ospf_process=ospf_data["process_id"],
-                    ospf_networks=ospf_data.get("networks", []),
+                    ospf_networks=ospf_networks,
                     ospf_redistribute={
                         **ospf_data.get("redistribute", {}),
                         "as_number": device.get("bgp", {}).get("as_number", ""),

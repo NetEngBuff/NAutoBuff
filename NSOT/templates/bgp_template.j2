@@ -1,17 +1,15 @@
 router bgp {{ bgp.as_number }}
 {% for af in bgp.address_families %}
-  {% for network in af.networks %}
-  network {{ network.ip }}/{{ network.mask }}
-  {% endfor %}
   {% for neighbor in af.neighbors %}
   neighbor {{ neighbor.ip }} remote-as {{ neighbor.remote_as }}
   {% endfor %}
+  {% for network in af.networks %}
+  network {{ network.ip }}/{{ network.mask }}
+  {% endfor %}
 {% endfor %}
-
 {% if bgp.redistribute_ospf %}
  redistribute ospf 1 match internal external 1 external 2
 {% endif %}
-
 {% if bgp.redistribute_rip %}
  redistribute rip
 {% endif %}
