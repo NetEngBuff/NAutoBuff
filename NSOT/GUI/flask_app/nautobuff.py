@@ -7,6 +7,7 @@ import time
 import docker
 import json
 import logging
+import re
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 from flask import (
@@ -38,6 +39,8 @@ from threading import Thread
 from pathlib import Path
 import socket
 import netifaces
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from netmiko import ConnectHandler
 
 
 # Get the current directory of this script
@@ -59,6 +62,44 @@ sys.path.append(os.path.abspath(predict_dir))
 topo_path = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../../../pilot-config/topo.yml")
 )
+
+
+def _is_topology_running():
+    try:
+        client = docker.from_env()
+        return bool(client.containers.list(filters={"label": "containerlab"}))
+    except Exception as e:
+        print(f"[ℹ] Could not check containerlab state: {e}")
+        return False
+
+
+def _topology_page_context(**extra):
+    yaml_generated = bool(extra.pop("yaml_generated", False))
+    context = {
+        "docker_images": get_docker_images(),
+        "has_topology_yaml": os.path.exists(topo_path),
+        "yaml_generated": yaml_generated,
+        "is_topology_running": _is_topology_running(),
+        "topology_yaml": "",
+    }
+    if context["has_topology_yaml"]:
+        try:
+            with open(topo_path, encoding="utf-8") as f:
+                context["topology_yaml"] = f.read()
+        except Exception as e:
+            print(f"[ℹ] Could not read topology YAML: {e}")
+    context.update(extra)
+    return context
+
+
+def _vendor_from_kind(kind):
+    return {
+        "ceos": "arista",
+        "cisco_iol": "cisco",
+        "crpd": "juniper",
+        "vjunosswitch": "juniper",
+        "linux": "linux",
+    }.get((kind or "").strip().lower(), "")
 
 
 # ── Application Logging Setup ────────────────────────────────────────────────
@@ -130,7 +171,7 @@ from user_db import (
 )
 from ping import ping_local, ping_remote
 from goldenConfig import generate_configs
-from show_commands import execute_show_command
+from show_commands import execute_show_command, find_device_info
 from generate_yaml import create_yaml_from_form_data
 from config_Gen import conf_gen
 from update_topo import update_topology, get_hosts_from_csv
@@ -277,6 +318,40 @@ socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
 # ── SSH console session registry (keyed by Socket.IO sid) ─────────────────────
 _ssh_sessions: dict = {}
 
+
+def _cidr_prefix(value):
+    value = str(value or "").strip()
+    if not value or value.upper() == "N/A":
+        return value or "N/A"
+    if value.startswith("/"):
+        value = value[1:]
+    if value.isdigit():
+        prefix = int(value)
+        return f"/{prefix}" if 0 <= prefix <= 32 else value
+    parts = value.split(".")
+    if len(parts) != 4:
+        return value
+    try:
+        octets = [int(part) for part in parts]
+    except ValueError:
+        return value
+    if any(octet < 0 or octet > 255 for octet in octets):
+        return value
+    bits = "".join(f"{octet:08b}" for octet in octets)
+    if "01" in bits:
+        return value
+    return f"/{bits.count('1')}"
+
+
+def _cidr_value(value):
+    prefix = _cidr_prefix(value)
+    return prefix[1:] if prefix.startswith("/") else prefix
+
+
+@app.template_filter("cidr_prefix")
+def cidr_prefix_filter(value):
+    return _cidr_prefix(value)
+
 # ── Flask-Login setup ──────────────────────────────────────────────────────────
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
@@ -337,6 +412,219 @@ def _get_vendor_for_device(device_id):
     except Exception:
         pass
     return None
+
+
+TELEMETRY_COMMANDS = {
+    "arista": {
+        "l2": [
+            ("Interfaces", "show interfaces status"),
+            ("MAC Table", "show mac address-table"),
+            ("LLDP", "show lldp neighbors"),
+            ("VLANs", "show vlan brief"),
+        ],
+        "l3": [
+            ("IP Interfaces", "show ip interface brief"),
+            ("Routes", "show ip route"),
+            ("BGP", "show ip bgp summary"),
+            ("OSPF", "show ip ospf neighbor"),
+        ],
+        "device": [
+            ("Version", "show version"),
+            ("Clock", "show clock"),
+            ("CPU", "show processes top once"),
+            ("Counters", "show interfaces counters"),
+        ],
+    },
+    "cisco": {
+        "l2": [
+            ("Interfaces", "show interfaces status"),
+            ("MAC Table", "show mac address-table"),
+            ("LLDP", "show lldp neighbors"),
+            ("VLANs", "show vlan brief"),
+        ],
+        "l3": [
+            ("IP Interfaces", "show ip interface brief"),
+            ("Routes", "show ip route"),
+            ("BGP", "show ip bgp summary"),
+            ("OSPF", "show ip ospf neighbor"),
+        ],
+        "device": [
+            ("Version", "show version"),
+            ("Clock", "show clock"),
+            ("CPU", "show processes cpu sorted"),
+            ("Counters", "show interfaces counters"),
+        ],
+    },
+    "juniper": {
+        "l2": [
+            ("Interfaces", "show interfaces terse"),
+            ("MAC Table", "show ethernet-switching table"),
+            ("LLDP", "show lldp neighbors"),
+            ("VLANs", "show vlans"),
+        ],
+        "l3": [
+            ("IP Interfaces", "show interfaces terse"),
+            ("Routes", "show route summary"),
+            ("BGP", "show bgp summary"),
+            ("OSPF", "show ospf neighbor"),
+        ],
+        "device": [
+            ("Version", "show version"),
+            ("Uptime", "show system uptime"),
+            ("Hardware", "show chassis hardware"),
+            ("Alarms", "show chassis alarms"),
+        ],
+    },
+}
+
+
+def _read_hosts_inventory():
+    hosts_csv_path = os.path.join(IPAM_DIR, "hosts.csv")
+    hosts = []
+    try:
+        with open(hosts_csv_path, newline="", encoding="utf-8-sig") as f:
+            for row in csv.DictReader(f):
+                hostname = (row.get("hostname") or "").strip()
+                if not hostname:
+                    continue
+                hosts.append({
+                    "hostname": hostname,
+                    "management_ip": (row.get("management_ip") or "").strip(),
+                    "vendor": (row.get("vendor") or "arista").strip().lower(),
+                })
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"Error reading telemetry hosts inventory: {e}")
+    return hosts
+
+
+def _commands_for_vendor(vendor):
+    return TELEMETRY_COMMANDS.get((vendor or "").lower(), TELEMETRY_COMMANDS["arista"])
+
+
+def _run_device_telemetry(hostname, groups):
+    device_info = find_device_info(hostname)
+    if not device_info:
+        return {
+            "success": False,
+            "device": hostname,
+            "error": f"Device {hostname} not found in hosts.csv",
+            "groups": {},
+        }
+
+    vendor = (_get_vendor_for_device(hostname) or "arista").strip().lower()
+    command_map = _commands_for_vendor(vendor)
+    selected_groups = [g for g in groups if g in command_map] or ["l2", "l3", "device"]
+    output_groups = {}
+
+    try:
+        ssh_conn = ConnectHandler(**device_info)
+        if device_info.get("device_type") != "juniper_junos":
+            ssh_conn.enable()
+        for group in selected_groups:
+            output_groups[group] = []
+            for label, command in command_map[group]:
+                try:
+                    output = ssh_conn.send_command(command, read_timeout=20)
+                    output_groups[group].append({
+                        "label": label,
+                        "command": command,
+                        "success": True,
+                        "output": output,
+                    })
+                except Exception as cmd_error:
+                    output_groups[group].append({
+                        "label": label,
+                        "command": command,
+                        "success": False,
+                        "output": str(cmd_error),
+                    })
+        ssh_conn.disconnect()
+        return {
+            "success": True,
+            "device": hostname,
+            "vendor": vendor,
+            "groups": output_groups,
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "device": hostname,
+            "vendor": vendor,
+            "error": str(e),
+            "groups": output_groups,
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+
+def _run_custom_telemetry(hostname, commands, group_id="custom"):
+    device_info = find_device_info(hostname)
+    if not device_info:
+        return {
+            "success": False,
+            "device": hostname,
+            "error": f"Device {hostname} not found in hosts.csv",
+            "groups": {},
+        }
+
+    clean_commands = []
+    for item in commands[:12]:
+        command = (item.get("command") or "").strip()
+        label = (item.get("label") or command).strip()
+        if not command or not command.lower().startswith("show "):
+            continue
+        clean_commands.append((label[:60], command[:180]))
+
+    if not clean_commands:
+        return {
+            "success": False,
+            "device": hostname,
+            "error": "At least one show command is required.",
+            "groups": {},
+        }
+
+    vendor = (_get_vendor_for_device(hostname) or "arista").strip().lower()
+    output_groups = {group_id: []}
+
+    try:
+        ssh_conn = ConnectHandler(**device_info)
+        if device_info.get("device_type") != "juniper_junos":
+            ssh_conn.enable()
+        for label, command in clean_commands:
+            try:
+                output = ssh_conn.send_command(command, read_timeout=20)
+                output_groups[group_id].append({
+                    "label": label,
+                    "command": command,
+                    "success": True,
+                    "output": output,
+                })
+            except Exception as cmd_error:
+                output_groups[group_id].append({
+                    "label": label,
+                    "command": command,
+                    "success": False,
+                    "output": str(cmd_error),
+                })
+        ssh_conn.disconnect()
+        return {
+            "success": True,
+            "device": hostname,
+            "vendor": vendor,
+            "groups": output_groups,
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "device": hostname,
+            "vendor": vendor,
+            "error": str(e),
+            "groups": output_groups,
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
 
 
 # Context processor to make devices + current time available in all templates
@@ -488,6 +776,30 @@ def hosts_inventory():
     except Exception as e:
         print(f"[⚠] Could not read hosts.csv: {e}")
     return render_template("hosts_inventory.html", hosts=hosts)
+
+
+@app.route("/admin/hosts-inventory/delete", methods=["POST"])
+@login_required
+@admin_required
+def delete_host():
+    hostname = request.form.get("hostname", "").strip()
+    if not hostname:
+        return ("Missing hostname", 400)
+    hosts_csv_path = os.path.join(IPAM_DIR, "hosts.csv")
+    try:
+        with open(hosts_csv_path, newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames or []
+            rows = [r for r in reader if r.get("hostname", "").strip() != hostname]
+        with open(hosts_csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"[✔] Deleted host '{hostname}' from hosts.csv")
+    except Exception as e:
+        print(f"[⚠] Failed to delete host '{hostname}': {e}")
+        return (f"Error: {e}", 500)
+    return redirect(url_for("hosts_inventory"))
 
 
 @app.route("/")
@@ -753,7 +1065,7 @@ def shutdown_ollama_route():
 
 @app.route("/add-hosts", methods=["GET", "POST"])
 @login_required
-@operator_required
+@admin_required
 def add_hosts():
     message = None
     if request.method == "POST":
@@ -763,19 +1075,18 @@ def add_hosts():
         management_ips = request.form.getlist("management_ip[]")
         subnet_cidrs = request.form.getlist("subnet_cidr[]")
         vendors = request.form.getlist("vendor[]")
-        save_mode = request.form.get("save_mode", "new")
-
         rows = []
         for i in range(len(hostnames)):
             if hostnames[i] and usernames[i] and passwords[i] and management_ips[i] and subnet_cidrs[i]:
+                subnet_cidr = _cidr_value(subnet_cidrs[i])
                 rows.append(
-                    [hostnames[i], usernames[i], passwords[i], management_ips[i], subnet_cidrs[i], vendors[i] if i < len(vendors) else ""]
+                    [hostnames[i], usernames[i], passwords[i], management_ips[i], subnet_cidr, vendors[i] if i < len(vendors) else ""]
                 )
 
         if rows:
-            path = write_hosts_csv(rows, append=(save_mode == "append"))
-            mode_label = "Appended to" if save_mode == "append" else "Created"
-            message = f"✅ {mode_label} hosts.csv with {len(rows)} new device(s)."
+            path = write_hosts_csv(rows, append=True)
+            flash(f"Saved {len(rows)} host(s) to hosts.csv.")
+            return redirect(url_for("hosts_inventory"))
         else:
             message = "⚠️ No valid entries to save."
             
@@ -811,6 +1122,11 @@ def build_topology():
             )
             username = request.form.get(f"device_username_{i}", "")
             password = request.form.get(f"device_password_{i}", "")
+            vendor = (
+                request.form.get(f"device_vendor_{i}", "").strip().lower()
+                or (_get_vendor_for_device(name) or "").strip().lower()
+                or _vendor_from_kind(kind)
+            )
 
             devices.append(
                 {
@@ -823,23 +1139,49 @@ def build_topology():
                     "ip_address": ip_address,
                     "username": username,
                     "password": password,
+                    "vendor": vendor,
                 }
             )
 
             i += 1
 
-        # ✅ Parse links
+        device_names = {device["name"] for device in devices}
+
+        # ✅ Parse every rendered link select field. Do not rely on link_count
+        # or hidden JSON; both can be stale if the dynamic form is re-rendered.
+        link_indexes = sorted(
+            {
+                int(match.group(1))
+                for key in request.form.keys()
+                for match in [re.fullmatch(r"link_dev[12]_(\d+)", key)]
+                if match
+            }
+        )
+        for link_index in link_indexes:
+            links.append((
+                request.form.get(f"link_dev1_{link_index}", ""),
+                request.form.get(f"link_dev2_{link_index}", ""),
+            ))
+
         link_dev1_list = request.form.get("link_dev1_json")
         link_dev2_list = request.form.get("link_dev2_json")
-        if link_dev1_list and link_dev2_list:
+        if not links and link_dev1_list and link_dev2_list:
             try:
                 dev1_list = json.loads(link_dev1_list)
                 dev2_list = json.loads(link_dev2_list)
             except json.JSONDecodeError as e:
-                return render_template("build_topology.html",
-                                       docker_images=get_docker_images(),
-                                       error=f"Invalid link data: {e}")
+                return render_template(
+                    "build_topology.html",
+                    **_topology_page_context(error=f"Invalid link data: {e}")
+                )
             links = list(zip(dev1_list, dev2_list))
+
+        links = [
+            (dev1, dev2)
+            for dev1, dev2 in links
+            if dev1 and dev2 and dev1 != dev2 and dev1 in device_names and dev2 in device_names
+        ]
+        print(f"[INFO] Parsed topology links from form: {links}")
 
         # ✅ Build topology and update CSV
         print("[INFO] Generating topology YAML...")
@@ -849,19 +1191,15 @@ def build_topology():
         print("[INFO] Generating hosts.csv...")
         regenerate_hosts_csv(devices)
 
-        # ✅ Render response
-        client = docker.from_env()
-        images = [tag for img in client.images.list() for tag in img.tags if ":" in tag]
+        session["topology_yaml_generated"] = True
         message = f"✅ topo.yml generated at: <code>{output_path}</code>"
 
         return render_template(
-            "build_topology.html", docker_images=images, message=message
+            "build_topology.html", **_topology_page_context(message=message, yaml_generated=True)
         )
 
     # GET fallback
-    client = docker.from_env()
-    images = [tag for img in client.images.list() for tag in img.tags if ":" in tag]
-    return render_template("build_topology.html", docker_images=images)
+    return render_template("build_topology.html", **_topology_page_context())
 
 
 @app.route("/deploy-topology", methods=["POST"], endpoint="deploy_topology_route")
@@ -911,6 +1249,7 @@ def deploy_topology_route():
         subprocess.run(["sudo", "systemctl", "restart", "ipam.service"], check=True)
 
         print("[✔] Deploy output captured successfully.")
+        session["topology_yaml_generated"] = False
         message = "✅ Containerlab topology deployed successfully."
 
     except subprocess.CalledProcessError as e:
@@ -920,7 +1259,7 @@ def deploy_topology_route():
         message = f"❌ Failed to deploy topology:<br><pre>{error_detail}</pre>"
 
     return render_template(
-        "build_topology.html", docker_images=get_docker_images(), message=message
+        "build_topology.html", **_topology_page_context(message=message)
     )
 
 
@@ -954,8 +1293,7 @@ def delete_topology_route():
         else:
             return render_template(
                 "build_topology.html",
-                docker_images=get_docker_images(),
-                message="⚠️ No topology is currently deployed."
+                **_topology_page_context(message="⚠️ No topology is currently deployed.")
             )
 
     try:
@@ -978,6 +1316,7 @@ def delete_topology_route():
                 shutil.rmtree(lab_dir)
 
         message = "✅ Topology deleted successfully."
+        session["topology_yaml_generated"] = False
         print("[✔] Topology destroyed and folder cleaned.")
 
     except subprocess.CalledProcessError as e:
@@ -986,7 +1325,7 @@ def delete_topology_route():
         message = f"❌ Failed to delete topology:<br><pre>{error_detail}</pre>"
 
     return render_template(
-        "build_topology.html", docker_images=get_docker_images(), message=message
+        "build_topology.html", **_topology_page_context(message=message)
     )
 
 
@@ -1128,7 +1467,7 @@ def configure_device():
                 return render_template(
                     "configure_device.html",
                     devices=devices,
-                    message=f"⚠️ No vendor set for {device_id}. Please update the host in Add Hosts.",
+                    message=f"⚠️ No vendor set for {device_id}. Please update the host in Hosts Inventory.",
                 )
 
             # Interfaces
@@ -1145,7 +1484,7 @@ def configure_device():
                         "type": i_type,
                         "number": i_num,
                         "ip": ip if sp != "yes" else None,
-                        "mask": mask if sp != "yes" else None,
+                        "mask": _cidr_value(mask) if sp != "yes" else None,
                         "switchport": sp == "yes",
                     }
                 )
@@ -1160,7 +1499,7 @@ def configure_device():
                 request.form.getlist("subinterface_mask[]"),
             ):
                 subinterfaces.append(
-                    {"parent": parent, "id": sid, "vlan": vlan, "ip": ip, "mask": mask}
+                    {"parent": parent, "id": sid, "vlan": vlan, "ip": ip, "mask": _cidr_value(mask)}
                 )
 
             # VLANs
@@ -1255,7 +1594,7 @@ def configure_device():
                         }
 
                     address_family_entries[af]["networks"].append(
-                        {"ip": net, "mask": mask}
+                        {"ip": net, "mask": _cidr_value(mask)}
                     )
                     address_family_entries[af]["neighbors"].append(
                         {"ip": neighbor_ip, "remote_as": neighbor_as}
@@ -1358,7 +1697,7 @@ def upload_config():
 
         device_vendor = _get_vendor_for_device(device_id)
         if not device_vendor:
-            return jsonify({"status": "error", "message": f"No vendor set for {device_id}. Please update the host in Add Hosts."})
+            return jsonify({"status": "error", "message": f"No vendor set for {device_id}. Please update the host in Hosts Inventory."})
 
         if not config_file:
             return jsonify({"status": "error", "message": "No config file provided"})
@@ -1398,7 +1737,7 @@ def rollback_device():
 
         device_vendor = _get_vendor_for_device(device_id)
         if not device_vendor:
-            return jsonify({"status": "error", "message": f"No vendor set for {device_id}. Please update the host in Add Hosts."})
+            return jsonify({"status": "error", "message": f"No vendor set for {device_id}. Please update the host in Hosts Inventory."})
 
         # Perform rollback
         success, message = rollback_to_golden_config(device_id, device_vendor)
@@ -1418,6 +1757,73 @@ def rollback_device():
 def tools():
     devices = hosts_reader.get_devices()
     return render_template("tools.html", devices=devices)
+
+
+@app.route("/telemetry")
+@login_required
+def telemetry_dashboard():
+    hosts = _read_hosts_inventory()
+    return render_template("telemetry.html", hosts=hosts)
+
+
+@app.route("/api/telemetry/devices")
+@login_required
+def api_telemetry_devices():
+    return jsonify({"devices": _read_hosts_inventory()})
+
+
+@app.route("/api/telemetry/poll", methods=["POST"])
+@login_required
+def api_telemetry_poll():
+    data = request.get_json() or {}
+    hostname = (data.get("device") or "").strip()
+    groups = data.get("groups") or ["l2", "l3", "device"]
+    if not hostname:
+        return jsonify({"success": False, "error": "Device is required."}), 400
+    if not isinstance(groups, list):
+        groups = ["l2", "l3", "device"]
+    return jsonify(_run_device_telemetry(hostname, groups))
+
+
+@app.route("/api/telemetry/custom", methods=["POST"])
+@login_required
+def api_telemetry_custom():
+    data = request.get_json() or {}
+    hostname = (data.get("device") or "").strip()
+    group_id = (data.get("group_id") or "custom").strip()[:40]
+    commands = data.get("commands") or []
+    if not hostname:
+        return jsonify({"success": False, "error": "Device is required."}), 400
+    if not isinstance(commands, list):
+        return jsonify({"success": False, "error": "Commands must be a list."}), 400
+    return jsonify(_run_custom_telemetry(hostname, commands, group_id))
+
+
+@app.route("/api/telemetry/poll-all", methods=["POST"])
+@login_required
+def api_telemetry_poll_all():
+    data = request.get_json() or {}
+    groups = data.get("groups") or ["l2", "l3", "device"]
+    if not isinstance(groups, list):
+        groups = ["l2", "l3", "device"]
+
+    hosts = _read_hosts_inventory()
+    results = []
+    with ThreadPoolExecutor(max_workers=min(4, max(len(hosts), 1))) as executor:
+        future_map = {
+            executor.submit(_run_device_telemetry, host["hostname"], groups): host
+            for host in hosts
+        }
+        for future in as_completed(future_map):
+            results.append(future.result())
+
+    order = {host["hostname"]: idx for idx, host in enumerate(hosts)}
+    results.sort(key=lambda item: order.get(item.get("device"), 9999))
+    return jsonify({
+        "success": True,
+        "results": results,
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    })
 
 
 @app.route("/api/ping", methods=["POST"])
@@ -1637,16 +2043,17 @@ def hosts_data():
     hosts = []
     hosts_csv_path = os.path.join(IPAM_DIR, "hosts.csv")
     try:
-        with open(hosts_csv_path, newline="") as f:
+        with open(hosts_csv_path, newline="", encoding="utf-8-sig") as f:
             for row in csv.DictReader(f):
                 mgmt_ip = row.get("management_ip", "")
                 subnet = row.get("subnet_cidr", "24")
+                vendor = (row.get("vendor") or "arista").strip().lower()
                 hosts.append({
                     "hostname": row.get("hostname", ""),
                     "management_ip": f"{mgmt_ip}/{subnet}" if mgmt_ip else "",
                     "username": row.get("username", ""),
                     "password": row.get("password", ""),
-                    "vendor": row.get("vendor", ""),
+                    "vendor": vendor,
                 })
     except Exception as e:
         print(f"[⚠] Could not read hosts.csv: {e}")
@@ -1914,4 +2321,4 @@ if __name__ == "__main__":
     thread.start()
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
 
-    socketio.run(app, host="0.0.0.0", port=5555, debug=debug)
+    socketio.run(app, host="0.0.0.0", port=5555, debug=debug, allow_unsafe_werkzeug=True)

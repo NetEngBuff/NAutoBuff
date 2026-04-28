@@ -143,6 +143,7 @@ def backup_dut(device: str) -> str:
     ]
     try:
         connection = ConnectHandler(**creds)
+        connection.enable()
         out.append("✓ Connected\n")
 
         config = connection.send_command("show running-config", read_timeout=60)

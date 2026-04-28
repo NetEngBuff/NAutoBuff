@@ -1,23 +1,23 @@
 {% extends "base.html" %}
 {% from '_macros.html' import next_steps %}
-{% block title %}IPAM - NAutoBuff{% endblock %}
+{% block title %}IPAM — NAutoBuff{% endblock %}
+{% block breadcrumb %}Physical Lab / IPAM{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">IP Address Management</h1>
-  <p class="page-description">View and manage your network's IP address inventory</p>
+  <p class="page-description">Live IP address inventory with automatic SNMP polling</p>
 </div>
 
-<!-- Status bar -->
 <div class="ipam-status-bar">
   <div class="ipam-status-left">
     <span class="ipam-pulse"></span>
-    <span>IPAM — polling every {{ poll_interval }}s</span>
+    <span style="font-family:var(--font-mono);font-size:12px;">POLLING every {{ poll_interval }}s</span>
     <span class="ipam-last-updated" id="ipam-last-updated"></span>
   </div>
   <div class="ipam-status-right">
     <button type="button" class="btn btn-secondary btn-sm" id="ipam-resync-ips-btn" onclick="resyncIPs()" title="Re-read management IPs from containerlab and restart IPAM poller">
-      <svg id="ipam-resync-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px;">
+      <svg id="ipam-resync-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;">
         <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 0 21 12"/>
         <polyline points="21 2 21 8 15 8"/>
       </svg>
@@ -33,7 +33,7 @@
         <th>Device Name</th>
         <th>Interface Name</th>
         <th>IP Address</th>
-        <th>Subnet Mask</th>
+        <th>CIDR</th>
       </tr>
     </thead>
     <tbody id="ipam-tbody">
@@ -45,81 +45,26 @@
           {% endif %}
           <td>{{ row["Interface Name"] }}</td>
           <td class="ip-address font-mono">{{ row["IP Address"] }}</td>
-          <td class="font-mono">{{ row["Subnet Mask"] }}</td>
+          <td class="font-mono">{{ row["Subnet Mask"]|cidr_prefix }}</td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 
-<div id="ipam-empty" class="empty-state" style="display: {% if not ipam_data %}block{% else %}none{% endif %}">
+<div id="ipam-empty" class="empty-state" style="display:{% if not ipam_data %}block{% else %}none{% endif %}">
   <div class="empty-state-icon">
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <ellipse cx="12" cy="5" rx="9" ry="3"/>
-      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-    </svg>
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
   </div>
   <h3 class="empty-state-title">No IP addresses found</h3>
   <p class="empty-state-description">Deploy a topology to populate the IPAM database</p>
 </div>
 
 {{ next_steps([
-  {'url': '/configure-device', 'title': 'Configure Device', 'desc': 'Push configs to any device',         'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 19.07A10 10 0 0 0 4.93 4.93"/></svg>'},
-  {'url': '/dashboard',        'title': 'Dashboard',        'desc': 'Live telemetry and metrics',          'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'},
-  {'url': '/topology',         'title': 'Topology',         'desc': 'View the network graph',              'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>'}
+  {'url': '/configure-device', 'title': 'Configure Device', 'desc': 'Push configs to any device', 'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 19.07A10 10 0 0 0 4.93 4.93"/></svg>'},
+  {'url': '/dashboard',        'title': 'Dashboard',        'desc': 'Live telemetry and metrics', 'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'},
+  {'url': '/topology',         'title': 'Topology',         'desc': 'View the network graph',    'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>'}
 ], label="Quick actions") }}
-
-<style>
-.ipam-status-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-4);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-}
-
-.ipam-status-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.ipam-pulse {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-success, #22c55e);
-  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
-  animation: ipam-pulse 2s ease-in-out infinite;
-  flex-shrink: 0;
-}
-
-@keyframes ipam-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
-  70%  { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-}
-
-.ipam-last-updated {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-}
-
-@keyframes ipam-spin {
-  to { transform: rotate(360deg); }
-}
-.ipam-syncing {
-  animation: ipam-spin 0.7s linear infinite;
-}
-</style>
 
 <script>
 const POLL_INTERVAL = {{ poll_interval }};
@@ -127,96 +72,63 @@ let isFetching = false;
 
 function bindHoverHighlight() {
   document.querySelectorAll('.table-ipam tbody tr').forEach(row => {
-    const deviceClass = row.dataset.device;
-    if (!deviceClass) return;
-    row.addEventListener('mouseenter', () => {
-      document.querySelectorAll(`[data-device="${deviceClass}"]`).forEach(r => {
-        r.style.backgroundColor = 'var(--color-primary-light)';
-      });
-    });
-    row.addEventListener('mouseleave', () => {
-      document.querySelectorAll(`[data-device="${deviceClass}"]`).forEach(r => {
-        r.style.backgroundColor = '';
-      });
-    });
+    const dc = row.dataset.device; if (!dc) return;
+    row.addEventListener('mouseenter', () => document.querySelectorAll(`[data-device="${dc}"]`).forEach(r=>r.style.backgroundColor='rgba(0,212,255,0.05)'));
+    row.addEventListener('mouseleave', () => document.querySelectorAll(`[data-device="${dc}"]`).forEach(r=>r.style.backgroundColor=''));
   });
+}
+
+function toCidrPrefix(value) {
+  const raw = String(value || '').trim();
+  if (!raw || raw.toUpperCase() === 'N/A') return raw || 'N/A';
+  const normalized = raw.startsWith('/') ? raw.slice(1) : raw;
+  if (/^\d+$/.test(normalized)) return `/${normalized}`;
+  const parts = normalized.split('.');
+  if (parts.length !== 4) return raw;
+  const bits = parts.map(part => {
+    const octet = Number(part);
+    if (!Number.isInteger(octet) || octet < 0 || octet > 255) return null;
+    return octet.toString(2).padStart(8, '0');
+  });
+  if (bits.includes(null)) return raw;
+  const maskBits = bits.join('');
+  if (maskBits.includes('01')) return raw;
+  return `/${(maskBits.match(/1/g) || []).length}`;
 }
 
 function renderTable(data) {
   const tbody = document.getElementById('ipam-tbody');
   const empty = document.getElementById('ipam-empty');
-
-  if (!data || data.length === 0) {
-    tbody.innerHTML = '';
-    empty.style.display = 'block';
-    return;
-  }
-
-  empty.style.display = 'none';
+  if (!data || !data.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
   tbody.innerHTML = data.map(row => {
-    const deviceClass = `device-${row["Device Name"].toLowerCase().replace(/ /g, '-')}`;
-    const firstCell = row.rowspan
-      ? `<td rowspan="${row.rowspan}" class="hostname">${row["Device Name"]}</td>`
-      : '';
-    return `<tr class="${deviceClass}" data-device="${deviceClass}">
-      ${firstCell}
-      <td>${row["Interface Name"]}</td>
-      <td class="ip-address font-mono">${row["IP Address"]}</td>
-      <td class="font-mono">${row["Subnet Mask"]}</td>
-    </tr>`;
+    const dc = `device-${row["Device Name"].toLowerCase().replace(/ /g,'-')}`;
+    const fc = row.rowspan ? `<td rowspan="${row.rowspan}" class="hostname">${row["Device Name"]}</td>` : '';
+    return `<tr class="${dc}" data-device="${dc}">${fc}<td>${row["Interface Name"]}</td><td class="ip-address font-mono">${row["IP Address"]}</td><td class="font-mono">${toCidrPrefix(row["Subnet Mask"])}</td></tr>`;
   }).join('');
-
   bindHoverHighlight();
 }
 
 function updateLastUpdated(ts) {
   const el = document.getElementById('ipam-last-updated');
-  el.textContent = ts ? `· last updated ${ts}` : '';
+  el.textContent = ts ? `· updated ${ts}` : '';
 }
 
 function fetchAndRefresh() {
-  fetch('/ipam-data')
-    .then(r => r.json())
-    .then(res => {
-      renderTable(res.data);
-      updateLastUpdated(res.last_updated);
-    })
-    .catch(() => {})
-    .finally(() => { isFetching = false; });
+  fetch('/ipam-data').then(r=>r.json()).then(res=>{ renderTable(res.data); updateLastUpdated(res.last_updated); })
+    .catch(()=>{}).finally(()=>{ isFetching=false; });
 }
 
 function resyncIPs() {
-  const btn = document.getElementById('ipam-resync-ips-btn');
-  const icon = document.getElementById('ipam-resync-icon');
-  if (btn) btn.disabled = true;
-  if (icon) icon.classList.add('ipam-syncing');
-
-  fetch('/ipam-sync-ips', { method: 'POST' })
-    .then(r => r.json())
-    .then(() => {
-      setTimeout(() => {
-        fetchAndRefresh();
-        if (btn) btn.disabled = false;
-        if (icon) icon.classList.remove('ipam-syncing');
-      }, 5000);
-    })
-    .catch(() => {
-      if (btn) btn.disabled = false;
-      if (icon) icon.classList.remove('ipam-syncing');
-    });
+  const btn=document.getElementById('ipam-resync-ips-btn');
+  const icon=document.getElementById('ipam-resync-icon');
+  if (btn) btn.disabled=true; if (icon) icon.classList.add('ipam-syncing');
+  fetch('/ipam-sync-ips', {method:'POST'}).then(r=>r.json()).then(()=>{
+    setTimeout(()=>{ fetchAndRefresh(); if(btn)btn.disabled=false; if(icon)icon.classList.remove('ipam-syncing'); }, 5000);
+  }).catch(()=>{ if(btn)btn.disabled=false; if(icon)icon.classList.remove('ipam-syncing'); });
 }
 
-// Silent background refresh every POLL_INTERVAL seconds
-setInterval(() => {
-  if (!isFetching) {
-    isFetching = true;
-    fetchAndRefresh();
-  }
-}, POLL_INTERVAL * 1000);
-
-document.addEventListener('DOMContentLoaded', () => {
-  bindHoverHighlight();
-  fetchAndRefresh();
-});
+setInterval(()=>{ if(!isFetching){isFetching=true; fetchAndRefresh();} }, POLL_INTERVAL*1000);
+document.addEventListener('DOMContentLoaded', ()=>{ bindHoverHighlight(); fetchAndRefresh(); });
 </script>
 {% endblock %}

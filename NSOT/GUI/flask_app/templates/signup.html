@@ -3,97 +3,58 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sign Up - NAutoBuff</title>
-  <script>
-    (function() {
-      const t = localStorage.getItem('theme') || 'light';
-      document.documentElement.setAttribute('data-theme', t);
-    })();
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <title>Create Account — NAutoBuff v2</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/v2.css') }}">
   <style>
-    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--color-bg); }
-    .signup-card {
-      width: 100%; max-width: 400px;
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-lg);
-      padding: var(--space-8);
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-    }
-    .signup-logo {
-      display: flex; align-items: center; justify-content: center; gap: var(--space-2);
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 1.8rem; letter-spacing: 0.05em;
-      color: var(--color-text-primary);
-      margin-bottom: var(--space-6);
-    }
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+    body::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(0,212,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.012) 1px,transparent 1px); background-size:52px 52px; pointer-events:none; z-index:0; }
+    .signup-wrap { position:relative; z-index:1; width:100%; max-width:420px; padding:var(--sp-4); }
+    .signup-logo { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:28px; }
+    .signup-logo-icon { width:40px; height:40px; background:linear-gradient(135deg,var(--vlab),#0099BB); border-radius:var(--r-lg); display:flex; align-items:center; justify-content:center; box-shadow:0 0 20px var(--vlab-glow); }
+    .signup-logo-title { font-family:var(--font-display); font-size:14px; font-weight:700; letter-spacing:0.1em; color:var(--t1); }
+    .signup-card { background:var(--nb-surface); border:1px solid var(--nb-border); border-radius:var(--r-xl); padding:30px; box-shadow:var(--sh-xl); position:relative; overflow:hidden; }
+    .signup-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--vlab),transparent); }
   </style>
 </head>
 <body>
-  <div class="signup-card">
+  <div class="signup-wrap">
     <div class="signup-logo">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
-        <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-      </svg>
-      NAutoBuff
+      <div class="signup-logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+      </div>
+      <span class="signup-logo-title">NAUTOBUFF</span>
     </div>
 
-    {% if not invite %}
-      <div class="alert alert-error">
-        <span class="alert-icon">&#10007;</span>
-        <div class="alert-content">{{ error }}</div>
-      </div>
-      <p style="text-align:center;margin-top:var(--space-4);font-size:var(--font-size-sm);color:var(--color-text-muted);">
-        Contact your NAutoBuff administrator for a valid invite link.
-      </p>
-
-    {% elif success %}
-      <div class="alert alert-success">
-        <span class="alert-icon">&#10003;</span>
-        <div class="alert-content">Account created successfully!</div>
-      </div>
-      <p style="text-align:center;margin-top:var(--space-4);font-size:var(--font-size-sm);color:var(--color-text-muted);">
-        You can now <a href="{{ url_for('login') }}" style="color:var(--color-primary);">log in</a>.
-      </p>
-
-    {% else %}
-      <div style="text-align:center;margin-bottom:var(--space-5);">
-        <p style="font-size:var(--font-size-sm);color:var(--color-text-muted);margin-bottom:var(--space-2);">You've been invited to join NAutoBuff</p>
-        <span style="font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);border:1px solid var(--color-primary);border-radius:var(--radius-sm);padding:2px 10px;color:var(--color-primary);">
-          Role: {{ invite.role }}
-        </span>
-      </div>
+    <div class="signup-card">
+      <h1 style="font-size:16px;font-weight:600;color:var(--t1);text-align:center;margin-bottom:6px;">Create Account</h1>
+      <p style="font-size:13px;color:var(--t3);text-align:center;margin-bottom:24px;">You were invited to join NAutoBuff</p>
 
       {% if error %}
-      <div class="alert alert-error" style="margin-bottom:var(--space-4);">
-        <span class="alert-icon">&#10007;</span>
+      <div class="alert alert-error" style="margin-bottom:var(--sp-5);">
+        <span class="alert-icon">✘</span>
         <div class="alert-content">{{ error }}</div>
       </div>
       {% endif %}
 
       <form method="POST" class="form">
         <div class="form-group">
-          <label class="form-label">Choose a Username</label>
-          <input type="text" name="username" class="form-input" autofocus required>
+          <label class="form-label">Username</label>
+          <input type="text" name="username" class="form-input" autofocus required placeholder="Choose a username">
         </div>
         <div class="form-group">
-          <label class="form-label">Password <span style="font-weight:400;color:var(--color-text-muted)">(min 8 characters)</span></label>
-          <input type="password" name="password" class="form-input" required minlength="8">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" class="form-input" required placeholder="Min 8 characters">
         </div>
         <div class="form-group">
           <label class="form-label">Confirm Password</label>
-          <input type="password" name="confirm_password" class="form-input" required>
+          <input type="password" name="confirm_password" class="form-input" required placeholder="Repeat password">
         </div>
-        <button type="submit" class="btn btn-primary btn-block" style="margin-top:var(--space-2);">
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:var(--sp-2);">
           Create Account
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
       </form>
-    {% endif %}
+    </div>
   </div>
 </body>
 </html>

@@ -3,77 +3,130 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login - NAutoBuff</title>
-  <script>
-    (function() {
-      const t = localStorage.getItem('theme') || 'light';
-      document.documentElement.setAttribute('data-theme', t);
-    })();
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <title>Login — NAutoBuff v2</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/v2.css') }}">
   <style>
-    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--color-bg); }
-    .login-card {
-      width: 100%; max-width: 380px;
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-lg);
-      padding: var(--space-8);
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    body {
+      display:flex; align-items:center; justify-content:center;
+      min-height:100vh; background:var(--nb-base); overflow:hidden;
     }
+    body::before {
+      content:''; position:fixed; inset:0;
+      background-image: linear-gradient(rgba(0,212,255,0.015) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(0,212,255,0.015) 1px, transparent 1px);
+      background-size:52px 52px; pointer-events:none; z-index:0;
+    }
+    /* Ambient glow */
+    body::after {
+      content:''; position:fixed;
+      top:-200px; left:50%; transform:translateX(-50%);
+      width:600px; height:600px;
+      background:radial-gradient(ellipse, rgba(0,212,255,0.07) 0%, transparent 70%);
+      pointer-events:none; z-index:0;
+    }
+
+    .login-wrap {
+      position:relative; z-index:1;
+      width:100%; max-width:380px; padding:var(--sp-4);
+    }
+
+    /* Logo */
     .login-logo {
-      display: flex; align-items: center; justify-content: center; gap: var(--space-2);
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 1.8rem; letter-spacing: 0.05em;
-      color: var(--color-text-primary);
-      margin-bottom: var(--space-6);
+      display:flex; align-items:center; justify-content:center; gap:10px;
+      margin-bottom:32px;
     }
+    .login-logo-icon {
+      width:42px; height:42px;
+      background:linear-gradient(135deg, var(--vlab) 0%, #0099BB 100%);
+      border-radius:var(--r-lg); display:flex; align-items:center; justify-content:center;
+      box-shadow:0 0 24px var(--vlab-glow);
+    }
+    .login-logo-text { display:flex; flex-direction:column; }
+    .login-logo-title {
+      font-family:var(--font-display); font-size:15px; font-weight:700;
+      letter-spacing:0.1em; color:var(--t1); line-height:1;
+    }
+    .login-logo-sub { font-family:var(--font-mono); font-size:9px; color:var(--vlab); letter-spacing:0.12em; margin-top:2px; }
+
+    /* Card */
+    .login-card {
+      background:var(--nb-surface); border:1px solid var(--nb-border);
+      border-radius:var(--r-xl); padding:32px;
+      box-shadow:var(--sh-xl);
+      position:relative; overflow:hidden;
+    }
+    .login-card::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg, var(--vlab), transparent);
+    }
+
     .login-title {
-      font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold);
-      color: var(--color-text-primary); margin-bottom: var(--space-6); text-align: center;
+      font-size:16px; font-weight:600; color:var(--t1);
+      margin-bottom:6px; text-align:center;
+    }
+    .login-sub { font-size:13px; color:var(--t3); text-align:center; margin-bottom:24px; }
+
+    /* Footer */
+    .login-footer {
+      text-align:center; margin-top:20px;
+      font-size:11px; color:var(--t4);
+      font-family:var(--font-mono); letter-spacing:0.05em;
     }
   </style>
 </head>
 <body>
-  <div class="login-card">
+  <div class="login-wrap">
     <div class="login-logo">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
-        <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-      </svg>
-      NAutoBuff
+      <div class="login-logo-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
+          <rect x="2" y="2" width="20" height="8" rx="2"/>
+          <rect x="2" y="14" width="20" height="8" rx="2"/>
+          <line x1="6" y1="6" x2="6.01" y2="6"/>
+          <line x1="6" y1="18" x2="6.01" y2="18"/>
+        </svg>
+      </div>
+      <div class="login-logo-text">
+        <span class="login-logo-title">NAUTOBUFF</span>
+        <span class="login-logo-sub">NSoT PLATFORM</span>
+      </div>
     </div>
-    <p class="login-title">Sign in to continue</p>
 
-    {% if error %}
-    <div class="alert alert-error" style="margin-bottom:var(--space-4);">
-      <span class="alert-icon">&#10007;</span>
-      <div class="alert-content">{{ error }}</div>
+    <div class="login-card">
+      <h1 class="login-title">Sign In</h1>
+      <p class="login-sub">Access your network automation platform</p>
+
+      {% if error %}
+      <div class="alert alert-error" style="margin-bottom:var(--sp-5);">
+        <span class="alert-icon">✘</span>
+        <div class="alert-content">{{ error }}</div>
+      </div>
+      {% endif %}
+
+      <form method="POST" class="form">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input type="text" name="username" class="form-input" autofocus required placeholder="Enter username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" class="form-input" required placeholder="••••••••">
+        </div>
+        <div class="form-group">
+          <label class="form-check">
+            <input type="checkbox" name="remember" class="form-check-input">
+            <span class="form-check-label">Remember me for 30 days</span>
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:var(--sp-2);">
+          Sign In
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </form>
     </div>
-    {% endif %}
 
-    <form method="POST" class="form">
-      <div class="form-group">
-        <label class="form-label">Username</label>
-        <input type="text" name="username" class="form-input" autofocus required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" name="password" class="form-input" required>
-      </div>
-      <div class="form-group">
-        <label class="form-check">
-          <input type="checkbox" name="remember" class="form-check-input">
-          <span class="form-check-label">Remember me</span>
-        </label>
-      </div>
-      <button type="submit" class="btn btn-primary btn-block" style="margin-top:var(--space-2);">
-        Sign In
-      </button>
-    </form>
+    <div class="login-footer">
+      NAUTOBUFF — NETWORK SOURCE OF TRUTH
+    </div>
   </div>
 </body>
 </html>

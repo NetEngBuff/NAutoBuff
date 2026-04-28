@@ -1,19 +1,32 @@
 {% extends "base.html" %}
-{% block title %}Tools - NAutoBuff{% endblock %}
+{% block title %}Tools — NAutoBuff{% endblock %}
+{% block breadcrumb %}Physical Lab / Tools{% endblock %}
 
 {% block head %}
-<!-- xterm.js -->
 <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
-<!-- Socket.IO client (must match Flask-SocketIO 5.x / protocol v5) -->
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-{% endblock head %}
+<style>
+.tools-mode-bar {
+  display:flex; align-items:center; gap:var(--sp-3); margin-bottom:var(--sp-6);
+  padding:3px; background:var(--nb-elevated); border:1px solid var(--nb-border);
+  border-radius:var(--r-lg); width:fit-content;
+}
+.tools-mode-btn {
+  padding:6px 16px; border:none; border-radius:var(--r-md);
+  font-size:12px; font-weight:600; cursor:pointer;
+  transition:all 150ms ease; background:transparent; color:var(--t3);
+  font-family:var(--font-ui); letter-spacing:0.03em;
+}
+.tools-mode-btn.active { background:var(--plab); color:var(--nb-base); }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Network Tools</h1>
-  <p class="page-description">Diagnostic and management utilities for your network</p>
+  <p class="page-description">Diagnostic and management utilities for your physical network devices</p>
 </div>
 
 <div class="grid grid-cols-3 gap-6">
@@ -22,8 +35,13 @@
   <!-- Golden Config Generator -->
   <div class="tool-card">
     <div class="tool-card-header">
-      <h3 class="tool-card-title">Golden Config Generator</h3>
-      <p class="tool-card-description">Generate golden configuration snapshots</p>
+      <div>
+        <h3 class="tool-card-title">Golden Config</h3>
+        <p class="tool-card-description">Generate configuration snapshots</p>
+      </div>
+      <div style="width:32px;height:32px;border-radius:var(--r-md);background:var(--plab-dim);border:1px solid rgba(255,122,61,0.2);display:flex;align-items:center;justify-content:center;color:var(--plab);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
     </div>
     <div class="tool-card-body">
       <div class="form">
@@ -42,7 +60,8 @@
             <span class="form-check-label">All devices from hosts.csv</span>
           </label>
         </div>
-        <button class="btn btn-primary btn-block" id="gc-btn" onclick="runGoldenConfig()">
+        <button class="btn btn-plab btn-block" id="gc-btn" onclick="runGoldenConfig()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Generate Config
         </button>
       </div>
@@ -54,13 +73,18 @@
   <!-- Show Configs -->
   <div class="tool-card">
     <div class="tool-card-header">
-      <h3 class="tool-card-title">Show Configs</h3>
-      <p class="tool-card-description">Execute show commands on devices</p>
+      <div>
+        <h3 class="tool-card-title">Show Configs</h3>
+        <p class="tool-card-description">Execute show commands on devices</p>
+      </div>
+      <div style="width:32px;height:32px;border-radius:var(--r-md);background:var(--plab-dim);border:1px solid rgba(255,122,61,0.2);display:flex;align-items:center;justify-content:center;color:var(--plab);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      </div>
     </div>
     <div class="tool-card-body">
       <div class="form">
         <div id="show-no-device-alert" class="alert alert-error" style="display:none;">
-          <span class="alert-icon">&#10007;</span>
+          <span class="alert-icon">✘</span>
           <div class="alert-content">Please select a device before executing a command.</div>
         </div>
         <div class="form-group">
@@ -99,19 +123,24 @@
           <label class="form-label">Custom Command</label>
           <input type="text" id="show-command" class="form-input" placeholder="e.g., show version">
         </div>
-        <button class="btn btn-primary btn-block" id="show-btn" onclick="runShowCommand()">
+        <button class="btn btn-plab btn-block" id="show-btn" onclick="runShowCommand()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           Execute Command
         </button>
       </div>
-      <div id="show-result" class="output-container mt-4" style="display:none;"></div>
     </div>
   </div>
 
   <!-- Console Access -->
   <div class="tool-card">
     <div class="tool-card-header">
-      <h3 class="tool-card-title">Console Access</h3>
-      <p class="tool-card-description">Interactive SSH terminal for each device</p>
+      <div>
+        <h3 class="tool-card-title">Console Access</h3>
+        <p class="tool-card-description">Interactive SSH terminal</p>
+      </div>
+      <div style="width:32px;height:32px;border-radius:var(--r-md);background:var(--vlab-dim);border:1px solid rgba(0,212,255,0.2);display:flex;align-items:center;justify-content:center;color:var(--vlab);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
     </div>
     <div class="tool-card-body">
       <div class="form">
@@ -125,6 +154,7 @@
           </select>
         </div>
         <button class="btn btn-primary btn-block" onclick="openConsole()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           Open Terminal
         </button>
       </div>
@@ -134,28 +164,38 @@
   <!-- Ping Test -->
   <div class="tool-card">
     <div class="tool-card-header">
-      <h3 class="tool-card-title">Ping Test</h3>
-      <p class="tool-card-description">Test network connectivity</p>
+      <div>
+        <h3 class="tool-card-title">Ping Test</h3>
+        <p class="tool-card-description">Test network connectivity</p>
+      </div>
+      <div style="width:32px;height:32px;border-radius:var(--r-md);background:rgba(0,224,153,0.08);border:1px solid rgba(0,224,153,0.2);display:flex;align-items:center;justify-content:center;color:var(--ok);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
     </div>
     <div class="tool-card-body">
       <div class="form">
-        <div class="form-group">
-          <label class="form-label">Source IP</label>
-          <input type="text" id="ping-source" class="form-input" placeholder="localhost">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Source IP</label>
+            <input type="text" id="ping-source" class="form-input" placeholder="localhost">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Destination IP</label>
+            <input type="text" id="ping-dest" class="form-input" placeholder="192.168.1.1">
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Destination IP</label>
-          <input type="text" id="ping-dest" class="form-input">
-        </div>
-        <div class="form-group">
-          <label class="form-label">SSH Username</label>
-          <input type="text" id="ping-user" class="form-input" placeholder="root">
-        </div>
-        <div class="form-group">
-          <label class="form-label">SSH Password</label>
-          <input type="password" id="ping-pass" class="form-input">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">SSH Username</label>
+            <input type="text" id="ping-user" class="form-input" placeholder="root">
+          </div>
+          <div class="form-group">
+            <label class="form-label">SSH Password</label>
+            <input type="password" id="ping-pass" class="form-input" placeholder="••••••••">
+          </div>
         </div>
         <button class="btn btn-primary btn-block" id="ping-btn" onclick="runPing()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           Run Ping Test
         </button>
       </div>
@@ -164,30 +204,26 @@
 
 </div>
 
+<!-- Output card -->
 <div id="show-output-card" class="card card-elevated mt-6" style="display:none;">
-  <div class="card-header" style="display:flex; align-items:center; justify-content:space-between;">
-    <h4 id="show-output-title">Output</h4>
-    <span id="show-output-badge" style="font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);border:1px solid;border-radius:var(--radius-sm);padding:2px 8px;"></span>
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:var(--sp-3);">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      <h4 id="show-output-title" style="font-size:14px;font-weight:600;">Output</h4>
+    </div>
+    <span id="show-output-badge" class="badge"></span>
   </div>
   <div class="card-body">
-    <pre id="show-output-pre" class="output-container" style="max-height: 400px;"></pre>
+    <pre id="show-output-pre" class="output-container" style="max-height:400px;"></pre>
   </div>
 </div>
-
-<style>
-.btn-loading-state {
-  opacity: 0.75;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-</style>
 
 <script>
 function setLoading(btnId, loading) {
   const btn = document.getElementById(btnId);
   if (loading) {
     btn.dataset.originalText = btn.innerHTML;
-    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Running...`;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Running…`;
     btn.classList.add('btn-loading-state');
   } else {
     btn.innerHTML = btn.dataset.originalText;
@@ -195,301 +231,157 @@ function setLoading(btnId, loading) {
   }
 }
 
-function showResult(elId, html) {
-  const el = document.getElementById(elId);
-  el.style.display = 'block';
-  el.innerHTML = html;
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
 function showOutputCard(title, text, success) {
-  const card = document.getElementById('show-output-card');
+  const card  = document.getElementById('show-output-card');
   const titleEl = document.getElementById('show-output-title');
-  const pre = document.getElementById('show-output-pre');
+  const pre   = document.getElementById('show-output-pre');
   const badge = document.getElementById('show-output-badge');
-
   titleEl.textContent = title;
   pre.textContent = text;
   badge.textContent = success ? 'Success' : 'Failed';
-  badge.style.color = success ? 'var(--color-success)' : 'var(--color-error)';
-  badge.style.borderColor = success ? 'var(--color-success)' : 'var(--color-error)';
-
+  badge.className = 'badge ' + (success ? 'badge-ok' : 'badge-err');
   card.style.display = 'block';
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// ── Ping ──────────────────────────────────────────────
+function showResult(elId, html) {
+  const el = document.getElementById(elId);
+  el.style.display = 'block'; el.innerHTML = html;
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 function runPing() {
   const source = document.getElementById('ping-source').value.trim() || 'localhost';
   const dest   = document.getElementById('ping-dest').value.trim();
-  if (!dest) {
-    showOutputCard('Ping', `Enter a destination IP.`, false);
-    return;
-  }
-
+  if (!dest) { showOutputCard('Ping', 'Enter a destination IP.', false); return; }
   setLoading('ping-btn', true);
   fetch('/api/ping', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      source,
-      destination: dest,
-      username: document.getElementById('ping-user').value || 'root',
-      password: document.getElementById('ping-pass').value || '',
-    })
-  })
-  .then(r => r.json())
-  .then(res => showOutputCard(`Ping ${source} → ${dest}`, res.output, res.success))
-  .catch(e => showOutputCard('Ping', `Error: ${e.message}`, false))
-  .finally(() => setLoading('ping-btn', false));
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ source, destination: dest, username: document.getElementById('ping-user').value||'root', password: document.getElementById('ping-pass').value||'' })
+  }).then(r=>r.json()).then(res=>showOutputCard(`Ping ${source} → ${dest}`, res.output, res.success))
+    .catch(e=>showOutputCard('Ping', `Error: ${e.message}`, false))
+    .finally(()=>setLoading('ping-btn', false));
 }
 
-// ── Show Command ──────────────────────────────────────
-function setCommand(val) {
-  document.getElementById('show-command').value = val;
-  clearShowAlert();
-}
-
-function clearShowAlert() {
-  document.getElementById('show-no-device-alert').style.display = 'none';
-}
+function setCommand(val) { document.getElementById('show-command').value = val; clearShowAlert(); }
+function clearShowAlert() { document.getElementById('show-no-device-alert').style.display = 'none'; }
 
 function runShowCommand() {
   const device  = document.getElementById('show-device').value;
   const command = document.getElementById('show-command').value.trim();
-
-  if (!device) {
-    const alert = document.getElementById('show-no-device-alert');
-    alert.style.display = 'flex';
-    alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    return;
-  }
-
+  if (!device) { const a=document.getElementById('show-no-device-alert'); a.style.display='flex'; a.scrollIntoView({behavior:'smooth',block:'nearest'}); return; }
   setLoading('show-btn', true);
-  fetch('/api/show-command', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ device, command })
-  })
-  .then(r => r.json())
-  .then(res => showOutputCard(`${device} — ${command}`, res.output, res.success))
-  .catch(e => showOutputCard(`${device} — ${command}`, `Error: ${e.message}`, false))
-  .finally(() => setLoading('show-btn', false));
+  fetch('/api/show-command', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({device, command}) })
+    .then(r=>r.json()).then(res=>showOutputCard(`${device} — ${command}`, res.output, res.success))
+    .catch(e=>showOutputCard(`${device} — ${command}`, `Error: ${e.message}`, false))
+    .finally(()=>setLoading('show-btn', false));
 }
 
-// ── Golden Config ─────────────────────────────────────
 function toggleGcDevice() {
   const cb = document.getElementById('gc-select-all');
   const select = document.getElementById('gc-device');
-  select.disabled = cb.checked;
-  if (cb.checked) select.value = '';
+  select.disabled = cb.checked; if (cb.checked) select.value = '';
 }
 
 function runGoldenConfig() {
   const selectAll = document.getElementById('gc-select-all').checked;
   const device    = document.getElementById('gc-device').value.trim();
-
-  if (!selectAll && !device) {
-    showResult('gc-result', '<span style="color:var(--color-error);">Enter a device name or select all.</span>');
-    return;
-  }
-
+  if (!selectAll && !device) { showResult('gc-result', '<span style="color:var(--err);">Enter a device name or select all.</span>'); return; }
   setLoading('gc-btn', true);
-  fetch('/api/golden-config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ select_all: selectAll, device })
-  })
-  .then(r => r.json())
-  .then(res => {
-    if (!res.success) {
-      showResult('gc-result', `<span style="color:var(--color-error);">${res.message}</span>`);
-      return;
-    }
-    const list = res.files.map(f => `<li>${f}</li>`).join('');
-    showResult('gc-result', `<strong>Generated Config Files:</strong><ul style="margin-top:6px;">${list}</ul>`);
-  })
-  .catch(e => showResult('gc-result', `<span style="color:var(--color-error);">Error: ${e.message}</span>`))
-  .finally(() => setLoading('gc-btn', false));
+  fetch('/api/golden-config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({select_all:selectAll, device}) })
+    .then(r=>r.json()).then(res => {
+      if (!res.success) { showResult('gc-result', `<span style="color:var(--err);">${res.message}</span>`); return; }
+      const list = res.files.map(f=>`<li style="padding:2px 0;">${f}</li>`).join('');
+      showResult('gc-result', `<strong style="color:var(--ok);">Generated Config Files:</strong><ul style="margin-top:8px;padding-left:16px;font-family:var(--font-mono);font-size:12px;">${list}</ul>`);
+    })
+    .catch(e=>showResult('gc-result', `<span style="color:var(--err);">Error: ${e.message}</span>`))
+    .finally(()=>setLoading('gc-btn', false));
 }
 
-// Spinner keyframe (reuse if already defined globally)
 if (!document.getElementById('tools-spin-style')) {
-  const s = document.createElement('style');
-  s.id = 'tools-spin-style';
+  const s = document.createElement('style'); s.id='tools-spin-style';
   s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
   document.head.appendChild(s);
 }
 </script>
 
-<!-- ── Console Overlay ──────────────────────────────────────────────────── -->
-<div id="console-overlay" style="
-  display:none; position:fixed; inset:0; z-index:9000;
-  background:rgba(0,0,0,0.85); flex-direction:column;
-  align-items:center; justify-content:center;">
-
-  <div style="
-    width:92vw; max-width:1200px; height:80vh;
-    background:#0d1117; border:1px solid #30363d; border-radius:10px;
-    display:flex; flex-direction:column; overflow:hidden;
-    box-shadow:0 20px 60px rgba(0,0,0,0.6);">
-
-    <!-- header bar -->
-    <div style="
-      display:flex; align-items:center; justify-content:space-between;
-      padding:10px 16px; background:#161b22; border-bottom:1px solid #30363d;
-      flex-shrink:0;">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:18px;">&#128196;</span>
-        <span id="console-title" style="color:#e6edf3; font-weight:600; font-size:14px;">
-          Console
-        </span>
-        <span id="console-status-dot" style="
-          width:8px; height:8px; border-radius:50%;
-          background:#484f58; display:inline-block; margin-left:4px;"></span>
-        <span id="console-status-text" style="color:#8b949e; font-size:12px;">Connecting…</span>
+<!-- Console Overlay -->
+<div id="console-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.88);backdrop-filter:blur(8px);flex-direction:column;align-items:center;justify-content:center;">
+  <div style="width:92vw;max-width:1200px;height:80vh;background:var(--nb-base);border:1px solid var(--nb-border);border-radius:var(--r-xl);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--sh-xl);">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:var(--nb-elevated);border-bottom:1px solid var(--nb-border);flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="display:flex;gap:5px;">
+          <span style="width:12px;height:12px;border-radius:50%;background:var(--err);"></span>
+          <span style="width:12px;height:12px;border-radius:50%;background:var(--warn);"></span>
+          <span style="width:12px;height:12px;border-radius:50%;background:var(--ok);"></span>
+        </div>
+        <span id="console-title" style="color:var(--t1);font-weight:600;font-size:13px;font-family:var(--font-mono);">Console</span>
+        <span id="console-status-dot" style="width:7px;height:7px;border-radius:50%;background:var(--t4);display:inline-block;"></span>
+        <span id="console-status-text" style="color:var(--t3);font-size:12px;">Connecting…</span>
       </div>
-      <div style="display:flex; gap:8px;">
-        <button onclick="clearConsole()" title="Clear" style="
-          background:none; border:1px solid #30363d; color:#8b949e;
-          border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px;">
-          Clear
-        </button>
-        <button onclick="closeConsole()" title="Close" style="
-          background:none; border:1px solid #30363d; color:#8b949e;
-          border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px;">
-          &#10005; Close
-        </button>
+      <div style="display:flex;gap:8px;">
+        <button onclick="clearConsole()" style="background:none;border:1px solid var(--nb-border);color:var(--t2);border-radius:var(--r-sm);padding:4px 12px;cursor:pointer;font-size:12px;font-family:var(--font-ui);">Clear</button>
+        <button onclick="closeConsole()" style="background:none;border:1px solid var(--nb-border);color:var(--t2);border-radius:var(--r-sm);padding:4px 12px;cursor:pointer;font-size:12px;font-family:var(--font-ui);">✕ Close</button>
       </div>
     </div>
-
-    <!-- terminal container -->
-    <div id="console-terminal" style="flex:1; overflow:hidden; padding:8px;"></div>
+    <div id="console-terminal" style="flex:1;overflow:hidden;padding:8px;"></div>
   </div>
 </div>
 
-<style>
-#console-overlay .xterm { height: 100%; }
-#console-overlay .xterm-viewport { overflow-y: hidden !important; }
-</style>
+<style>#console-overlay .xterm{height:100%;} #console-overlay .xterm-viewport{overflow-y:hidden!important;}</style>
 
 <script>
 (function () {
-  let _socket = null, _term = null, _fitAddon = null, _connected = false;
-
+  let _socket=null, _term=null, _fitAddon=null, _connected=false;
   function _setStatus(dot, text) {
     document.getElementById('console-status-dot').style.background = dot;
     document.getElementById('console-status-text').textContent = text;
   }
-
   window.openConsole = function () {
     const device = document.getElementById('console-device').value;
     if (!device) { alert('Select a device first.'); return; }
-
     const overlay = document.getElementById('console-overlay');
     overlay.style.display = 'flex';
     document.getElementById('console-title').textContent = device + ' — SSH Console';
-    _setStatus('#484f58', 'Connecting…');
-
-    // Build terminal if not yet created
+    _setStatus('var(--t4)', 'Connecting…');
     if (!_term) {
       _term = new Terminal({
-        theme: {
-          background: '#0d1117', foreground: '#e6edf3',
-          cursor: '#58a6ff', selectionBackground: '#264f78',
-          black: '#484f58', brightBlack: '#6e7681',
-        },
-        fontFamily: '"Cascadia Code", "Fira Code", Menlo, monospace',
-        fontSize: 13,
-        lineHeight: 1.2,
-        cursorBlink: true,
-        allowTransparency: true,
-        scrollback: 5000,
+        theme:{ background:'#030810', foreground:'#E8EDF5', cursor:'var(--vlab)', selectionBackground:'#1A3A5C', black:'#253040', brightBlack:'#4A5E7A' },
+        fontFamily:'"JetBrains Mono","Cascadia Code",Menlo,monospace', fontSize:13, lineHeight:1.2,
+        cursorBlink:true, allowTransparency:true, scrollback:5000,
       });
       _fitAddon = new FitAddon.FitAddon();
       _term.loadAddon(_fitAddon);
       _term.open(document.getElementById('console-terminal'));
-      _fitAddon.fit();
-
-      _term.onData(d => {
-        if (_socket && _connected) _socket.emit('ssh_input', { data: d });
-      });
-    } else {
-      _term.clear();
-      _fitAddon.fit();
-    }
-
-    // Connect Socket.IO
+      _fitAddon.fit(); _term.focus();
+      _term.onData(d => { if (_socket && _connected) _socket.emit('ssh_input', { data: d }); });
+    } else { _term.clear(); _fitAddon.fit(); _term.focus(); }
     if (_socket) { _socket.disconnect(); _socket = null; }
     _connected = false;
     _socket = io({ transports: ['websocket'] });
-
-    _socket.on('connect', () => {
-      _socket.emit('start_ssh', {
-        device,
-        cols: _term.cols,
-        rows: _term.rows,
-      });
-    });
-
-    _socket.on('ssh_ready', d => {
-      _connected = true;
-      _setStatus('#3fb950', 'Connected');
-    });
-
-    _socket.on('ssh_output', d => {
-      if (_term) _term.write(d.data);
-    });
-
-    _socket.on('ssh_error', d => {
-      _setStatus('#f85149', 'Error');
-      if (_term) _term.writeln('\r\n\x1b[31m✖ ' + d.message + '\x1b[0m');
-    });
-
-    _socket.on('ssh_closed', () => {
-      _connected = false;
-      _setStatus('#d29922', 'Disconnected');
-      if (_term) _term.writeln('\r\n\x1b[33m[Session closed]\x1b[0m');
-    });
-
-    _socket.on('disconnect', () => {
-      _connected = false;
-      _setStatus('#484f58', 'Disconnected');
-    });
+    _socket.on('connect', () => { _socket.emit('start_ssh', { device, cols:_term.cols, rows:_term.rows }); });
+    _socket.on('ssh_ready', () => { _connected=true; _setStatus('var(--ok)', 'Connected'); });
+    _socket.on('ssh_output', d => { if (_term) _term.write(d.data); });
+    _socket.on('ssh_error', d => { _setStatus('var(--err)', 'Error'); if (_term) _term.writeln('\r\n\x1b[31m✖ ' + d.message + '\x1b[0m'); });
+    _socket.on('ssh_closed', () => { _connected=false; _setStatus('var(--warn)', 'Disconnected'); if (_term) _term.writeln('\r\n\x1b[33m[Session closed]\x1b[0m'); });
+    _socket.on('disconnect', () => { _connected=false; _setStatus('var(--t4)', 'Disconnected'); });
   };
-
   window.closeConsole = function () {
-    if (_socket) { _socket.disconnect(); _socket = null; }
-    _connected = false;
+    if (_socket) { _socket.disconnect(); _socket=null; }
+    _connected=false;
     document.getElementById('console-overlay').style.display = 'none';
-    _setStatus('#484f58', 'Connecting…');
   };
-
-  window.clearConsole = function () {
-    if (_term) _term.clear();
-  };
-
-  // Resize terminal when window resizes
+  window.clearConsole = function () { if (_term) _term.clear(); };
   window.addEventListener('resize', () => {
     if (_term && _fitAddon && document.getElementById('console-overlay').style.display !== 'none') {
       _fitAddon.fit();
-      if (_socket && _connected) {
-        _socket.emit('ssh_resize', { cols: _term.cols, rows: _term.rows });
-      }
+      if (_socket && _connected) _socket.emit('ssh_resize', { cols:_term.cols, rows:_term.rows });
     }
   });
-
-  // Close on backdrop click
-  document.getElementById('console-overlay').addEventListener('click', function (e) {
-    if (e.target === this) closeConsole();
-  });
-
-  // Esc to close
+  document.getElementById('console-overlay').addEventListener('click', function(e) { if (e.target === this) closeConsole(); });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' &&
-        document.getElementById('console-overlay').style.display !== 'none') {
-      closeConsole();
-    }
+    if (e.key==='Escape' && document.getElementById('console-overlay').style.display!=='none') closeConsole();
   });
 })();
 </script>

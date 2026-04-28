@@ -1,325 +1,203 @@
 {% extends "base.html" %}
 {% from '_macros.html' import next_steps %}
-{% block title %}Configure Device - NAutoBuff{% endblock %}
+{% block title %}Configure Device — NAutoBuff{% endblock %}
 
 {% block content %}
 <div class="page-header">
+  <div class="page-header-eyebrow plab">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    Physical Lab
+  </div>
   <h1 class="page-title">Configure Device</h1>
-  <p class="page-description">Select protocols and features to configure your network device</p>
+  <p class="page-description">Select protocols and features to push to your network device</p>
 </div>
 
-<div class="card card-elevated" style="max-width: 1200px; margin: 0 auto;">
-  <div class="card-body">
-    <form method="POST" class="form" id="config-form" onsubmit="return showLoading()">
-      <!-- Device Selection -->
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Device Name</label>
-          <select name="device_id" class="form-select" required onchange="onConfigDeviceSelect(this.value)">
-            <option value="" disabled {% if not device_id %}selected{% endif %}>Select Device</option>
-            {% for device in devices %}
-            <option value="{{ device }}" {% if device == device_id %}selected{% endif %}>{{ device }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Vendor <span style="font-weight:var(--font-weight-normal);color:var(--color-text-muted)">(from hosts.csv)</span></label>
-          <div id="vendor-badge" style="display:none; align-items:center; gap:var(--space-2); padding:var(--space-2) var(--space-3); background:var(--color-primary-light,rgba(99,102,241,0.08)); border:1px solid var(--color-primary); border-radius:var(--radius-md); font-size:var(--font-size-sm); font-weight:var(--font-weight-medium); color:var(--color-primary);">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            <span id="vendor-badge-text">—</span>
-          </div>
-          <div id="vendor-missing" style="display:none; font-size:var(--font-size-xs); color:var(--color-error); margin-top:var(--space-1);">No vendor set — update in Add Hosts</div>
-        </div>
+<div class="v2-card" style="max-width:1120px; margin:0 auto;">
+  <form method="POST" class="form" id="config-form" onsubmit="return showLoading()">
+
+    <!-- Device Selection -->
+    <div class="form-row" style="align-items:flex-start; max-width:600px;">
+      <div class="form-group" style="flex:1.5">
+        <label class="form-label">Device</label>
+        <select name="device_id" class="form-select" required onchange="onConfigDeviceSelect(this.value)">
+          <option value="" disabled {% if not device_id %}selected{% endif %}>Select Device</option>
+          {% for device in devices %}
+          <option value="{{ device }}" {% if device == device_id %}selected{% endif %}>{{ device }}</option>
+          {% endfor %}
+        </select>
       </div>
-
-      <!-- Config File Upload Section -->
-      <div class="section-header" style="margin-top: var(--space-8);">
-        <span class="section-title">Quick Configuration Upload</span>
-        <div class="section-line"></div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Vendor <span class="form-hint">(from hosts.csv)</span></label>
+        <div id="vendor-badge" style="display:none; align-items:center; gap:8px; padding:8px 12px; background:rgba(255,122,61,0.08); border:1px solid rgba(255,122,61,0.3); border-radius:8px; font-size:13px; font-weight:600; color:var(--plab);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span id="vendor-badge-text">—</span>
+        </div>
+        <div id="vendor-missing" style="display:none; font-size:12px; color:var(--nb-err); margin-top:4px;">No vendor set — update in Add Hosts</div>
       </div>
+    </div>
 
-      <div class="config-upload-container">
-        <div class="upload-mode-toggle">
-          <button type="button" class="mode-btn active" data-mode="manual" onclick="toggleConfigMode('manual')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"/>
-            </svg>
-            Manual Configuration
-          </button>
-          <button type="button" class="mode-btn" data-mode="upload" onclick="toggleConfigMode('upload')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            Upload Config File
-          </button>
-        </div>
+    <!-- Upload / Manual Toggle -->
+    <div class="v2-section-header" style="margin-top:var(--space-8);">
+      <span class="v2-section-label">Quick Configuration Upload</span>
+      <div class="v2-section-line"></div>
+    </div>
 
-        <div id="upload-section" class="upload-section" style="display: none;">
-          <div class="file-upload-area" id="dropZone">
-            <div class="upload-icon">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-            </div>
-            <h3 class="upload-title">Drag & Drop Config File</h3>
-            <p class="upload-description">or click to browse</p>
-            <p class="upload-hint">Supports .cfg, .txt, .conf files</p>
-            <input type="file" id="configFileInput" accept=".cfg,.txt,.conf" style="display: none;">
-          </div>
-
-          <div id="filePreview" class="file-preview" style="display: none;">
-            <div class="file-preview-header">
-              <div class="file-info">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
-                  <polyline points="13 2 13 9 20 9"/>
-                </svg>
-                <div>
-                  <div class="file-name" id="fileName"></div>
-                  <div class="file-size" id="fileSize"></div>
-                </div>
-              </div>
-              <button type="button" class="btn-icon btn-sm" onclick="clearFile()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="6" x2="6" y2="18"/>
-                  <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
-            </div>
-            <div class="file-preview-content">
-              <pre id="fileContent"></pre>
-            </div>
-          </div>
-
-          <div class="form-actions" style="border: none; padding-top: var(--space-4);">
-            <button type="button" class="btn btn-primary" onclick="uploadConfigFile()" id="uploadBtn" disabled>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 2L11 13"/>
-                <path d="M22 2L15 22 11 13 2 9 22 2z"/>
-              </svg>
-              Push Configuration to Device
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Protocol Organization by Layer -->
-      <div class="section-header" style="margin-top: var(--space-8);">
-        <span class="section-title">Layer 2 Protocols</span>
-        <div class="section-line"></div>
-      </div>
-
-      <div class="protocol-grid">
-        <!-- VLAN Bubble -->
-        <div class="protocol-bubble" data-protocol="vlan" onclick="toggleProtocol('vlan')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="7" height="7" rx="1"/>
-              <rect x="14" y="3" width="7" height="7" rx="1"/>
-              <rect x="3" y="14" width="7" height="7" rx="1"/>
-              <rect x="14" y="14" width="7" height="7" rx="1"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">VLAN</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-
-        <!-- STP Bubble -->
-        <div class="protocol-bubble" data-protocol="stp" onclick="toggleProtocol('stp')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="5" r="3"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="12" x2="6" y2="19"/>
-              <line x1="12" y1="12" x2="18" y2="19"/>
-              <circle cx="6" cy="19" r="2"/>
-              <circle cx="18" cy="19" r="2"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">STP</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-
-        <!-- VXLAN Bubble -->
-        <div class="protocol-bubble" data-protocol="vxlan" onclick="toggleProtocol('vxlan')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7"/>
-              <ellipse cx="12" cy="7" rx="8" ry="4"/>
-              <path d="M4 12c0 2.21 3.582 4 8 4s8-1.79 8-4"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">VXLAN</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-      </div>
-
-      <div class="section-header" style="margin-top: var(--space-8);">
-        <span class="section-title">Layer 3 Protocols</span>
-        <div class="section-line"></div>
-      </div>
-
-      <div class="protocol-grid">
-        <!-- Interfaces Bubble -->
-        <div class="protocol-bubble" data-protocol="interfaces" onclick="toggleProtocol('interfaces')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="7" width="20" height="10" rx="2"/>
-              <line x1="6" y1="11" x2="6" y2="13"/>
-              <line x1="10" y1="11" x2="10" y2="13"/>
-              <line x1="14" y1="11" x2="14" y2="13"/>
-              <line x1="18" y1="11" x2="18" y2="13"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">Interfaces</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-
-        <!-- Subinterfaces Bubble -->
-        <div class="protocol-bubble" data-protocol="subinterfaces" onclick="toggleProtocol('subinterfaces')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2v6m0 0L9 5m3 3l3-3"/>
-              <path d="M19 10v4a7 7 0 01-14 0v-4"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">Subinterfaces</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-
-        <!-- Static Routes Bubble -->
-        <div class="protocol-bubble" data-protocol="static" onclick="toggleProtocol('static')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="5" y1="12" x2="19" y2="12"/>
-              <polyline points="12 5 19 12 12 19"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">Static Routes</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-
-        <!-- BGP Bubble -->
-        <div class="protocol-bubble" data-protocol="bgp" onclick="toggleProtocol('bgp')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M12 1v6m0 6v6M23 12h-6m-6 0H5"/>
-              <circle cx="12" cy="12" r="10"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">BGP</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-
-        <!-- OSPF Bubble -->
-        <div class="protocol-bubble" data-protocol="ospf" onclick="toggleProtocol('ospf')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-              <polyline points="2 17 12 22 22 17"/>
-              <polyline points="2 12 12 17 22 12"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">OSPF</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-
-        <!-- EIGRP Bubble -->
-        <div class="protocol-bubble" data-protocol="eigrp" onclick="toggleProtocol('eigrp')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-              <line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">EIGRP</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-
-        <!-- RIP Bubble -->
-        <div class="protocol-bubble" data-protocol="rip" onclick="toggleProtocol('rip')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="16"/>
-              <line x1="8" y1="12" x2="16" y2="12"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">RIP</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-
-        <!-- IS-IS Bubble -->
-        <div class="protocol-bubble" data-protocol="isis" onclick="toggleProtocol('isis')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-              <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">IS-IS</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-
-        <!-- MPLS Bubble -->
-        <div class="protocol-bubble" data-protocol="mpls" onclick="toggleProtocol('mpls')">
-          <div class="protocol-bubble-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 12h18M3 6h18M3 18h18"/>
-              <circle cx="7" cy="12" r="2"/>
-              <circle cx="17" cy="12" r="2"/>
-            </svg>
-          </div>
-          <div class="protocol-bubble-title">MPLS</div>
-          <div class="protocol-bubble-badge">0</div>
-        </div>
-      </div>
-
-      <!-- Expandable Protocol Sections -->
-      <div id="protocol-sections" style="margin-top: var(--space-8);"></div>
-
-      <div class="form-actions form-actions-center">
-        <button type="submit" class="btn btn-primary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-          Generate Configuration
-        </button>
-      </div>
-    </form>
-
-    {% if jenkins_result == 'jenkins_success' %}
-    <div class="form-actions form-actions-center" id="push-button-wrapper" style="margin-top: var(--space-4); border: none;">
-      <button type="button" class="btn btn-primary" onclick="pushConfig()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 2L11 13"/>
-          <path d="M22 2L15 22 11 13 2 9 22 2z"/>
-        </svg>
-        Push Configuration
+    <div class="mode-toggle-bar">
+      <button type="button" class="mode-btn active" data-mode="manual" onclick="toggleConfigMode('manual')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"/></svg>
+        Manual Configuration
+      </button>
+      <button type="button" class="mode-btn" data-mode="upload" onclick="toggleConfigMode('upload')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload Config File
       </button>
     </div>
-    {% endif %}
 
-    {% if message %}
-    <div style="padding: 0 var(--space-6) var(--space-2);">
-      <div class="alert {% if '❌' in message or 'failed' in message|lower %}alert-error{% else %}alert-success{% endif %}">
-        <span class="alert-icon">{% if '❌' in message or 'failed' in message|lower %}✕{% else %}✓{% endif %}</span>
-        <div class="alert-content">{{ message }}</div>
+    <div id="upload-section" style="display:none;">
+      <div class="file-drop-zone" id="dropZone">
+        <div style="color:var(--plab); margin-bottom:var(--space-4); opacity:0.7; transition:opacity 0.2s;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h3 style="font-size:16px; font-weight:600; color:var(--nb-text-1); margin-bottom:6px;">Drag & Drop Config File</h3>
+        <p style="font-size:13px; color:var(--nb-text-2); margin-bottom:4px;">or click to browse</p>
+        <p style="font-size:12px; color:var(--nb-text-3);">Supports .cfg, .txt, .conf</p>
+        <input type="file" id="configFileInput" accept=".cfg,.txt,.conf" style="display:none;">
+      </div>
+
+      <div id="filePreview" style="display:none; margin-top:var(--space-5); background:var(--nb-base); border:1px solid rgba(255,255,255,0.06); border-radius:12px; overflow:hidden;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:var(--space-3) var(--space-4); border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02);">
+          <div style="display:flex; align-items:center; gap:var(--space-3); color:var(--plab);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            <div>
+              <div id="fileName" style="font-size:13px; font-weight:600; color:var(--nb-text-1);"></div>
+              <div id="fileSize" style="font-size:11px; color:var(--nb-text-3); margin-top:2px;"></div>
+            </div>
+          </div>
+          <button type="button" onclick="clearFile()" style="background:none; border:none; color:var(--nb-text-3); cursor:pointer; padding:4px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div style="max-height:360px; overflow-y:auto; padding:var(--space-4);">
+          <pre id="fileContent" style="margin:0; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--nb-text-1); background:rgba(0,212,255,0.02); padding:var(--space-4); border-radius:8px; border-left:3px solid var(--plab); white-space:pre-wrap; word-break:break-word;"></pre>
+        </div>
+      </div>
+
+      <div class="form-actions" style="border:none; padding-top:var(--space-4);">
+        <button type="button" class="btn btn-primary" style="--btn-color:var(--plab); --btn-glow:rgba(255,122,61,0.3);" onclick="uploadConfigFile()" id="uploadBtn" disabled>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9 22 2z"/></svg>
+          Push Configuration to Device
+        </button>
       </div>
     </div>
-    {% endif %}
 
-    <div id="push-message" style="padding: 0 var(--space-6);"></div>
+    <!-- L2 Protocols -->
+    <div class="v2-section-header protocol-header" style="margin-top:var(--space-8);">
+      <span class="v2-section-label">Layer 2 Protocols</span>
+      <div class="v2-section-line"></div>
+    </div>
 
+    <div class="protocol-grid">
+      <div class="protocol-bubble" data-protocol="vlan" onclick="toggleProtocol('vlan')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+        <div class="pb-title">VLAN</div>
+        <div class="pb-badge">0</div>
+      </div>
+      <div class="protocol-bubble" data-protocol="stp" onclick="toggleProtocol('stp')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="6" y2="19"/><line x1="12" y1="12" x2="18" y2="19"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg></div>
+        <div class="pb-title">STP</div>
+        <div class="pb-badge">0</div>
+      </div>
+      <div class="protocol-bubble" data-protocol="vxlan" onclick="toggleProtocol('vxlan')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7"/><ellipse cx="12" cy="7" rx="8" ry="4"/><path d="M4 12c0 2.21 3.582 4 8 4s8-1.79 8-4"/></svg></div>
+        <div class="pb-title">VXLAN</div>
+        <div class="pb-badge">0</div>
+      </div>
+    </div>
+
+    <!-- L3 Protocols -->
+    <div class="v2-section-header protocol-header" style="margin-top:var(--space-8);">
+      <span class="v2-section-label">Layer 3 Protocols</span>
+      <div class="v2-section-line"></div>
+    </div>
+
+    <div class="protocol-grid">
+      <div class="protocol-bubble" data-protocol="interfaces" onclick="toggleProtocol('interfaces')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="6" y1="11" x2="6" y2="13"/><line x1="10" y1="11" x2="10" y2="13"/><line x1="14" y1="11" x2="14" y2="13"/><line x1="18" y1="11" x2="18" y2="13"/></svg></div>
+        <div class="pb-title">Interfaces</div>
+        <div class="pb-badge">0</div>
+      </div>
+      <div class="protocol-bubble" data-protocol="subinterfaces" onclick="toggleProtocol('subinterfaces')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 0L9 5m3 3l3-3"/><path d="M19 10v4a7 7 0 01-14 0v-4"/></svg></div>
+        <div class="pb-title">Subinterfaces</div>
+        <div class="pb-badge">0</div>
+      </div>
+      <div class="protocol-bubble" data-protocol="static" onclick="toggleProtocol('static')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+        <div class="pb-title">Static Routes</div>
+        <div class="pb-badge">0</div>
+      </div>
+      <div class="protocol-bubble" data-protocol="bgp" onclick="toggleProtocol('bgp')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M23 12h-6m-6 0H5"/><circle cx="12" cy="12" r="10"/></svg></div>
+        <div class="pb-title">BGP</div>
+        <div class="pb-badge">0</div>
+      </div>
+      <div class="protocol-bubble" data-protocol="ospf" onclick="toggleProtocol('ospf')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
+        <div class="pb-title">OSPF</div>
+        <div class="pb-badge">0</div>
+      </div>
+      <div class="protocol-bubble" data-protocol="eigrp" onclick="toggleProtocol('eigrp')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+        <div class="pb-title">EIGRP</div>
+        <div class="pb-badge">0</div>
+      </div>
+      <div class="protocol-bubble" data-protocol="rip" onclick="toggleProtocol('rip')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>
+        <div class="pb-title">RIP</div>
+        <div class="pb-badge">0</div>
+      </div>
+      <div class="protocol-bubble" data-protocol="isis" onclick="toggleProtocol('isis')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        <div class="pb-title">IS-IS</div>
+        <div class="pb-badge">0</div>
+      </div>
+      <div class="protocol-bubble" data-protocol="mpls" onclick="toggleProtocol('mpls')">
+        <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/><circle cx="7" cy="12" r="2"/><circle cx="17" cy="12" r="2"/></svg></div>
+        <div class="pb-title">MPLS</div>
+        <div class="pb-badge">0</div>
+      </div>
+    </div>
+
+    <!-- Protocol Sections Container -->
+    <div id="protocol-sections" style="margin-top:var(--space-8);"></div>
+
+    <div class="form-actions form-actions-center">
+      <button type="submit" class="btn btn-primary" style="--btn-color:var(--plab); --btn-glow:rgba(255,122,61,0.3);">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Generate Configuration
+      </button>
+    </div>
+  </form>
+
+  {% if jenkins_result == 'jenkins_success' %}
+  <div class="form-actions form-actions-center" id="push-button-wrapper" style="margin-top:var(--space-4); border:none;">
+    <button type="button" class="btn btn-primary" style="--btn-color:var(--plab); --btn-glow:rgba(255,122,61,0.3);" onclick="pushConfig()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9 22 2z"/></svg>
+      Push Configuration
+    </button>
   </div>
+  {% endif %}
+
+  {% if message %}
+  <div style="padding:0 var(--space-6) var(--space-2);">
+    <div class="alert {% if '❌' in message or 'failed' in message|lower %}alert-error{% else %}alert-success{% endif %}">
+      <span class="alert-icon">{% if '❌' in message or 'failed' in message|lower %}✕{% else %}✓{% endif %}</span>
+      <div class="alert-content">{{ message }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div id="push-message" style="padding:0 var(--space-6);"></div>
 </div>
 
 {% if message and ('✅' in message or ('failed' not in message|lower and '❌' not in message)) %}
@@ -331,556 +209,104 @@
 {% endif %}
 
 <!-- Loading Overlay -->
-<div class="modal-overlay" id="loading-overlay" style="display: none;">
-  <div class="loading-container">
-    <div class="loading-spinner"></div>
-    <p class="loading-text" id="loading-text">Initializing...</p>
+<div class="modal-overlay" id="loading-overlay" style="display:none;">
+  <div style="display:flex; flex-direction:column; align-items:center; gap:var(--space-5);">
+    <div class="plab-spinner"></div>
+    <p id="loading-text" style="font-family:'JetBrains Mono',monospace; color:var(--plab); font-size:13px; letter-spacing:0.05em; transition:opacity 0.5s;">Initializing...</p>
   </div>
 </div>
 
 <style>
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-}
-.loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid var(--color-border);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: cfg-spin 1s linear infinite;
-}
-@keyframes cfg-spin { to { transform: rotate(360deg); } }
-.loading-text {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  transition: opacity 0.5s ease-in-out;
-}
-</style>
+.v2-card { background:var(--nb-surface); border:1px solid rgba(255,255,255,0.06); border-radius:16px; padding:var(--space-6); }
+.page-header-eyebrow.plab { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--plab); background:rgba(255,122,61,0.1); border:1px solid rgba(255,122,61,0.25); padding:4px 10px; border-radius:99px; margin-bottom:var(--space-3); }
+.v2-section-header { display:flex; align-items:center; gap:var(--space-4); margin-bottom:var(--space-5); }
+.v2-section-label { font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--nb-text-3); white-space:nowrap; }
+.v2-section-line { flex:1; height:1px; background:rgba(255,255,255,0.06); }
+.form-hint { font-size:11px; color:var(--nb-text-3); font-weight:400; margin-left:4px; }
 
-<style>
-/* Protocol Bubbles Grid */
-.protocol-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
-}
+/* Mode toggle */
+.mode-toggle-bar { display:flex; gap:var(--space-2); padding:var(--space-2); background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; margin-bottom:var(--space-5); }
+.mode-btn { flex:1; display:flex; align-items:center; justify-content:center; gap:var(--space-2); padding:10px var(--space-4); background:transparent; border:1px solid transparent; border-radius:8px; color:var(--nb-text-3); font-size:13px; font-weight:500; cursor:pointer; transition:all 0.15s; }
+.mode-btn:hover { background:rgba(255,255,255,0.04); color:var(--nb-text-1); }
+.mode-btn.active { background:rgba(255,122,61,0.12); border-color:rgba(255,122,61,0.3); color:var(--plab); }
 
-/* Protocol Bubble */
-.protocol-bubble {
-  position: relative;
-  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-bg-secondary) 100%);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-5);
-  text-align: center;
-  cursor: pointer;
-  transition: all var(--transition-base);
-  overflow: hidden;
-}
+/* File drop */
+.file-drop-zone { border:2px dashed rgba(255,122,61,0.25); border-radius:12px; padding:var(--space-10); text-align:center; cursor:pointer; transition:all 0.2s; background:rgba(255,122,61,0.02); }
+.file-drop-zone:hover { border-color:var(--plab); background:rgba(255,122,61,0.05); transform:translateY(-2px); }
+.file-drop-zone.drag-over { border-color:var(--plab); background:rgba(255,122,61,0.08); box-shadow:0 0 0 4px rgba(255,122,61,0.1); }
 
-.protocol-bubble::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
-  transform: scaleX(0);
-  transition: transform var(--transition-base);
-}
+/* Protocol grid */
+.protocol-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:var(--space-3); margin-bottom:var(--space-4); }
+.protocol-bubble { position:relative; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:var(--space-5) var(--space-3); text-align:center; cursor:pointer; transition:all 0.2s; }
+.protocol-bubble:hover { border-color:rgba(255,122,61,0.4); transform:translateY(-3px); background:rgba(255,122,61,0.04); }
+.protocol-bubble.active { border-color:var(--plab); background:rgba(255,122,61,0.07); box-shadow:0 0 0 2px rgba(255,122,61,0.2); }
+.pb-icon { color:var(--nb-text-3); margin-bottom:var(--space-2); display:flex; align-items:center; justify-content:center; transition:color 0.2s; }
+.protocol-bubble:hover .pb-icon, .protocol-bubble.active .pb-icon { color:var(--plab); }
+.pb-title { font-size:11px; font-weight:700; color:var(--nb-text-2); text-transform:uppercase; letter-spacing:0.07em; }
+.pb-badge { position:absolute; top:6px; right:6px; background:var(--plab); color:#fff; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; opacity:0; transform:scale(0); transition:all 0.2s; }
+.protocol-bubble.active .pb-badge, .protocol-bubble.has-config .pb-badge { opacity:1; transform:scale(1); }
 
-.protocol-bubble:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: var(--shadow-lg);
-}
+/* Protocol section */
+.protocol-section { background:rgba(255,122,61,0.02); border:1px solid rgba(255,122,61,0.15); border-left:3px solid var(--plab); border-radius:12px; padding:var(--space-5); margin-bottom:var(--space-4); animation:fadeSlide 0.25s ease; }
+@keyframes fadeSlide { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+.protocol-section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--space-5); padding-bottom:var(--space-3); border-bottom:1px solid rgba(255,122,61,0.1); }
+.protocol-section-title { font-family:'Orbitron',sans-serif; font-size:13px; font-weight:600; color:var(--plab); text-transform:uppercase; letter-spacing:0.08em; }
+.protocol-section-close { background:transparent; border:none; color:var(--nb-text-3); cursor:pointer; padding:4px; border-radius:6px; transition:all 0.15s; }
+.protocol-section-close:hover { background:rgba(239,68,68,0.1); color:#ef4444; }
 
-.protocol-bubble:hover::before {
-  transform: scaleX(1);
-}
+/* Config block */
+.config-block { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:var(--space-4); margin-bottom:var(--space-3); position:relative; border-left:3px solid rgba(255,122,61,0.4); transition:all 0.2s; animation:fadeSlide 0.2s ease; }
+.config-block:hover { border-left-color:var(--plab); background:rgba(255,122,61,0.02); }
+.config-block:last-child { margin-bottom:0; }
 
-.protocol-bubble.active {
-  border-color: var(--color-primary);
-  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-surface) 100%);
-  box-shadow: var(--shadow-md), 0 0 0 2px var(--color-primary);
-}
+/* Checkbox group */
+.checkbox-group { display:flex; flex-wrap:wrap; gap:var(--space-3); margin:var(--space-3) 0; padding:var(--space-3); background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid rgba(255,255,255,0.05); }
+.checkbox-group .form-check { padding:var(--space-2) var(--space-3); background:rgba(255,255,255,0.02); border-radius:6px; border:1px solid transparent; transition:all 0.15s; }
+.checkbox-group .form-check:hover { border-color:rgba(255,122,61,0.3); }
 
-.protocol-bubble.active::before {
-  transform: scaleX(1);
-}
-
-.protocol-bubble-icon {
-  margin-bottom: var(--space-3);
-  color: var(--color-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform var(--transition-base);
-}
-
-.protocol-bubble:hover .protocol-bubble-icon {
-  transform: scale(1.1);
-}
-
-.protocol-bubble.active .protocol-bubble-icon {
-  color: var(--color-primary);
-}
-
-.protocol-bubble-title {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  margin-bottom: var(--space-2);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.protocol-bubble-badge {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
-  color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  box-shadow: var(--shadow-sm);
-  opacity: 0;
-  transform: scale(0);
-  transition: all var(--transition-base);
-}
-
-.protocol-bubble.active .protocol-bubble-badge,
-.protocol-bubble.has-config .protocol-bubble-badge {
-  opacity: 1;
-  transform: scale(1);
-}
-
-/* Protocol Section (Expandable) */
-.protocol-section {
-  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-bg-secondary) 100%);
-  border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-primary);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  margin-bottom: var(--space-5);
-  animation: expandIn 0.3s ease-out;
-}
-
-.protocol-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-5);
-  padding-bottom: var(--space-4);
-  border-bottom: 2px solid transparent;
-  border-image: linear-gradient(90deg, var(--color-primary), transparent) 1;
-}
-
-.protocol-section-title {
-  font-family: var(--font-family-display);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.protocol-section-close {
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: var(--space-2);
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
-}
-
-.protocol-section-close:hover {
-  background: var(--color-error-light);
-  color: var(--color-error);
-}
-
-@keyframes expandIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* Loading styles */
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid var(--color-border);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.loading-text {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  transition: opacity 0.5s ease-in-out;
-}
-
-/* Config block styling */
-.config-block {
-  background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-surface) 100%);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  margin-bottom: var(--space-4);
-  border: 1px solid var(--color-border);
-  position: relative;
-  transition: all var(--transition-base);
-  animation: slideIn 0.3s ease-out;
-}
-
-.config-block::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: linear-gradient(180deg, var(--color-primary), var(--color-accent));
-  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
-  opacity: 0.7;
-}
-
-.config-block:hover {
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-md);
-  transform: translateX(4px);
-}
-
-.config-block:hover::before {
-  opacity: 1;
-}
-
-.config-block .form-row {
-  margin-bottom: var(--space-4);
-}
-
-.config-block .form-row:last-child {
-  margin-bottom: 0;
-}
-
-.config-block .btn-danger {
-  margin-top: var(--space-3);
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Checkbox group styling */
-.checkbox-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  margin: var(--space-4) 0;
-  padding: var(--space-4);
-  background: var(--color-bg-secondary);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-}
-
-.checkbox-group .form-check {
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface);
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  transition: all var(--transition-fast);
-}
-
-.checkbox-group .form-check:hover {
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-sm);
-}
-
-/* Upload mode toggle */
-.upload-mode-toggle {
-  display: flex;
-  gap: var(--space-3);
-  margin-bottom: var(--space-6);
-  background: var(--color-bg-secondary);
-  padding: var(--space-2);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-}
-
-.mode-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.mode-btn:hover {
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-}
-
-.mode-btn.active {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
-  color: var(--color-text-inverse);
-  border-color: var(--color-primary);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-}
-
-/* File upload area */
-.file-upload-area {
-  border: 2px dashed var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-10);
-  text-align: center;
-  cursor: pointer;
-  transition: all var(--transition-base);
-  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-bg-secondary) 100%);
-}
-
-.file-upload-area:hover {
-  border-color: var(--color-primary);
-  background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-surface) 100%);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.file-upload-area.drag-over {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-  box-shadow: 0 0 0 4px var(--color-primary-light);
-}
-
-.upload-icon {
-  color: var(--color-primary);
-  margin-bottom: var(--space-4);
-  opacity: 0.7;
-  transition: all var(--transition-base);
-}
-
-.file-upload-area:hover .upload-icon {
-  opacity: 1;
-  transform: translateY(-4px);
-}
-
-.upload-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  margin-bottom: var(--space-2);
-}
-
-.upload-description {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-  margin-bottom: var(--space-1);
-}
-
-.upload-hint {
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
-}
-
-/* File preview */
-.file-preview {
-  margin-top: var(--space-6);
-  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-bg-secondary) 100%);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  animation: slideIn 0.3s ease-out;
-}
-
-.file-preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-}
-
-.file-info {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  color: var(--color-primary);
-}
-
-.file-name {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
-}
-
-.file-size {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  margin-top: var(--space-1);
-}
-
-.file-preview-content {
-  max-height: 400px;
-  overflow-y: auto;
-  padding: var(--space-4);
-}
-
-.file-preview-content pre {
-  margin: 0;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-primary);
-  background: var(--color-bg-tertiary);
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-  border-left: 4px solid var(--color-primary);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.upload-section {
-  animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* Loading */
+.plab-spinner { width:52px; height:52px; border:3px solid rgba(255,122,61,0.15); border-top-color:var(--plab); border-radius:50%; animation:ps 0.8s linear infinite; box-shadow:0 0 20px rgba(255,122,61,0.3); }
+@keyframes ps { to { transform:rotate(360deg); } }
 </style>
 
 <script>
-// Config upload state
 let uploadedFile = null;
 let currentMode = 'manual';
 
-// Toggle between manual config and file upload
 function toggleConfigMode(mode) {
   currentMode = mode;
   const manualBtn = document.querySelector('[data-mode="manual"]');
   const uploadBtn = document.querySelector('[data-mode="upload"]');
   const uploadSection = document.getElementById('upload-section');
-  const protocolSections = document.querySelectorAll('.section-header, .protocol-grid, #protocol-sections');
+  const manualParts = document.querySelectorAll('.protocol-header, .protocol-grid, #protocol-sections');
 
   if (mode === 'upload') {
     manualBtn.classList.remove('active');
     uploadBtn.classList.add('active');
     uploadSection.style.display = 'block';
-    protocolSections.forEach(el => el.style.display = 'none');
+    manualParts.forEach(el => el.style.display = 'none');
   } else {
     uploadBtn.classList.remove('active');
     manualBtn.classList.add('active');
     uploadSection.style.display = 'none';
-    protocolSections.forEach(el => el.style.display = '');
+    manualParts.forEach(el => el.style.display = '');
   }
 }
 
-// Drag and drop handlers
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('configFileInput');
-
 dropZone.addEventListener('click', () => fileInput.click());
-
-dropZone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  dropZone.classList.add('drag-over');
-});
-
-dropZone.addEventListener('dragleave', () => {
-  dropZone.classList.remove('drag-over');
-});
-
-dropZone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  dropZone.classList.remove('drag-over');
-
-  const files = e.dataTransfer.files;
-  if (files.length > 0) {
-    handleFile(files[0]);
-  }
-});
-
-fileInput.addEventListener('change', (e) => {
-  if (e.target.files.length > 0) {
-    handleFile(e.target.files[0]);
-  }
-});
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
 
 function handleFile(file) {
-  // Validate file type
-  const validExtensions = ['.cfg', '.txt', '.conf'];
-  const fileName = file.name.toLowerCase();
-  const isValid = validExtensions.some(ext => fileName.endsWith(ext));
-
-  if (!isValid) {
-    alert('Please upload a valid config file (.cfg, .txt, .conf)');
-    return;
-  }
-
+  const valid = ['.cfg', '.txt', '.conf'].some(ext => file.name.toLowerCase().endsWith(ext));
+  if (!valid) { alert('Please upload a valid config file (.cfg, .txt, .conf)'); return; }
   uploadedFile = file;
-
-  // Read file content
   const reader = new FileReader();
-  reader.onload = (e) => {
-    const content = e.target.result;
-    displayFilePreview(file.name, file.size, content);
-  };
+  reader.onload = e => displayFilePreview(file.name, file.size, e.target.result);
   reader.readAsText(file);
 }
 
@@ -890,8 +316,6 @@ function displayFilePreview(name, size, content) {
   document.getElementById('fileContent').textContent = content;
   document.getElementById('filePreview').style.display = 'block';
   document.getElementById('uploadBtn').disabled = false;
-
-  // Hide drop zone
   dropZone.style.display = 'none';
 }
 
@@ -917,171 +341,69 @@ function onConfigDeviceSelect(deviceId) {
   const badge = document.getElementById('vendor-badge');
   const badgeText = document.getElementById('vendor-badge-text');
   const missing = document.getElementById('vendor-missing');
-
-  if (!deviceId) {
-    badge.style.display = 'none';
-    missing.style.display = 'none';
-    configDeviceVendor = "";
-    return;
-  }
-
-  fetch('/hosts-data')
-    .then(r => r.json())
-    .then(hosts => {
-      const host = hosts.find(h => h.hostname === deviceId);
-      const vendor = host?.vendor || "";
-      configDeviceVendor = vendor;
-      if (vendor) {
-        badgeText.textContent = vendor.charAt(0).toUpperCase() + vendor.slice(1);
-        badge.style.display = 'flex';
-        missing.style.display = 'none';
-      } else {
-        badge.style.display = 'none';
-        missing.style.display = 'block';
-      }
-    })
-    .catch(() => {});
+  if (!deviceId) { badge.style.display = 'none'; missing.style.display = 'none'; configDeviceVendor = ""; return; }
+  fetch('/hosts-data').then(r => r.json()).then(hosts => {
+    const host = hosts.find(h => h.hostname === deviceId);
+    const vendor = host?.vendor || "";
+    configDeviceVendor = vendor;
+    if (vendor) { badgeText.textContent = vendor.charAt(0).toUpperCase() + vendor.slice(1); badge.style.display = 'flex'; missing.style.display = 'none'; }
+    else { badge.style.display = 'none'; missing.style.display = 'block'; }
+  }).catch(() => {});
 }
 
 async function uploadConfigFile() {
   const deviceId = document.querySelector('select[name="device_id"]').value;
-
-  if (!deviceId) {
-    alert('Please select a device');
-    return;
-  }
-
-  if (!uploadedFile) {
-    alert('Please select a config file');
-    return;
-  }
-
-  // Show loading
+  if (!deviceId) { alert('Please select a device'); return; }
+  if (!uploadedFile) { alert('Please select a config file'); return; }
   showLoading();
-
-  // Create form data
   const formData = new FormData();
   formData.append('config_file', uploadedFile);
   formData.append('device_id', deviceId);
-
   try {
-    const response = await fetch('/upload-config', {
-      method: 'POST',
-      body: formData
-    });
-
+    const response = await fetch('/upload-config', { method: 'POST', body: formData });
     const data = await response.json();
-
-    // Hide loading
-    document.getElementById('loading-overlay').style.display = 'none';
-
-    if (data.status === 'success') {
-      // Show success message
-      const messageDiv = document.createElement('div');
-      messageDiv.className = 'alert alert-success';
-      messageDiv.innerHTML = `
-        <span class="alert-icon">&#10003;</span>
-        <div class="alert-content">${data.message}</div>
-      `;
-      document.querySelector('.card-body').insertBefore(messageDiv, document.querySelector('.card-body').firstChild);
-
-      // Clear the file
-      clearFile();
-    } else {
-      // Show error message
-      const messageDiv = document.createElement('div');
-      messageDiv.className = 'alert alert-error';
-      messageDiv.innerHTML = `
-        <span class="alert-icon">&#10005;</span>
-        <div class="alert-content">${data.message}</div>
-      `;
-      document.querySelector('.card-body').insertBefore(messageDiv, document.querySelector('.card-body').firstChild);
-    }
+    _hideLoading();
+    const msgDiv = document.createElement('div');
+    msgDiv.className = data.status === 'success' ? 'alert alert-success' : 'alert alert-error';
+    msgDiv.innerHTML = `<span class="alert-icon">${data.status === 'success' ? '&#10003;' : '&#10005;'}</span><div class="alert-content">${data.message}</div>`;
+    document.querySelector('.v2-card').insertBefore(msgDiv, document.querySelector('.v2-card').firstChild);
+    if (data.status === 'success') clearFile();
   } catch (error) {
-    document.getElementById('loading-overlay').style.display = 'none';
+    _hideLoading();
     alert('Error uploading config: ' + error.message);
   }
 }
 
-// Active protocols state
+// Protocol bubbles
 const activeProtocols = new Set();
 const protocolCounts = {};
-
-// Protocol configurations - will be populated dynamically later with Jinja
 const protocolConfigs = {
-  interfaces: {
-    title: 'Interface Configuration',
-    fields: () => getInterfaceBlock()
-  },
-  subinterfaces: {
-    title: 'Subinterface Configuration',
-    fields: () => getSubinterfaceBlock()
-  },
-  vlan: {
-    title: 'VLAN Configuration',
-    fields: () => getVlanBlock()
-  },
-  bgp: {
-    title: 'BGP Configuration',
-    fields: () => getBgpSection()
-  },
-  ospf: {
-    title: 'OSPF Configuration',
-    fields: () => getOspfSection()
-  },
-  eigrp: {
-    title: 'EIGRP Configuration',
-    fields: () => getEigrpBlock()
-  },
-  rip: {
-    title: 'RIP Configuration',
-    fields: () => getRipBlock()
-  },
-  isis: {
-    title: 'IS-IS Configuration',
-    fields: () => getIsisBlock()
-  },
-  stp: {
-    title: 'STP Configuration',
-    fields: () => getStpBlock()
-  },
-  vxlan: {
-    title: 'VXLAN Configuration',
-    fields: () => getVxlanBlock()
-  },
-  mpls: {
-    title: 'MPLS Configuration',
-    fields: () => getMplsBlock()
-  },
-  static: {
-    title: 'Static Routes Configuration',
-    fields: () => getStaticRouteBlock()
-  }
+  interfaces: { title: 'Interface Configuration', fields: () => getInterfaceBlock() },
+  subinterfaces: { title: 'Subinterface Configuration', fields: () => getSubinterfaceBlock() },
+  vlan: { title: 'VLAN Configuration', fields: () => getVlanBlock() },
+  bgp: { title: 'BGP Configuration', fields: () => getBgpSection() },
+  ospf: { title: 'OSPF Configuration', fields: () => getOspfSection() },
+  eigrp: { title: 'EIGRP Configuration', fields: () => getEigrpBlock() },
+  rip: { title: 'RIP Configuration', fields: () => getRipBlock() },
+  isis: { title: 'IS-IS Configuration', fields: () => getIsisBlock() },
+  stp: { title: 'STP Configuration', fields: () => getStpBlock() },
+  vxlan: { title: 'VXLAN Configuration', fields: () => getVxlanBlock() },
+  mpls: { title: 'MPLS Configuration', fields: () => getMplsBlock() },
+  static: { title: 'Static Routes Configuration', fields: () => getStaticRouteBlock() }
 };
 
 function toggleProtocol(protocol) {
   const bubble = document.querySelector(`[data-protocol="${protocol}"]`);
   const container = document.getElementById('protocol-sections');
-
   if (activeProtocols.has(protocol)) {
-    // Remove protocol
     activeProtocols.delete(protocol);
     bubble.classList.remove('active');
-    const section = document.getElementById(`section-${protocol}`);
-    if (section) {
-      section.remove();
-    }
-
-    // Recalculate count based on actual remaining config blocks
-    const remainingBlocks = document.querySelectorAll(`#${protocol}-content .config-block`).length;
-    protocolCounts[protocol] = remainingBlocks;
+    document.getElementById(`section-${protocol}`)?.remove();
+    protocolCounts[protocol] = 0;
     updateBadge(protocol);
   } else {
-    // Add protocol
     activeProtocols.add(protocol);
     bubble.classList.add('active');
-
-    // Create section
     const section = document.createElement('div');
     section.id = `section-${protocol}`;
     section.className = 'protocol-section';
@@ -1089,38 +411,24 @@ function toggleProtocol(protocol) {
       <div class="protocol-section-header">
         <h3 class="protocol-section-title">${protocolConfigs[protocol].title}</h3>
         <button type="button" class="protocol-section-close" onclick="toggleProtocol('${protocol}')">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
       <div id="${protocol}-content"></div>
-      <div class="form-actions form-actions-center" style="border: none; padding: 0; margin-top: var(--space-4);">
+      <div class="form-actions form-actions-center" style="border:none; padding:0; margin-top:var(--space-4);">
         <button type="button" class="btn btn-secondary btn-sm" onclick="addProtocolConfig('${protocol}')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Add Configuration
         </button>
-      </div>
-    `;
+      </div>`;
     container.appendChild(section);
-
-    // Initialize count
-    if (!protocolCounts[protocol]) {
-      protocolCounts[protocol] = 0;
-    }
+    if (!protocolCounts[protocol]) protocolCounts[protocol] = 0;
     updateBadge(protocol);
   }
 }
 
 function addProtocolConfig(protocol) {
-  const content = document.getElementById(`${protocol}-content`);
-  content.insertAdjacentHTML('beforeend', protocolConfigs[protocol].fields());
-
-  // Update count
+  document.getElementById(`${protocol}-content`).insertAdjacentHTML('beforeend', protocolConfigs[protocol].fields());
   protocolCounts[protocol] = (protocolCounts[protocol] || 0) + 1;
   updateBadge(protocol);
 }
@@ -1133,588 +441,98 @@ function removeProtocolConfig(element, protocol) {
 
 function updateBadge(protocol) {
   const bubble = document.querySelector(`[data-protocol="${protocol}"]`);
-  const badge = bubble.querySelector('.protocol-bubble-badge');
-  badge.textContent = protocolCounts[protocol];
-
-  if (protocolCounts[protocol] > 0) {
-    bubble.classList.add('has-config');
-  } else {
-    bubble.classList.remove('has-config');
-  }
+  bubble.querySelector('.pb-badge').textContent = protocolCounts[protocol];
+  if (protocolCounts[protocol] > 0) bubble.classList.add('has-config');
+  else bubble.classList.remove('has-config');
 }
 
-// Configuration block generators
-function getInterfaceBlock() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Interface Type</label>
-          <input type="text" name="interface_type[]" class="form-input" placeholder="Ethernet">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Interface Number</label>
-          <input type="text" name="interface_number[]" class="form-input" placeholder="1">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">IP Address</label>
-          <input type="text" name="interface_ip[]" class="form-input" placeholder="10.0.0.1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Subnet Mask</label>
-          <input type="text" name="interface_mask[]" class="form-input" placeholder="255.255.255.0">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group" style="max-width: 200px;">
-          <label class="form-label">Switchport</label>
-          <select name="switchport[]" class="form-select">
-            <option value="no">No</option>
-            <option value="yes">Yes</option>
-          </select>
-        </div>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'interfaces')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+const RMVBTN = (p) => `<button type="button" class="btn btn-danger btn-sm" style="margin-top:var(--space-3);" onclick="removeProtocolConfig(this, '${p}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Remove</button>`;
 
-function getSubinterfaceBlock() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Parent Interface</label>
-          <input type="text" name="subinterface_parent[]" class="form-input" placeholder="Ethernet1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Subinterface ID</label>
-          <input type="text" name="subinterface_id[]" class="form-input" placeholder="100">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Encapsulation VLAN</label>
-          <input type="text" name="subinterface_vlan[]" class="form-input" placeholder="100">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">IP Address</label>
-          <input type="text" name="subinterface_ip[]" class="form-input" placeholder="10.0.1.1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Subnet Mask</label>
-          <input type="text" name="subinterface_mask[]" class="form-input" placeholder="255.255.255.0">
-        </div>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'subinterfaces')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getInterfaceBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">Interface Type</label><input type="text" name="interface_type[]" class="form-input" placeholder="Ethernet"></div><div class="form-group"><label class="form-label">Interface Number</label><input type="text" name="interface_number[]" class="form-input" placeholder="1"></div></div><div class="form-row"><div class="form-group"><label class="form-label">IP Address</label><input type="text" name="interface_ip[]" class="form-input" placeholder="10.0.0.1"></div><div class="form-group"><label class="form-label">CIDR Prefix</label><input type="text" name="interface_mask[]" class="form-input" placeholder="/24"></div></div><div class="form-row"><div class="form-group" style="max-width:200px;"><label class="form-label">Switchport</label><select name="switchport[]" class="form-select"><option value="no">No</option><option value="yes">Yes</option></select></div></div>${RMVBTN('interfaces')}</div>`; }
 
-function getVlanBlock() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">VLAN ID</label>
-          <input type="text" name="vlan_id[]" class="form-input" placeholder="100">
-        </div>
-        <div class="form-group">
-          <label class="form-label">VLAN Name</label>
-          <input type="text" name="vlan_name[]" class="form-input" placeholder="Management">
-        </div>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'vlan')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getSubinterfaceBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">Parent Interface</label><input type="text" name="subinterface_parent[]" class="form-input" placeholder="Ethernet1"></div><div class="form-group"><label class="form-label">Subinterface ID</label><input type="text" name="subinterface_id[]" class="form-input" placeholder="100"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Encapsulation VLAN</label><input type="text" name="subinterface_vlan[]" class="form-input" placeholder="100"></div></div><div class="form-row"><div class="form-group"><label class="form-label">IP Address</label><input type="text" name="subinterface_ip[]" class="form-input" placeholder="10.0.1.1"></div><div class="form-group"><label class="form-label">CIDR Prefix</label><input type="text" name="subinterface_mask[]" class="form-input" placeholder="/24"></div></div>${RMVBTN('subinterfaces')}</div>`; }
 
-function getBgpSection() {
-  return `
-    <div class="config-block">
-      <div class="form-group">
-        <label class="form-label">ASN</label>
-        <input type="text" name="bgp_asn" class="form-input" style="max-width: 200px;" placeholder="65001">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Neighbor IP</label>
-          <input type="text" name="bgp_neighbor[]" class="form-input" placeholder="10.0.0.2">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Remote ASN</label>
-          <input type="text" name="bgp_remote_as[]" class="form-input" placeholder="65002">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Address Family</label>
-          <input type="text" name="bgp_address_family[]" class="form-input" placeholder="ipv4">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Advertised Network</label>
-          <input type="text" name="bgp_network[]" class="form-input" placeholder="10.0.0.0">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Subnet Mask</label>
-          <input type="text" name="bgp_mask[]" class="form-input" placeholder="255.255.255.0">
-        </div>
-      </div>
-      <div class="checkbox-group">
-        <label class="form-check">
-          <input type="checkbox" name="redistribute_ospf_into_bgp" class="form-check-input">
-          <span class="form-check-label">Redistribute OSPF</span>
-        </label>
-        <label class="form-check">
-          <input type="checkbox" name="redistribute_rip_into_bgp" class="form-check-input">
-          <span class="form-check-label">Redistribute RIP</span>
-        </label>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'bgp')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getVlanBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">VLAN ID</label><input type="text" name="vlan_id[]" class="form-input" placeholder="100"></div><div class="form-group"><label class="form-label">VLAN Name</label><input type="text" name="vlan_name[]" class="form-input" placeholder="Management"></div></div>${RMVBTN('vlan')}</div>`; }
 
-function getOspfSection() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Process ID</label>
-          <input type="text" name="ospf_process_id[]" class="form-input" placeholder="1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Network IP</label>
-          <input type="text" name="ospf_network[]" class="form-input" placeholder="10.0.0.0">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Wildcard Mask</label>
-          <input type="text" name="ospf_wildcard[]" class="form-input" placeholder="0.0.0.255">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Area</label>
-          <input type="text" name="ospf_area[]" class="form-input" placeholder="0">
-        </div>
-      </div>
-      <div class="checkbox-group">
-        <label class="form-check">
-          <input type="checkbox" name="ospf_redistribute_connected[]" class="form-check-input">
-          <span class="form-check-label">Redistribute Connected</span>
-        </label>
-        <label class="form-check">
-          <input type="checkbox" name="ospf_redistribute_bgp[]" class="form-check-input">
-          <span class="form-check-label">Redistribute BGP</span>
-        </label>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'ospf')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getBgpSection() { return `<div class="config-block"><div class="form-group"><label class="form-label">ASN</label><input type="text" name="bgp_asn" class="form-input" style="max-width:200px;" placeholder="65001"></div><div class="form-row"><div class="form-group"><label class="form-label">Neighbor IP</label><input type="text" name="bgp_neighbor[]" class="form-input" placeholder="10.0.0.2"></div><div class="form-group"><label class="form-label">Remote ASN</label><input type="text" name="bgp_remote_as[]" class="form-input" placeholder="65002"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Address Family</label><input type="text" name="bgp_address_family[]" class="form-input" placeholder="ipv4"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Advertised Network</label><input type="text" name="bgp_network[]" class="form-input" placeholder="10.0.0.0"></div><div class="form-group"><label class="form-label">CIDR Prefix</label><input type="text" name="bgp_mask[]" class="form-input" placeholder="/24"></div></div><div class="checkbox-group"><label class="form-check"><input type="checkbox" name="redistribute_ospf_into_bgp" class="form-check-input"><span class="form-check-label">Redistribute OSPF</span></label><label class="form-check"><input type="checkbox" name="redistribute_rip_into_bgp" class="form-check-input"><span class="form-check-label">Redistribute RIP</span></label></div>${RMVBTN('bgp')}</div>`; }
 
-function getEigrpBlock() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">AS Number</label>
-          <input type="text" name="eigrp_as[]" class="form-input" placeholder="100">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Network</label>
-          <input type="text" name="eigrp_network[]" class="form-input" placeholder="10.0.0.0">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Wildcard Mask</label>
-          <input type="text" name="eigrp_wildcard[]" class="form-input" placeholder="0.0.0.255">
-        </div>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'eigrp')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getOspfSection() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">Process ID</label><input type="text" name="ospf_process_id[]" class="form-input" placeholder="1"></div><div class="form-group"><label class="form-label">Network IP</label><input type="text" name="ospf_network[]" class="form-input" placeholder="10.0.0.0"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Wildcard Mask</label><input type="text" name="ospf_wildcard[]" class="form-input" placeholder="0.0.0.255"></div><div class="form-group"><label class="form-label">Area</label><input type="text" name="ospf_area[]" class="form-input" placeholder="0"></div></div><div class="checkbox-group"><label class="form-check"><input type="checkbox" name="ospf_redistribute_connected[]" class="form-check-input"><span class="form-check-label">Redistribute Connected</span></label><label class="form-check"><input type="checkbox" name="ospf_redistribute_bgp[]" class="form-check-input"><span class="form-check-label">Redistribute BGP</span></label></div>${RMVBTN('ospf')}</div>`; }
 
-function getRipBlock() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">RIP Version</label>
-          <input type="text" name="rip_version[]" class="form-input" placeholder="2">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Network IP</label>
-          <input type="text" name="rip_network[]" class="form-input" placeholder="10.0.0.0">
-        </div>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'rip')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getEigrpBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">AS Number</label><input type="text" name="eigrp_as[]" class="form-input" placeholder="100"></div><div class="form-group"><label class="form-label">Network</label><input type="text" name="eigrp_network[]" class="form-input" placeholder="10.0.0.0"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Wildcard Mask</label><input type="text" name="eigrp_wildcard[]" class="form-input" placeholder="0.0.0.255"></div></div>${RMVBTN('eigrp')}</div>`; }
 
-function getIsisBlock() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Process Tag</label>
-          <input type="text" name="isis_tag[]" class="form-input" placeholder="1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">NET Address</label>
-          <input type="text" name="isis_net[]" class="form-input" placeholder="49.0001.0000.0000.0001.00">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Level</label>
-          <select name="isis_level[]" class="form-select">
-            <option value="level-1">Level 1</option>
-            <option value="level-2">Level 2</option>
-            <option value="level-1-2">Level 1-2</option>
-          </select>
-        </div>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'isis')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getRipBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">RIP Version</label><input type="text" name="rip_version[]" class="form-input" placeholder="2"></div><div class="form-group"><label class="form-label">Network IP</label><input type="text" name="rip_network[]" class="form-input" placeholder="10.0.0.0"></div></div>${RMVBTN('rip')}</div>`; }
 
-function getStpBlock() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">STP Mode</label>
-          <select name="stp_mode[]" class="form-select">
-            <option value="pvst">PVST</option>
-            <option value="rapid-pvst">Rapid PVST</option>
-            <option value="mst">MST</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Priority</label>
-          <input type="text" name="stp_priority[]" class="form-input" placeholder="32768">
-        </div>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'stp')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getIsisBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">Process Tag</label><input type="text" name="isis_tag[]" class="form-input" placeholder="1"></div><div class="form-group"><label class="form-label">NET Address</label><input type="text" name="isis_net[]" class="form-input" placeholder="49.0001.0000.0000.0001.00"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Level</label><select name="isis_level[]" class="form-select"><option value="level-1">Level 1</option><option value="level-2">Level 2</option><option value="level-1-2">Level 1-2</option></select></div></div>${RMVBTN('isis')}</div>`; }
 
-function getVxlanBlock() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">VNI</label>
-          <input type="text" name="vxlan_vni[]" class="form-input" placeholder="10100">
-        </div>
-        <div class="form-group">
-          <label class="form-label">VLAN</label>
-          <input type="text" name="vxlan_vlan[]" class="form-input" placeholder="100">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Source Interface</label>
-          <input type="text" name="vxlan_source[]" class="form-input" placeholder="Loopback0">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Multicast Group</label>
-          <input type="text" name="vxlan_mcast[]" class="form-input" placeholder="239.1.1.1">
-        </div>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'vxlan')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getStpBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">STP Mode</label><select name="stp_mode[]" class="form-select"><option value="pvst">PVST</option><option value="rapid-pvst">Rapid PVST</option><option value="mst">MST</option></select></div><div class="form-group"><label class="form-label">Priority</label><input type="text" name="stp_priority[]" class="form-input" placeholder="32768"></div></div>${RMVBTN('stp')}</div>`; }
 
-function getMplsBlock() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">LDP Router ID</label>
-          <input type="text" name="mpls_router_id[]" class="form-input" placeholder="1.1.1.1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Interface</label>
-          <input type="text" name="mpls_interface[]" class="form-input" placeholder="GigabitEthernet0/0">
-        </div>
-      </div>
-      <div class="checkbox-group">
-        <label class="form-check">
-          <input type="checkbox" name="mpls_ldp[]" class="form-check-input">
-          <span class="form-check-label">Enable LDP</span>
-        </label>
-        <label class="form-check">
-          <input type="checkbox" name="mpls_te[]" class="form-check-input">
-          <span class="form-check-label">Enable Traffic Engineering</span>
-        </label>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'mpls')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getVxlanBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">VNI</label><input type="text" name="vxlan_vni[]" class="form-input" placeholder="10100"></div><div class="form-group"><label class="form-label">VLAN</label><input type="text" name="vxlan_vlan[]" class="form-input" placeholder="100"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Source Interface</label><input type="text" name="vxlan_source[]" class="form-input" placeholder="Loopback0"></div><div class="form-group"><label class="form-label">Multicast Group</label><input type="text" name="vxlan_mcast[]" class="form-input" placeholder="239.1.1.1"></div></div>${RMVBTN('vxlan')}</div>`; }
 
-function getStaticRouteBlock() {
-  return `
-    <div class="config-block">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Destination Network</label>
-          <input type="text" name="static_network[]" class="form-input" placeholder="192.168.1.0">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Subnet Mask</label>
-          <input type="text" name="static_mask[]" class="form-input" placeholder="255.255.255.0">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Next Hop / Exit Interface</label>
-          <input type="text" name="static_nexthop[]" class="form-input" placeholder="10.0.0.1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Administrative Distance</label>
-          <input type="text" name="static_ad[]" class="form-input" placeholder="1" style="max-width: 120px;">
-        </div>
-      </div>
-      <button type="button" class="btn btn-danger btn-sm" onclick="removeProtocolConfig(this, 'static')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        Remove
-      </button>
-    </div>
-  `;
-}
+function getMplsBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">LDP Router ID</label><input type="text" name="mpls_router_id[]" class="form-input" placeholder="1.1.1.1"></div><div class="form-group"><label class="form-label">Interface</label><input type="text" name="mpls_interface[]" class="form-input" placeholder="GigabitEthernet0/0"></div></div><div class="checkbox-group"><label class="form-check"><input type="checkbox" name="mpls_ldp[]" class="form-check-input"><span class="form-check-label">Enable LDP</span></label><label class="form-check"><input type="checkbox" name="mpls_te[]" class="form-check-input"><span class="form-check-label">Enable Traffic Engineering</span></label></div>${RMVBTN('mpls')}</div>`; }
 
-function showLoading() {
-  const overlay = document.getElementById("loading-overlay");
-  overlay.style.display = "flex";
-  overlay.offsetHeight; // force reflow so transition fires
-  overlay.classList.add("visible");
-  rotateTerms();
-  return true;
-}
+function getStaticRouteBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">Destination Network</label><input type="text" name="static_network[]" class="form-input" placeholder="192.168.1.0"></div><div class="form-group"><label class="form-label">CIDR Prefix</label><input type="text" name="static_mask[]" class="form-input" placeholder="/24"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Next Hop / Exit Interface</label><input type="text" name="static_nexthop[]" class="form-input" placeholder="10.0.0.1"></div><div class="form-group"><label class="form-label">Administrative Distance</label><input type="text" name="static_ad[]" class="form-input" placeholder="1" style="max-width:120px;"></div></div>${RMVBTN('static')}</div>`; }
 
-const terms = [
-  "Routing BGP packets to destination...",
-  "Configuring Layer 3 protocols...",
-  "Injecting routes into routing table...",
-  "Initializing OSPF process...",
-  "Building VLAN database...",
-  "Applying router configuration...",
-  "Writing configs to flash memory...",
-  "Converging network topology...",
-  "Establishing BGP neighbor relationships...",
-  "Calculating OSPF shortest paths...",
-  "Propagating routing updates...",
-  "Configuring interface parameters...",
-];
-
-let index = 0;
-let rotateInterval;
-
-function rotateTerms() {
-  const el = document.getElementById("loading-text");
-  el.style.opacity = 0;
-  setTimeout(() => {
-    el.innerText = terms[index];
-    el.style.opacity = 1;
-    index = (index + 1) % terms.length;
-  }, 500);
-
-  if (!rotateInterval) {
-    rotateInterval = setInterval(rotateTerms, 7000);
-  }
-}
-
-terms.sort(() => Math.random() - 0.5);
-
-function _hideLoading() {
-  const overlay = document.getElementById("loading-overlay");
-  overlay.classList.remove("visible");
-  overlay.style.display = "none";
-  clearInterval(rotateInterval);
-  rotateInterval = null;
-}
-
-async function pushConfig() {
-  const deviceId = document.querySelector("select[name='device_id']").value;
-  showLoading();
-
-  let result;
-  try {
-    const response = await fetch("/push-config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ device_id: deviceId }),
-    });
-    result = await response.json();
-  } catch (e) {
-    _hideLoading();
-    document.getElementById("push-message").innerHTML = `
-      <div class="alert alert-error">
-        <span class="alert-icon">&#10007;</span>
-        <div class="alert-content">Request failed: ${e.message}</div>
-      </div>`;
-    return;
-  }
-
-  _hideLoading();
-  const messageContainer = document.getElementById("push-message");
-  const pushWrapper = document.getElementById("push-button-wrapper");
-
-  if (result.status === "success") {
-    messageContainer.innerHTML = `
-      <div class="alert alert-success">
-        <span class="alert-icon">&#10003;</span>
-        <div class="alert-content">Configuration pushed successfully.</div>
-      </div>
-    `;
-
-    if (pushWrapper) {
-      pushWrapper.style.display = "none";
-    }
-
-    document.getElementById("config-form").reset();
-  } else {
-    messageContainer.innerHTML = `
-      <div class="alert alert-error">
-        <span class="alert-icon">&#10007;</span>
-        <div class="alert-content">Push failed: ${result.message}</div>
-      </div>
-    `;
-  }
-}
-
-// ── Loading overlay ────────────────────────────────────────
+// Loading overlay
 const loadingTerms = [
-  "Routing BGP packets to Valhalla...",
-  "Spinning up Layer 3 magic...",
-  "Injecting routes into the Matrix...",
-  "Summoning OSPF daemons...",
-  "Crafting VLAN potions...",
-  "Talking to network oracles...",
-  "Negotiating with DHCP spirits...",
-  "Sniffing packets from the astral plane...",
-  "Tunneling through hyperspace...",
-  "Enabling port-channel wizardry...",
-  "Building bridges with STP spells...",
-  "Conjuring MAC addresses...",
-  "Programming the P4 gods...",
-  "Pinging the void...",
-  "Weaving MPLS labels into destiny...",
-  "Peering with interdimensional routers...",
-  "Binding interfaces with eldritch configs...",
-  "Casting 'show run' scrolls...",
-  "Parsing YANGs of destiny...",
-  "Teleporting configs into flash...",
+  "Routing BGP packets to destination...","Configuring Layer 3 protocols...","Injecting routes into routing table...",
+  "Initializing OSPF process...","Building VLAN database...","Applying router configuration...",
+  "Writing configs to flash memory...","Converging network topology...","Establishing BGP neighbor relationships...",
+  "Calculating OSPF shortest paths...","Propagating routing updates...","Configuring interface parameters...",
+  "Negotiating with DHCP spirits...","Casting 'show run' scrolls...","Parsing YANGs of destiny...",
+  "Teleporting configs into flash...","Peering with interdimensional routers...","Binding interfaces with eldritch configs...",
+  "Weaving MPLS labels into destiny...","Pinging the void...",
 ];
 loadingTerms.sort(() => Math.random() - 0.5);
-let loadingIndex = 0;
+let loadingIdx = 0;
 let loadingInterval = null;
 
 function rotateLoadingTerms() {
   const el = document.getElementById("loading-text");
   if (!el) return;
   el.style.opacity = 0;
-  setTimeout(() => {
-    el.innerText = loadingTerms[loadingIndex];
-    el.style.opacity = 1;
-    loadingIndex = (loadingIndex + 1) % loadingTerms.length;
-  }, 500);
-  if (!loadingInterval) {
-    loadingInterval = setInterval(rotateLoadingTerms, 7000);
-  }
+  setTimeout(() => { el.innerText = loadingTerms[loadingIdx]; el.style.opacity = 1; loadingIdx = (loadingIdx + 1) % loadingTerms.length; }, 500);
+  if (!loadingInterval) loadingInterval = setInterval(rotateLoadingTerms, 7000);
 }
 
 function showLoading() {
   const overlay = document.getElementById("loading-overlay");
   overlay.style.display = "flex";
-  overlay.offsetHeight; // trigger reflow for CSS transition
+  overlay.offsetHeight;
   overlay.classList.add("visible");
   rotateLoadingTerms();
   return true;
+}
+
+function _hideLoading() {
+  const overlay = document.getElementById("loading-overlay");
+  overlay.classList.remove("visible");
+  overlay.style.display = "none";
+  clearInterval(loadingInterval);
+  loadingInterval = null;
+}
+
+async function pushConfig() {
+  const deviceId = document.querySelector("select[name='device_id']").value;
+  showLoading();
+  let result;
+  try {
+    const response = await fetch("/push-config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device_id: deviceId }) });
+    result = await response.json();
+  } catch (e) {
+    _hideLoading();
+    document.getElementById("push-message").innerHTML = `<div class="alert alert-error"><span class="alert-icon">&#10007;</span><div class="alert-content">Request failed: ${e.message}</div></div>`;
+    return;
+  }
+  _hideLoading();
+  const msgContainer = document.getElementById("push-message");
+  const pushWrapper = document.getElementById("push-button-wrapper");
+  if (result.status === "success") {
+    msgContainer.innerHTML = `<div class="alert alert-success"><span class="alert-icon">&#10003;</span><div class="alert-content">Configuration pushed successfully.</div></div>`;
+    if (pushWrapper) pushWrapper.style.display = "none";
+    document.getElementById("config-form").reset();
+  } else {
+    msgContainer.innerHTML = `<div class="alert alert-error"><span class="alert-icon">&#10007;</span><div class="alert-content">Push failed: ${result.message}</div></div>`;
+  }
 }
 </script>
 {% endblock %}

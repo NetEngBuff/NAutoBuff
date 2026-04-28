@@ -1,328 +1,311 @@
 {% extends "base.html" %}
 {% from '_macros.html' import next_steps %}
-{% block title %}Add Device - NAutoBuff{% endblock %}
+{% block title %}Add Device — NAutoBuff{% endblock %}
 
 {% block content %}
 <div class="page-header">
+  <div class="page-header-eyebrow vlab">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    Virtual Lab
+  </div>
   <h1 class="page-title">Add Device</h1>
-  <p class="page-description">Add a new device to your existing network topology</p>
+  <p class="page-description">Add a new node to your existing topology</p>
 </div>
 
-<!-- ── Teardown warning ──────────────────────────────────────────────────── -->
-<div class="alert alert-warning" style="max-width:700px; margin: 0 auto 20px; display:flex; gap:12px; align-items:flex-start;">
-  <span style="font-size:18px; flex-shrink:0;">&#9888;</span>
-  <div style="flex:1;">
-    <strong>Adding a device triggers a full topology teardown and redeploy.</strong>
-    <ul style="margin: 6px 0 8px 0; padding-left: 18px; line-height: 1.7;">
-      <li>All existing devices will be destroyed and recreated.</li>
-      <li>Devices that have a golden config will be <strong>automatically restored</strong> after redeploy.</li>
-      <li>Devices <strong>without</strong> a golden config, or with a stale one (e.g. missing <code>Management0</code>), will boot with a <strong>default blank config</strong>.</li>
-    </ul>
-    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-      <button type="button" id="snap-btn" class="btn btn-secondary" style="font-size:13px; padding:6px 14px;" onclick="snapshotAll()">
-        Snapshot All Devices Now
-      </button>
-      <span id="snap-status" style="font-size:13px;"></span>
+<!-- Teardown Warning -->
+<div class="teardown-warn" style="max-width:680px; margin:0 auto var(--space-5);">
+  <div style="display:flex; gap:var(--space-4); align-items:flex-start;">
+    <div style="flex-shrink:0; width:34px; height:34px; border-radius:50%; background:rgba(255,122,61,0.1); border:1px solid rgba(255,122,61,0.3); display:flex; align-items:center; justify-content:center;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--plab)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div style="flex:1;">
+      <p style="font-size:13px; font-weight:600; color:var(--plab); margin-bottom:var(--space-1);">Full topology teardown &amp; redeploy required</p>
+      <p style="font-size:12px; color:var(--nb-text-2); margin-bottom:var(--space-3); line-height:1.6;">
+        Devices with a golden config will be auto-restored. Devices without one will boot blank.
+      </p>
+      <div style="display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap;">
+        <button type="button" id="snap-btn" class="btn btn-secondary" style="font-size:12px;" onclick="snapshotAll()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Snapshot All Devices Now
+        </button>
+        <span id="snap-status" style="font-size:12px;"></span>
+      </div>
     </div>
   </div>
 </div>
 
-<div class="card card-elevated" style="max-width: 700px; margin: 0 auto;">
-  <div class="card-body">
-    <form method="POST" class="form" id="add-device-form" onsubmit="return handleSubmit()">
+<div class="v2-card" style="max-width:680px; margin:0 auto;">
+  <form method="POST" class="form" id="add-device-form" onsubmit="return handleSubmit()">
+    <input type="hidden" name="connection_count" id="connection-count-hidden" value="0">
 
-      <!-- Hidden field keeps connection count in sync for the server -->
-      <input type="hidden" name="connection_count" id="connection-count-hidden" value="0">
+    <!-- Hidden fields populated from hosts.csv selection -->
+    <input type="hidden" name="device_name" id="h-device-name">
+    <input type="hidden" name="ip_address"  id="h-ip-address">
+    <input type="hidden" name="username"    id="h-username">
+    <input type="hidden" name="password"    id="h-password">
+    <input type="hidden" name="vendor"      id="h-vendor">
 
-      <!-- ── Device Information ─────────────────────────────── -->
-      <div class="form-fieldset">
-        <legend class="form-legend">Device Information</legend>
+    <!-- ── Step 1: Host ── -->
+    <div class="v2-section-header">
+      <span class="v2-section-label">
+        <span class="step-num">1</span> Select Host
+      </span>
+      <div class="v2-section-line"></div>
+    </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Device Name</label>
-            <input type="text" name="device_name" class="form-input" placeholder="R3" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Kind</label>
-            <select name="kind" id="kind-select" class="form-select" required onchange="toggleExecOrConfig()">
-              <option value="">-- Select --</option>
-              <option value="ceos">ceos</option>
-              <option value="linux">linux</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Vendor</label>
-            <select name="vendor" class="form-select" required>
-              <option value="arista">Arista</option>
-              <option value="cisco">Cisco</option>
-              <option value="juniper">Juniper</option>
-            </select>
-          </div>
-        </div>
+    <div class="form-group">
+      <select id="host-select" class="form-select" required onchange="onHostSelect(this.value)">
+        <option value="">— Select from hosts.csv —</option>
+      </select>
+    </div>
 
-        <div class="form-group">
-          <label class="form-label">Docker Image</label>
-          <select name="image" class="form-select" required>
-            <option value="">-- Select Image --</option>
-            {% for img in docker_images %}
-              <option value="{{ img }}">{{ img }}</option>
-            {% endfor %}
-          </select>
-        </div>
+    <!-- Auto-fill info pill (shown after selection) -->
+    <div id="host-pill" class="host-pill" style="display:none;"></div>
 
-        <div id="config-section" class="form-group" style="display: none;">
-          <label class="form-label">Config File Path <span class="form-hint">(optional)</span></label>
-          <input type="text" name="config" class="form-input" placeholder="/path/to/startup.cfg">
-        </div>
+    <!-- ── Step 2: Container ── -->
+    <div class="v2-section-header" style="margin-top:var(--space-5);">
+      <span class="v2-section-label">
+        <span class="step-num">2</span> Container Settings
+      </span>
+      <div class="v2-section-line"></div>
+    </div>
 
-        <div id="exec-section" class="form-group" style="display: none;">
-          <label class="form-label">Exec Commands <span class="form-hint">(one per line)</span></label>
-          <textarea name="exec[]" rows="3" class="form-textarea" placeholder="ip link set eth1 up&#10;dhclient eth1"></textarea>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">MAC Address <span class="form-hint">(optional)</span></label>
-          <input type="text" name="mac_address" class="form-input" placeholder="aa:bb:cc:dd:ee:ff">
-        </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Kind</label>
+        <select name="kind" id="kind-select" class="form-select" required onchange="toggleExecOrConfig()">
+          <option value="">-- Select --</option>
+          <option value="ceos">ceos</option>
+          <option value="linux">linux</option>
+          <option value="cisco_iol">cisco_iol</option>
+          <option value="crpd">crpd</option>
+        </select>
       </div>
-
-      <!-- ── Network Configuration ──────────────────────────── -->
-      <div class="form-fieldset">
-        <legend class="form-legend">Network Configuration</legend>
-
-        <div class="form-group">
-          <label class="form-label">Management IP <span class="form-hint">(CIDR notation)</span></label>
-          <input type="text" name="ip_address" class="form-input" placeholder="172.20.20.10/24" required>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">SSH Username</label>
-            <input type="text" name="username" class="form-input" placeholder="admin" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label">SSH Password</label>
-            <input type="password" name="password" class="form-input" placeholder="admin" required>
-          </div>
-        </div>
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Docker Image</label>
+        <select name="image" class="form-select" required>
+          <option value="">-- Select Image --</option>
+          {% for img in docker_images %}
+          <option value="{{ img }}">{{ img }}</option>
+          {% endfor %}
+        </select>
       </div>
+    </div>
 
-      <!-- ── Connections ─────────────────────────────────────── -->
-      <div class="form-fieldset">
-        <legend class="form-legend">Connections</legend>
+    <div id="config-section" class="form-group" style="display:none;">
+      <label class="form-label">Startup Config Path <span class="form-hint">optional — leave blank to auto-generate</span></label>
+      <input type="text" name="config" class="form-input" placeholder="/path/to/startup.cfg">
+    </div>
 
-        <div id="connection-rows"></div>
+    <div id="exec-section" class="form-group" style="display:none;">
+      <label class="form-label">Exec Commands <span class="form-hint">one per line</span></label>
+      <textarea name="exec[]" rows="2" class="form-textarea" placeholder="ip link set eth1 up&#10;dhclient eth1"></textarea>
+    </div>
 
-        <button type="button" class="btn btn-secondary btn-sm" onclick="addConnection()" style="margin-top: var(--space-2);">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px;">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Add Connection
-        </button>
-      </div>
+    <div class="form-group">
+      <label class="form-label">MAC Address <span class="form-hint">optional</span></label>
+      <input type="text" name="mac_address" class="form-input" placeholder="aa:bb:cc:dd:ee:ff" style="max-width:220px;">
+    </div>
 
-      {% if message and '✅' in message %}
-      {{ next_steps([
-        {'url': '/configure-device', 'title': 'Configure Device', 'desc': 'Push configs to the new device',   'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 19.07A10 10 0 0 0 4.93 4.93"/></svg>'},
-        {'url': '/ipam',             'title': 'View IPAM',        'desc': 'Verify the new device IP',         'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'},
-        {'url': '/topology',         'title': 'View Topology',    'desc': 'See the updated network graph',    'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>'}
-      ]) }}
-      {% endif %}
+    <!-- ── Step 3: Connections ── -->
+    <div class="v2-section-header" style="margin-top:var(--space-5);">
+      <span class="v2-section-label">
+        <span class="step-num">3</span> Connections
+      </span>
+      <div class="v2-section-line"></div>
+    </div>
 
-      {% if message %}
-      <div class="alert {{ 'alert-error' if '❌' in message else 'alert-success' }}">
-        <span class="alert-icon">{{ '✕' if '❌' in message else '✓' }}</span>
-        <div class="alert-content">{{ message|safe }}</div>
-      </div>
-      {% endif %}
+    <div id="connection-rows"></div>
 
-      <div class="form-actions form-actions-center" style="margin-top: var(--space-5);">
-        <button type="submit" class="btn btn-primary">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Add Device
-        </button>
-      </div>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="addConnection()" style="margin-top:var(--space-2);">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Connection
+    </button>
 
-    </form>
-  </div>
+    {% if message and '✅' in message %}
+    {{ next_steps([
+      {'url': '/configure-device', 'title': 'Configure Device', 'desc': 'Push configs to the new device',  'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 19.07A10 10 0 0 0 4.93 4.93"/></svg>'},
+      {'url': '/ipam',             'title': 'View IPAM',        'desc': 'Verify the new device IP',        'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'},
+      {'url': '/topology',         'title': 'View Topology',    'desc': 'See the updated network graph',   'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>'}
+    ]) }}
+    {% endif %}
+
+    {% if message %}
+    <div class="alert {{ 'alert-error' if '❌' in message else 'alert-success' }}" style="margin-top:var(--space-5);">
+      <span class="alert-icon">{{ '✕' if '❌' in message else '✓' }}</span>
+      <div class="alert-content">{{ message|safe }}</div>
+    </div>
+    {% endif %}
+
+    <div class="form-actions form-actions-center" style="margin-top:var(--space-6);">
+      <button type="submit" class="btn btn-primary" style="--btn-color:var(--vlab); --btn-glow:rgba(0,212,255,0.3);">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Add Device &amp; Redeploy
+      </button>
+    </div>
+  </form>
 </div>
 
 <!-- Loading Overlay -->
-<div class="modal-overlay" id="loading-overlay" style="display: none;">
-  <div class="loading-container">
-    <div class="loading-spinner"></div>
-    <p class="loading-text" id="loading-text">Initializing...</p>
+<div class="modal-overlay" id="loading-overlay" style="display:none;">
+  <div style="display:flex; flex-direction:column; align-items:center; gap:var(--space-5);">
+    <div class="topo-spinner"></div>
+    <p id="loading-text" style="font-family:'JetBrains Mono',monospace; color:var(--vlab); font-size:13px; letter-spacing:0.05em; transition:opacity 0.5s;">Initializing...</p>
   </div>
 </div>
 
 <style>
-.form-hint {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  font-weight: var(--font-weight-normal);
-  margin-left: var(--space-1);
-}
-
-.connection-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-}
-
-.connection-row .form-select {
-  flex: 1;
-  margin-bottom: 0;
-}
-
-.connection-row label {
-  white-space: nowrap;
-  min-width: 110px;
-  margin-bottom: 0;
-}
-
-.btn-remove {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-base);
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-fast);
-}
-
-.btn-remove:hover {
-  background: var(--color-error-bg, rgba(239,68,68,0.1));
-  border-color: var(--color-error, #ef4444);
-  color: var(--color-error, #ef4444);
-}
-
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid var(--color-border);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.loading-text {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  transition: opacity 0.5s ease-in-out;
-}
+.v2-card { background:var(--nb-surface); border:1px solid rgba(255,255,255,0.06); border-radius:16px; padding:var(--space-6); }
+.page-header-eyebrow.vlab { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--vlab); background:rgba(0,212,255,0.1); border:1px solid rgba(0,212,255,0.25); padding:4px 10px; border-radius:99px; margin-bottom:var(--space-3); }
+.v2-section-header { display:flex; align-items:center; gap:var(--space-3); margin-bottom:var(--space-4); }
+.v2-section-label { display:flex; align-items:center; gap:var(--space-2); font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--nb-text-3); white-space:nowrap; }
+.v2-section-line { flex:1; height:1px; background:rgba(255,255,255,0.06); }
+.step-num { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:var(--vlab); color:var(--nb-base); font-size:10px; font-weight:800; font-family:var(--font-mono); flex-shrink:0; }
+.form-hint { font-size:11px; color:var(--nb-text-3); font-weight:400; margin-left:6px; }
+.host-pill { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; padding:10px 14px; background:rgba(0,212,255,0.05); border:1px solid rgba(0,212,255,0.2); border-radius:10px; margin-bottom:var(--space-2); font-size:12px; }
+.pill-item { display:inline-flex; align-items:center; gap:5px; color:var(--nb-text-2); font-family:var(--font-mono); }
+.pill-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--vlab); margin-left:auto; }
+.connection-row { display:flex; align-items:center; gap:var(--space-3); margin-bottom:var(--space-3); }
+.connection-row .form-select { flex:1; margin-bottom:0; }
+.connection-row .conn-label { font-size:12px; color:var(--nb-text-3); white-space:nowrap; min-width:90px; }
+.btn-remove-conn { flex-shrink:0; width:28px; height:28px; padding:0; border-radius:8px; background:transparent; border:1px solid rgba(255,255,255,0.08); color:var(--nb-text-3); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+.btn-remove-conn:hover { background:rgba(239,68,68,0.1); border-color:#ef4444; color:#ef4444; }
+.teardown-warn { background:rgba(255,122,61,0.04); border:1px solid rgba(255,122,61,0.2); border-radius:12px; padding:var(--space-4); }
+.topo-spinner { width:52px; height:52px; border:3px solid rgba(0,212,255,0.15); border-top-color:var(--vlab); border-radius:50%; animation:ts 0.8s linear infinite; box-shadow:0 0 20px rgba(0,212,255,0.3); }
+@keyframes ts { to { transform:rotate(360deg); } }
 </style>
 
 <script>
-// Available hosts injected from Jinja at page load
+let hostsData = [];
 const availableHosts = [{% for host in available_hosts %}"{{ host }}"{% if not loop.last %},{% endif %}{% endfor %}];
 
+// Load hosts.csv data and populate the dropdown
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('/hosts-data')
+    .then(r => r.json())
+    .then(data => {
+      hostsData = data;
+      const sel = document.getElementById('host-select');
+      if (!data.length) {
+        sel.innerHTML = '<option value="">No hosts found in hosts.csv</option>';
+        return;
+      }
+      data.forEach(h => {
+        const opt = document.createElement('option');
+        opt.value = h.hostname;
+        opt.textContent = h.hostname + (h.vendor ? ` — ${h.vendor}` : '');
+        sel.appendChild(opt);
+      });
+    })
+    .catch(() => {});
+
+  toggleExecOrConfig();
+});
+
+function onHostSelect(hostname) {
+  const host = hostsData.find(h => h.hostname === hostname);
+  const pill = document.getElementById('host-pill');
+
+  if (!host) { pill.style.display = 'none'; clearHidden(); return; }
+
+  // Populate hidden fields the backend reads
+  document.getElementById('h-device-name').value = host.hostname;
+  document.getElementById('h-ip-address').value  = host.management_ip;
+  document.getElementById('h-username').value     = host.username;
+  document.getElementById('h-password').value     = host.password;
+  document.getElementById('h-vendor').value       = host.vendor || '';
+
+  pill.innerHTML = `
+    <span class="pill-item">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--vlab)" stroke-width="2.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      ${host.hostname}
+    </span>
+    <span class="pill-item">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      ${host.management_ip}
+    </span>
+    <span class="pill-item">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      ${host.username}
+    </span>
+    ${host.vendor ? `<span class="pill-item" style="color:var(--vlab); font-weight:700;">${host.vendor}</span>` : ''}
+    <span class="pill-label">from hosts.csv</span>
+  `;
+  pill.style.display = 'flex';
+}
+
+function clearHidden() {
+  ['h-device-name','h-ip-address','h-username','h-password','h-vendor'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+}
+
+function toggleExecOrConfig() {
+  const kind = document.getElementById('kind-select').value;
+  document.getElementById('config-section').style.display = kind === 'ceos' ? 'block' : 'none';
+  document.getElementById('exec-section').style.display   = kind === 'linux' ? 'block' : 'none';
+}
+
 function buildHostOptions() {
-  return availableHosts.map(h => `<option value="${h}">${h}</option>`).join("");
+  return availableHosts.map(h => `<option value="${h}">${h}</option>`).join('');
 }
 
 function updateConnectionCount() {
-  const rows = document.querySelectorAll("#connection-rows .connection-row");
-  document.getElementById("connection-count-hidden").value = rows.length;
-  // Re-index names and labels
+  const rows = document.querySelectorAll('#connection-rows .connection-row');
+  document.getElementById('connection-count-hidden').value = rows.length;
   rows.forEach((row, i) => {
-    row.querySelector("label").textContent = `Connect to Device ${i + 1}`;
-    row.querySelector("select").name = `connect_to_${i}`;
+    row.querySelector('.conn-label').textContent = `Link ${i + 1}`;
+    row.querySelector('select').name = `connect_to_${i}`;
   });
 }
 
 function addConnection() {
-  const container = document.getElementById("connection-rows");
-  const idx = container.querySelectorAll(".connection-row").length;
-  const row = document.createElement("div");
-  row.className = "connection-row";
+  const container = document.getElementById('connection-rows');
+  const idx = container.querySelectorAll('.connection-row').length;
+  const row = document.createElement('div');
+  row.className = 'connection-row';
   row.innerHTML = `
-    <label class="form-label">Connect to Device ${idx + 1}</label>
+    <span class="conn-label">Link ${idx + 1}</span>
     <select name="connect_to_${idx}" class="form-select" required>
-      <option value="">-- Select Device --</option>
+      <option value="">-- Select existing device --</option>
       ${buildHostOptions()}
     </select>
-    <button type="button" class="btn-remove" title="Remove" onclick="removeConnection(this)">&#215;</button>
+    <button type="button" class="btn-remove-conn" title="Remove" onclick="removeConnection(this)">&#215;</button>
   `;
   container.appendChild(row);
   updateConnectionCount();
 }
 
 function removeConnection(btn) {
-  btn.closest(".connection-row").remove();
+  btn.closest('.connection-row').remove();
   updateConnectionCount();
-}
-
-function toggleExecOrConfig() {
-  const kind = document.getElementById("kind-select").value;
-  document.getElementById("config-section").style.display = kind === "ceos" ? "block" : "none";
-  document.getElementById("exec-section").style.display = kind === "linux" ? "block" : "none";
 }
 
 function snapshotAll() {
   const btn = document.getElementById('snap-btn');
   const status = document.getElementById('snap-status');
   btn.disabled = true;
-  btn.textContent = 'Snapshotting…';
-  status.style.color = '';
   status.textContent = '';
-
   fetch('/api/golden-config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ select_all: true })
   })
   .then(r => r.json())
   .then(res => {
-    if (res.success) {
-      status.style.color = 'var(--color-success)';
-      status.textContent = '✔ Snapshots saved for all devices — safe to proceed.';
-    } else {
-      status.style.color = 'var(--color-error)';
-      status.textContent = '✖ ' + (res.message || 'Snapshot failed.');
-    }
+    if (res.success) { status.style.color = 'var(--ok)'; status.textContent = '✔ All snapshots saved'; }
+    else { status.style.color = 'var(--err)'; status.textContent = '✖ ' + (res.message || 'Failed'); }
   })
-  .catch(e => {
-    status.style.color = 'var(--color-error)';
-    status.textContent = '✖ Error: ' + e.message;
-  })
-  .finally(() => {
-    btn.disabled = false;
-    btn.textContent = 'Snapshot All Devices Now';
-  });
+  .catch(e => { status.style.color = 'var(--err)'; status.textContent = '✖ ' + e.message; })
+  .finally(() => { btn.disabled = false; });
 }
 
 function handleSubmit() {
+  if (!document.getElementById('h-device-name').value) {
+    alert('Please select a host from hosts.csv first.');
+    return false;
+  }
   const confirmed = confirm(
-    "⚠️ Full Topology Teardown\n\n" +
-    "Adding this device will destroy and redeploy the entire topology.\n\n" +
-    "• Existing devices WITH a golden config will be auto-restored.\n" +
-    "• Existing devices WITHOUT a golden config will boot blank.\n\n" +
-    "Have you taken golden config snapshots for all devices?\n\n" +
-    "Click OK to continue, or Cancel to go take snapshots first."
+    "⚠️ Full Topology Teardown\n\nThis will destroy and redeploy the entire topology.\n\nDevices WITH a golden config → auto-restored.\nDevices WITHOUT → boot blank.\n\nContinue?"
   );
   if (!confirmed) return false;
   updateConnectionCount();
@@ -331,73 +314,28 @@ function handleSubmit() {
 }
 
 function showLoading() {
-  const overlay = document.getElementById("loading-overlay");
-  overlay.style.display = "flex";
-  overlay.offsetHeight; // trigger reflow for CSS transition
-  overlay.classList.add("visible");
+  const overlay = document.getElementById('loading-overlay');
+  overlay.style.display = 'flex';
+  overlay.offsetHeight;
+  overlay.classList.add('visible');
   rotateTerms();
 }
 
-document.addEventListener("DOMContentLoaded", function () {
-  toggleExecOrConfig();
-});
-
 const terms = [
-  "Routing BGP packets to Valhalla...",
-  "Spinning up Layer 3 magic...",
-  "Injecting routes into the Matrix...",
-  "Summoning OSPF daemons...",
-  "Crafting VLAN potions...",
-  "Talking to network oracles...",
-  "Negotiating with DHCP spirits...",
-  "Sniffing packets from the astral plane...",
-  "Tunneling through hyperspace...",
-  "Enabling port-channel wizardry...",
-  "Building bridges with STP spells...",
-  "Balancing traffic on the tightrope of ECMP...",
-  "Fragmenting datagrams with care...",
-  "Conjuring MAC addresses...",
-  "Programming the P4 gods...",
-  "Pinging the void...",
-  "Announcing routes like a prophet...",
-  "Weaving MPLS labels into destiny...",
-  "Encoding bits of truth...",
-  "Assembling TCP handshakes...",
-  "Peering with interdimensional routers...",
-  "Binding interfaces with eldritch configs...",
-  "Casting 'show run' scrolls...",
-  "Parsing YANGs of destiny...",
-  "Bridging subnets across galaxies...",
-  "Extracting SNMP secrets from the vault...",
-  "Interfacing with quantum NICs...",
-  "Configuring routers with dark magic...",
-  "Recabling cables with thoughts alone...",
-  "Blessing interfaces with zero drops...",
-  "Summoning Ceos spirits from the cloud...",
-  "Resurrecting containers from the abyss...",
-  "Defragmenting reality into packets...",
-  "Rebooting layer zero...",
-  "Beaming bits through wormholes...",
-  "Unrolling IPv6 prophecies...",
-  "Hacking the mainframe of the underlay...",
-  "Teleporting configs into flash...",
+  "Routing BGP packets to Valhalla...","Spinning up Layer 3 magic...","Injecting routes into the Matrix...",
+  "Summoning OSPF daemons...","Crafting VLAN potions...","Talking to network oracles...",
+  "Negotiating with DHCP spirits...","Sniffing packets from the astral plane...","Tunneling through hyperspace...",
+  "Enabling port-channel wizardry...","Building bridges with STP spells...","Conjuring MAC addresses...",
+  "Pinging the void...","Weaving MPLS labels into destiny...","Teleporting configs into flash...",
 ];
-
 terms.sort(() => Math.random() - 0.5);
-let index = 0;
-let rotateInterval;
+let termIdx = 0, rotateInterval;
 
 function rotateTerms() {
-  const el = document.getElementById("loading-text");
+  const el = document.getElementById('loading-text');
   el.style.opacity = 0;
-  setTimeout(() => {
-    el.innerText = terms[index];
-    el.style.opacity = 1;
-    index = (index + 1) % terms.length;
-  }, 500);
-  if (!rotateInterval) {
-    rotateInterval = setInterval(rotateTerms, 7000);
-  }
+  setTimeout(() => { el.innerText = terms[termIdx]; el.style.opacity = 1; termIdx = (termIdx + 1) % terms.length; }, 500);
+  if (!rotateInterval) rotateInterval = setInterval(rotateTerms, 7000);
 }
 </script>
 {% endblock %}

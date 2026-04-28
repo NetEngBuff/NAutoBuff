@@ -1,180 +1,51 @@
 {% extends "base.html" %}
-{% block title %}User Management - NAutoBuff{% endblock %}
+{% block title %}User Management — NAutoBuff{% endblock %}
+{% block breadcrumb %}Admin / User Management{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">User Management</h1>
-  <p class="page-description">Manage accounts, roles, and invite new users</p>
+  <p class="page-description">Manage user accounts, roles, and invitations</p>
 </div>
 
-{% if message %}
-<div class="alert alert-success" style="max-width:900px;margin:0 auto var(--space-4);">
-  <span class="alert-icon">&#10003;</span>
-  <div class="alert-content">{{ message }}</div>
-</div>
-{% endif %}
-{% if error %}
-<div class="alert alert-error" style="max-width:900px;margin:0 auto var(--space-4);">
-  <span class="alert-icon">&#10007;</span>
-  <div class="alert-content">{{ error }}</div>
-</div>
-{% endif %}
-
-{% if invite_url %}
-<div class="card card-elevated" style="max-width:900px;margin:0 auto var(--space-4);border-color:var(--color-primary);">
-  <div class="card-body" style="display:flex;align-items:center;gap:var(--space-3);">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" style="flex-shrink:0">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-    </svg>
-    <code id="invite-url" style="font-size:var(--font-size-sm);word-break:break-all;color:var(--color-primary);flex:1;">{{ invite_url }}</code>
-    <button onclick="copyInviteUrl()" class="btn btn-secondary btn-sm" id="copy-btn" style="flex-shrink:0;">Copy</button>
-  </div>
-</div>
-{% endif %}
-
-<!-- Top row: Create User | Invite -->
-<div style="max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4);">
-
-  <!-- Create User -->
-  <div class="card card-elevated">
-    <div class="card-header"><h4>Create User</h4></div>
-    <div class="card-body">
-      <form method="POST" class="form">
-        <input type="hidden" name="action" value="create">
-        <div class="form-group">
-          <label class="form-label">Username</label>
-          <input type="text" name="username" class="form-input" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Password</label>
-          <input type="password" name="password" class="form-input" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Role</label>
-          <select name="role" class="form-select">
-            {% for r in roles %}<option value="{{ r }}">{{ r|capitalize }}</option>{% endfor %}
-          </select>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Create</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Invite — compact: generator + history in one card -->
-  <div class="card card-elevated" style="display:flex;flex-direction:column;">
-    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
-      <h4 style="margin:0;">Invite Link</h4>
-      <span style="font-size:var(--font-size-xs);color:var(--color-text-muted);">single-use</span>
-    </div>
-    <div class="card-body" style="display:flex;flex-direction:column;gap:var(--space-3);flex:1;">
-
-      <!-- Inline generator row -->
-      <form method="POST" style="display:flex;gap:var(--space-2);align-items:center;">
-        <input type="hidden" name="action" value="invite">
-        <select name="role" class="form-select" style="flex:1;">
-          {% for r in roles %}<option value="{{ r }}">{{ r|capitalize }}</option>{% endfor %}
-        </select>
-        <button type="submit" class="btn btn-secondary btn-sm" style="white-space:nowrap;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-          </svg>Generate
+<div class="grid grid-cols-2 gap-6">
+  <!-- Users table -->
+  <div style="grid-column:1/-1;">
+    <div class="card">
+      <div class="card-header">
+        <h3 style="font-size:14px;font-weight:600;">Active Users</h3>
+        <button class="btn btn-primary btn-sm" onclick="showInvitePanel()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          Invite User
         </button>
-      </form>
-
-      <!-- History list -->
-      <div style="flex:1;overflow-y:auto;max-height:180px;">
-        {% if invites %}
-          {% for inv in invites %}
-          <div style="display:flex;align-items:center;gap:var(--space-2);padding:5px 0;border-bottom:1px solid var(--color-border);">
-            <span style="font-size:10px;font-weight:var(--font-weight-semibold);
-              border:1px solid;border-radius:var(--radius-sm);padding:1px 6px;
-              color:{% if inv.role == 'admin' %}var(--color-error){% elif inv.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-text-muted){% endif %};
-              border-color:{% if inv.role == 'admin' %}var(--color-error){% elif inv.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-border){% endif %};">
-              {{ inv.role }}
-            </span>
-            <span style="flex:1;font-size:var(--font-size-xs);color:{% if inv.used %}var(--color-success){% else %}var(--color-primary){% endif %};">
-              {% if inv.used %}Used{% else %}Pending{% endif %}
-            </span>
-            {% if not inv.used %}
-            <form method="POST" onsubmit="return confirm('Revoke?')" style="margin:0;">
-              <input type="hidden" name="action" value="revoke_invite">
-              <input type="hidden" name="token" value="{{ inv.token }}">
-              <button type="submit" class="btn btn-danger btn-sm" style="padding:1px 8px;font-size:10px;">Revoke</button>
-            </form>
-            {% endif %}
-          </div>
-          {% endfor %}
-        {% else %}
-          <div style="padding:var(--space-3) 0;text-align:center;color:var(--color-text-muted);font-size:var(--font-size-xs);">No invites yet.</div>
-        {% endif %}
       </div>
-
-    </div>
-  </div>
-
-</div>
-
-<!-- Users table -->
-<div style="max-width:900px;margin:0 auto;">
-  <div class="card card-elevated">
-    <div class="card-header"><h4>All Users</h4></div>
-    <div class="card-body" style="padding:0;">
-      <div class="table-container" style="margin:0;">
-        <table class="table table-striped">
+      <div class="table-container" style="border:none;border-radius:0;">
+        <table class="table">
           <thead>
             <tr>
               <th>Username</th>
               <th>Role</th>
-              <th>Last Login</th>
-              <th></th>
+              <th>Created</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {% for u in users %}
+            {% for user in users %}
             <tr>
+              <td style="font-weight:500;">{{ user.username }}</td>
               <td>
-                {{ u.username }}
-                {% if u.username == current_user.username %}
-                <span style="font-size:10px;color:var(--color-primary);margin-left:4px;">(you)</span>
-                {% endif %}
-              </td>
-              <td>
-                <span style="font-size:10px;font-weight:var(--font-weight-semibold);
-                  border:1px solid;border-radius:var(--radius-sm);padding:1px 6px;
-                  color:{% if u.role == 'admin' %}var(--color-error){% elif u.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-text-muted){% endif %};
-                  border-color:{% if u.role == 'admin' %}var(--color-error){% elif u.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-border){% endif %};">
-                  {{ u.role }}
+                <span class="badge {% if user.role == 'admin' %}badge-err{% elif user.role == 'operator' %}badge-warn{% else %}badge-info{% endif %}">
+                  {{ user.role }}
                 </span>
               </td>
-              <td style="font-size:var(--font-size-xs);color:var(--color-text-muted);">{{ u.last_login or 'Never' }}</td>
+              <td style="font-family:var(--font-mono);font-size:11px;color:var(--t3);">{{ user.created_at if user.created_at else '—' }}</td>
               <td>
-                {% if u.username != current_user.username %}
-                <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
-                  <form method="POST" style="display:flex;gap:4px;align-items:center;">
-                    <input type="hidden" name="action" value="change_role">
-                    <input type="hidden" name="user_id" value="{{ u.id }}">
-                    <select name="role" class="form-select" style="font-size:10px;padding:2px 4px;height:auto;">
-                      {% for r in roles %}<option value="{{ r }}" {% if r == u.role %}selected{% endif %}>{{ r }}</option>{% endfor %}
-                    </select>
-                    <button type="submit" class="btn btn-secondary btn-sm">Set</button>
-                  </form>
-                  <form method="POST" style="display:flex;gap:4px;align-items:center;">
-                    <input type="hidden" name="action" value="reset_password">
-                    <input type="hidden" name="user_id" value="{{ u.id }}">
-                    <input type="password" name="new_password" class="form-input" style="font-size:10px;padding:2px 4px;height:auto;width:90px;" placeholder="New pwd">
-                    <button type="submit" class="btn btn-secondary btn-sm">Reset</button>
-                  </form>
-                  <form method="POST" onsubmit="return confirm('Delete {{ u.username }}?')">
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="user_id" value="{{ u.id }}">
-                    <button type="submit" class="btn btn-danger btn-sm">Del</button>
-                  </form>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <button class="btn btn-secondary btn-xs" onclick="resetPassword('{{ user.id }}', '{{ user.username }}')">Reset PW</button>
+                  {% if user.username != current_user.username %}
+                  <button class="btn btn-xs" style="background:var(--err-dim);color:var(--err);border:1px solid rgba(255,77,106,0.2);" onclick="deleteUser('{{ user.id }}', '{{ user.username }}')">Delete</button>
+                  {% endif %}
                 </div>
-                {% else %}
-                <span style="color:var(--color-text-muted);font-size:var(--font-size-xs);">—</span>
-                {% endif %}
               </td>
             </tr>
             {% endfor %}
@@ -183,17 +54,78 @@
       </div>
     </div>
   </div>
+
+  <!-- Invite panel -->
+  <div id="invite-panel" style="display:none;grid-column:1/-1;">
+    <div class="card">
+      <div class="card-header">
+        <h3 style="font-size:14px;font-weight:600;">Create Invite Link</h3>
+        <button onclick="document.getElementById('invite-panel').style.display='none'" style="background:none;border:none;cursor:pointer;color:var(--t3);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="form" style="max-width:400px;">
+          <div class="form-group">
+            <label class="form-label">Role for New User</label>
+            <select id="invite-role" class="form-select">
+              <option value="viewer">Viewer</option>
+              <option value="operator">Operator</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="createInvite()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            Generate Invite Link
+          </button>
+        </div>
+        <div id="invite-result" class="mt-4" style="display:none;">
+          <div class="alert alert-success">
+            <span class="alert-icon">✔</span>
+            <div class="alert-content">
+              <div style="margin-bottom:6px;font-weight:600;">Invite link generated</div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <code id="invite-link" style="font-family:var(--font-mono);font-size:11px;background:rgba(0,224,153,0.08);padding:4px 8px;border-radius:var(--r-sm);flex:1;word-break:break-all;"></code>
+                <button onclick="copyInvite()" class="btn btn-sm btn-secondary" style="flex-shrink:0;">Copy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-function copyInviteUrl() {
-  const url = document.getElementById('invite-url').textContent.trim();
-  navigator.clipboard.writeText(url).then(() => {
-    const btn = document.getElementById('copy-btn');
-    btn.textContent = 'Copied!';
-    btn.classList.replace('btn-secondary', 'btn-primary');
-    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.replace('btn-primary', 'btn-secondary'); }, 2000);
-  });
+function showInvitePanel() { document.getElementById('invite-panel').style.display='block'; }
+
+function createInvite() {
+  const role = document.getElementById('invite-role').value;
+  fetch('/api/users/invite', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({role}) })
+    .then(r=>r.json()).then(data => {
+      if (data.invite_url) {
+        document.getElementById('invite-link').textContent = data.invite_url;
+        document.getElementById('invite-result').style.display = 'block';
+      } else { alert(data.error || 'Failed to generate invite'); }
+    }).catch(e=>alert(`Error: ${e.message}`));
+}
+
+function copyInvite() {
+  const text = document.getElementById('invite-link').textContent;
+  const btn = document.querySelector('[onclick="copyInvite()"]');
+  if (navigator.clipboard) { navigator.clipboard.writeText(text).then(()=>{ const o=btn.textContent; btn.textContent='Copied!'; setTimeout(()=>btn.textContent=o,1500); }); }
+}
+
+function resetPassword(userId, username) {
+  const newPw = prompt(`New password for ${username}:`);
+  if (!newPw) return;
+  fetch(`/api/users/${userId}/password`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:newPw}) })
+    .then(r=>r.json()).then(d=>alert(d.message||d.error)).catch(e=>alert(`Error: ${e.message}`));
+}
+
+function deleteUser(userId, username) {
+  if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+  fetch(`/api/users/${userId}`, { method:'DELETE' }).then(r=>r.json()).then(d=>{ alert(d.message||d.error); location.reload(); }).catch(e=>alert(`Error: ${e.message}`));
 }
 </script>
 {% endblock %}

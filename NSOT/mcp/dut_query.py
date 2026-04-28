@@ -160,6 +160,7 @@ def query_dut(device: str, keyword: str) -> str:
     out = [f"Querying {device} for: {keyword}", "=" * 60, ""]
     try:
         connection = ConnectHandler(**creds)
+        connection.enable()
         log, results = _query_device(connection, keyword)
         out.append(log)
         if results:

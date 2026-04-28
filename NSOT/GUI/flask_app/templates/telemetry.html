@@ -1,0 +1,933 @@
+{% extends "base.html" %}
+{% block title %}Engineer Telemetry - NAutoBuff{% endblock %}
+{% block breadcrumb %}Engineer Telemetry{% endblock %}
+
+{% block content %}
+<section class="et-shell">
+  <header class="et-header">
+    <div>
+      <div class="et-eyebrow">Show Command Telemetry</div>
+      <h1>Engineer Telemetry</h1>
+      <p>Live L2, L3, and device-state snapshots from hosts.csv. Built for network engineers who need raw operational output in one place.</p>
+    </div>
+    <div class="et-controls">
+      <label class="et-interval">
+        <span>Poll</span>
+        <input id="pollSeconds" type="number" min="5" max="300" value="15">
+        <span>sec</span>
+      </label>
+      <button type="button" id="pollNowBtn" class="btn btn-secondary btn-sm" onclick="pollActiveDevice()">Poll Now</button>
+      <button type="button" id="pauseBtn" class="btn btn-primary btn-sm" onclick="togglePolling()">Pause</button>
+      <button type="button" id="pollAllBtn" class="btn btn-ghost btn-sm" onclick="pollAllDevices()">Poll All</button>
+      <button type="button" id="fullscreenBtn" class="btn btn-ghost btn-sm" onclick="toggleFullscreenMode()">Fullscreen</button>
+    </div>
+  </header>
+
+  {% if hosts %}
+  <div class="et-layout">
+    <aside class="et-devices">
+      <div class="et-panel-title">Inventory</div>
+      <div class="et-device-list">
+        {% for host in hosts %}
+        <button
+          type="button"
+          class="et-device {% if loop.first %}active{% endif %}"
+          data-device="{{ host.hostname }}"
+          onclick="selectDevice('{{ host.hostname }}')">
+          <span class="et-device-name">{{ host.hostname }}</span>
+          <span class="et-device-meta">{{ host.vendor }} / {{ host.management_ip or 'no mgmt ip' }}</span>
+          <span class="et-device-state" id="state-{{ host.hostname }}">Idle</span>
+        </button>
+        {% endfor %}
+      </div>
+    </aside>
+
+    <main class="et-main">
+      <div class="et-active">
+        <div>
+          <div class="et-panel-title">Active Device</div>
+          <h2 id="activeDeviceTitle">{{ hosts[0].hostname }}</h2>
+          <div id="activeDeviceMeta">{{ hosts[0].vendor }} / {{ hosts[0].management_ip or 'no mgmt ip' }}</div>
+        </div>
+        <div class="et-status">
+          <span id="pollStatusDot" class="et-dot idle"></span>
+          <span id="pollStatusText">Waiting for first poll</span>
+        </div>
+      </div>
+
+      <div class="et-group-tabs" role="tablist" aria-label="Telemetry category">
+        <button type="button" class="et-tab active" data-group="l2" onclick="switchTelemetryGroup('l2')">L2</button>
+        <button type="button" class="et-tab" data-group="l3" onclick="switchTelemetryGroup('l3')">L3</button>
+        <button type="button" class="et-tab" data-group="device" onclick="switchTelemetryGroup('device')">System</button>
+        <span id="customTelemetryTabs" class="et-custom-tabs"></span>
+        <button type="button" class="et-tab et-tab-add" onclick="openCustomTabModal()" title="Add custom telemetry tab">+</button>
+      </div>
+
+      <div id="telemetryGroups" class="et-groups">
+        <div class="et-empty">Polling device...</div>
+      </div>
+    </main>
+  </div>
+  {% else %}
+  <div class="et-empty">No devices found in hosts.csv.</div>
+  {% endif %}
+</section>
+
+<div class="modal-overlay" id="customTelemetryModal" onclick="closeCustomTabModal(event)">
+  <div class="rollback-modal et-custom-modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title">Custom Telemetry Tab</h2>
+      <button type="button" class="modal-close" onclick="closeCustomTabModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Tab Name</label>
+        <input id="customTabName" class="form-input" placeholder="Optics">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Show Commands</label>
+        <textarea id="customTabCommands" class="form-textarea et-custom-commands" placeholder="Interfaces: show interfaces status&#10;Optics: show interfaces transceiver&#10;Errors: show interfaces counters errors"></textarea>
+      </div>
+      <div class="form-hint">Use one command per line. Optional format: Label: show command</div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeCustomTabModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveCustomTab()">Save Tab</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.et-shell {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.et-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-6);
+  padding: var(--sp-5);
+  border: 1px solid var(--nb-border);
+  border-radius: var(--r-lg);
+  background: linear-gradient(135deg, rgba(0,212,255,0.06), rgba(255,122,61,0.04));
+}
+
+.et-eyebrow,
+.et-panel-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vlab);
+}
+
+.et-header h1 {
+  margin: 5px 0 6px;
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3vw, 36px);
+  letter-spacing: 0;
+}
+
+.et-header p {
+  max-width: 720px;
+  color: var(--t2);
+  font-size: 13px;
+}
+
+.et-controls,
+.et-status,
+.et-group-tabs,
+.et-interval {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.et-controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.et-interval {
+  padding: 7px 10px;
+  border: 1px solid var(--nb-border);
+  border-radius: var(--r-md);
+  background: rgba(255,255,255,0.03);
+  color: var(--t2);
+  font-size: 12px;
+}
+
+.et-interval input {
+  width: 62px;
+  padding: 4px 6px;
+  border: 1px solid var(--nb-border);
+  border-radius: var(--r-sm);
+  background: var(--nb-base);
+  color: var(--t1);
+  font-family: var(--font-mono);
+}
+
+.et-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 310px) minmax(0, 1fr);
+  gap: var(--sp-5);
+}
+
+.et-devices,
+.et-active,
+.et-group,
+.et-empty {
+  border: 1px solid var(--nb-border);
+  border-radius: var(--r-lg);
+  background: var(--nb-surface);
+}
+
+.et-devices {
+  position: sticky;
+  top: calc(var(--topbar-h) + var(--sp-4));
+  max-height: calc(100vh - var(--topbar-h) - var(--sp-8));
+  overflow: hidden;
+}
+
+.et-devices > .et-panel-title {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--nb-border);
+}
+
+.et-device-list {
+  max-height: calc(100vh - var(--topbar-h) - 106px);
+  overflow-y: auto;
+  padding: var(--sp-2);
+}
+
+.et-device {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px var(--sp-2);
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--t2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.et-device:hover,
+.et-device.active {
+  color: var(--t1);
+  background: rgba(0,212,255,0.07);
+  border-color: rgba(0,212,255,0.24);
+}
+
+.et-device-name {
+  color: var(--t1);
+  font-weight: 700;
+}
+
+.et-device-meta {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--t3);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.et-device-state {
+  grid-column: 2;
+  grid-row: 1;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--t3);
+}
+
+.et-main {
+  min-width: 0;
+}
+
+.et-active {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.et-active h2 {
+  margin: 3px 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+
+#activeDeviceMeta,
+.et-status {
+  color: var(--t3);
+  font-size: 12px;
+}
+
+.et-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--warn);
+  box-shadow: 0 0 12px currentColor;
+}
+
+.et-dot.live { background: var(--ok); }
+.et-dot.error { background: var(--err); }
+.et-dot.idle { background: var(--warn); }
+
+.et-group-tabs {
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-4);
+  padding: 4px;
+  border: 1px solid var(--nb-border);
+  border-radius: var(--r-md);
+  background: var(--nb-surface);
+  width: fit-content;
+}
+
+.et-custom-tabs {
+  display: contents;
+}
+
+.et-tab {
+  min-width: 86px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--t3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.et-tab-add {
+  min-width: 42px;
+  color: var(--ok);
+  font-size: 15px;
+}
+
+.et-custom-tab {
+  gap: 7px;
+}
+
+.et-tab-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-full);
+  color: var(--t3);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.et-custom-tab:hover .et-tab-remove {
+  color: var(--err);
+}
+
+.et-tab:hover,
+.et-tab.active {
+  color: var(--vlab);
+  background: rgba(0,212,255,0.08);
+  border-color: rgba(0,212,255,0.24);
+}
+
+.et-groups {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+.et-group {
+  overflow: hidden;
+}
+
+.et-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--nb-border);
+  background: rgba(255,255,255,0.025);
+}
+
+.et-group-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.et-group-head span {
+  color: var(--t3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.et-tile-row {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--sp-3);
+  overflow: visible;
+  padding: var(--sp-4);
+}
+
+.et-tile {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  border: 1px solid var(--nb-border);
+  border-radius: var(--r-md);
+  background: var(--nb-base);
+}
+
+.et-tile.span-full { grid-column: span 12; }
+.et-tile.span-half { grid-column: span 6; }
+.et-tile.span-third { grid-column: span 4; }
+
+.et-tile-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-bottom: 1px solid var(--nb-border);
+}
+
+.et-label {
+  color: var(--t1);
+  font-weight: 700;
+}
+
+.et-command {
+  margin-top: 2px;
+  color: var(--t3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.et-badge {
+  color: var(--ok);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.et-badge.error {
+  color: var(--err);
+}
+
+.et-output {
+  margin: 0;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  padding: var(--sp-3);
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  tab-size: 2;
+  color: var(--t2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.et-output.fit-compact {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.et-output.fit-dense {
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.et-output.fit-micro {
+  font-size: 9px;
+  line-height: 1.3;
+}
+
+.et-empty {
+  padding: var(--sp-8);
+  color: var(--t3);
+  text-align: center;
+}
+
+.et-custom-modal {
+  max-width: 560px;
+}
+
+#customTelemetryModal {
+  z-index: 10050;
+}
+
+body.et-fullscreen-active #customTelemetryModal {
+  inset: 0;
+  left: 0;
+}
+
+.et-custom-commands {
+  min-height: 170px;
+  resize: vertical;
+  font-family: var(--font-mono);
+}
+
+.et-shell.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  max-width: none;
+  margin: 0;
+  padding: var(--sp-5);
+  overflow-y: auto;
+  background:
+    linear-gradient(135deg, rgba(0,212,255,0.04), rgba(255,122,61,0.025)),
+    var(--nb-base);
+}
+
+.et-shell.fullscreen .et-header {
+  margin-bottom: var(--sp-4);
+}
+
+.et-shell.fullscreen .et-layout {
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+}
+
+.et-shell.fullscreen .et-devices {
+  top: var(--sp-5);
+  max-height: calc(100vh - var(--sp-10));
+}
+
+.et-shell.fullscreen .et-device-list {
+  max-height: calc(100vh - 120px);
+}
+
+.et-shell.fullscreen .et-tile-row {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+body.et-fullscreen-active {
+  overflow: hidden;
+}
+
+body.et-fullscreen-active .nb-sidebar,
+body.et-fullscreen-active .nb-topbar,
+body.et-fullscreen-active #sidebarOverlay {
+  display: none !important;
+}
+
+body.et-fullscreen-active .nb-main {
+  margin-left: 0;
+  padding-top: 0;
+  z-index: 10001;
+}
+
+body.et-fullscreen-active .nb-content {
+  max-width: none;
+  padding: 0;
+}
+
+@media (max-width: 980px) {
+  .et-header,
+  .et-active {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .et-controls {
+    justify-content: flex-start;
+  }
+
+  .et-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .et-devices {
+    position: static;
+    max-height: none;
+  }
+
+  .et-device-list {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(210px, 260px);
+    max-height: none;
+    overflow-x: auto;
+  }
+
+  .et-tile-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .et-tile.span-full,
+  .et-tile.span-half,
+  .et-tile.span-third {
+    grid-column: 1;
+  }
+}
+</style>
+
+<script>
+const hosts = {{ hosts|tojson }};
+let activeDevice = hosts.length ? hosts[0].hostname : null;
+let pollTimer = null;
+let paused = false;
+let polling = false;
+let resultCache = {};
+let activeGroup = 'l2';
+const customTabsKey = 'nautobuff-v2-custom-telemetry-tabs';
+let customTabs = loadCustomTabs();
+
+function selectedGroups() {
+  return [activeGroup];
+}
+
+function cacheKey(device = activeDevice, group = activeGroup) {
+  return `${device || ''}::${group}`;
+}
+
+function activeCustomTab() {
+  return customTabs.find(tab => tab.id === activeGroup);
+}
+
+function activeHost() {
+  return hosts.find(host => host.hostname === activeDevice);
+}
+
+function setStatus(text, state) {
+  document.getElementById('pollStatusText').textContent = text;
+  document.getElementById('pollStatusDot').className = `et-dot ${state || 'idle'}`;
+}
+
+function setDeviceState(device, text) {
+  const el = document.getElementById(`state-${device}`);
+  if (el) el.textContent = text;
+}
+
+function selectDevice(device) {
+  activeDevice = device;
+  document.querySelectorAll('.et-device').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.device === device);
+  });
+
+  const host = activeHost();
+  document.getElementById('activeDeviceTitle').textContent = device;
+  document.getElementById('activeDeviceMeta').textContent = host ? `${host.vendor} / ${host.management_ip || 'no mgmt ip'}` : '';
+
+  const key = cacheKey(device, activeGroup);
+  if (resultCache[key]) {
+    renderTelemetry(resultCache[key]);
+  } else {
+    document.getElementById('telemetryGroups').innerHTML = '<div class="et-empty">Polling device...</div>';
+    pollActiveDevice();
+  }
+}
+
+function renderTelemetry(result) {
+  const container = document.getElementById('telemetryGroups');
+  if (!result.success) {
+    container.innerHTML = `<div class="et-empty">Polling failed: ${escapeHtml(result.error || 'Unknown error')}</div>`;
+    setStatus('Polling failed', 'error');
+    setDeviceState(result.device, 'Error');
+    return;
+  }
+
+  const customTab = activeCustomTab();
+  const labels = { l2: 'Layer 2', l3: 'Layer 3', device: 'System' };
+  const commands = (result.groups || {})[activeGroup] || [];
+  const html = `
+    <section class="et-group">
+      <div class="et-group-head">
+        <h3>${escapeHtml(customTab?.name || labels[activeGroup] || activeGroup)}</h3>
+        <span>${escapeHtml(result.updated_at || '')}</span>
+      </div>
+      <div class="et-tile-row">
+        ${commands.map(command => `
+          <article class="et-tile ${tileSpanClass(command.output || '')}">
+            <div class="et-tile-head">
+              <div>
+                <div class="et-label">${escapeHtml(command.label)}</div>
+                <div class="et-command">${escapeHtml(command.command)}</div>
+              </div>
+              <span class="et-badge ${command.success ? '' : 'error'}">${command.success ? 'OK' : 'ERR'}</span>
+            </div>
+            <pre class="et-output ${outputFitClass(command.output || '')}">${escapeHtml(command.output || '(no output)')}</pre>
+          </article>
+        `).join('')}
+      </div>
+    </section>
+  `;
+
+  container.innerHTML = commands.length ? html : '<div class="et-empty">No telemetry returned for this tab.</div>';
+  setStatus(`Last updated ${result.updated_at}`, 'live');
+  setDeviceState(result.device, 'Live');
+}
+
+function pollActiveDevice() {
+  if (!activeDevice || polling) return;
+  const customTab = activeCustomTab();
+  if (activeGroup.startsWith('custom:') && !customTab) return;
+  polling = true;
+  setStatus(`Polling ${activeDevice}...`, 'idle');
+  setDeviceState(activeDevice, 'Polling');
+
+  const customBody = customTab ? {
+    device: activeDevice,
+    group_id: activeGroup,
+    commands: customTab.commands,
+  } : null;
+  fetch(customTab ? '/api/telemetry/custom' : '/api/telemetry/poll', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(customBody || { device: activeDevice, groups: selectedGroups() })
+  })
+    .then(response => response.json())
+    .then(result => {
+      resultCache[cacheKey(result.device, activeGroup)] = result;
+      renderTelemetry(result);
+    })
+    .catch(error => {
+      setStatus(`Error: ${error.message}`, 'error');
+      setDeviceState(activeDevice, 'Error');
+    })
+    .finally(() => {
+      polling = false;
+      resetTimer();
+    });
+}
+
+function pollAllDevices() {
+  if (polling) return;
+  const customTab = activeCustomTab();
+  polling = true;
+  document.getElementById('pollAllBtn').disabled = true;
+  setStatus('Polling all devices...', 'idle');
+  hosts.forEach(host => setDeviceState(host.hostname, 'Polling'));
+
+  const request = customTab
+    ? Promise.all(hosts.map(host => fetch('/api/telemetry/custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device: host.hostname,
+          group_id: activeGroup,
+          commands: customTab.commands,
+        })
+      }).then(response => response.json()))).then(results => ({
+        results,
+        updated_at: new Date().toLocaleString(),
+      }))
+    : fetch('/api/telemetry/poll-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groups: selectedGroups() })
+      }).then(response => response.json());
+
+  request
+    .then(payload => {
+      (payload.results || []).forEach(result => {
+        resultCache[cacheKey(result.device, activeGroup)] = result;
+        setDeviceState(result.device, result.success ? 'Live' : 'Error');
+      });
+      const key = cacheKey(activeDevice, activeGroup);
+      if (resultCache[key]) renderTelemetry(resultCache[key]);
+      setStatus(`All devices updated ${payload.updated_at || ''}`, 'live');
+    })
+    .catch(error => setStatus(`Error: ${error.message}`, 'error'))
+    .finally(() => {
+      polling = false;
+      document.getElementById('pollAllBtn').disabled = false;
+      resetTimer();
+    });
+}
+
+function resetTimer() {
+  if (pollTimer) clearTimeout(pollTimer);
+  if (paused || !activeDevice) return;
+  const seconds = Math.min(300, Math.max(5, Number(document.getElementById('pollSeconds').value) || 15));
+  document.getElementById('pollSeconds').value = seconds;
+  pollTimer = setTimeout(pollActiveDevice, seconds * 1000);
+}
+
+function togglePolling() {
+  paused = !paused;
+  document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause';
+  setStatus(paused ? 'Polling paused' : 'Polling resumed', paused ? 'idle' : 'live');
+  if (pollTimer) clearTimeout(pollTimer);
+  if (!paused) pollActiveDevice();
+}
+
+function switchTelemetryGroup(group) {
+  activeGroup = group;
+  document.querySelectorAll('.et-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.group === group);
+  });
+  if (pollTimer) clearTimeout(pollTimer);
+  pollActiveDevice();
+}
+
+function toggleFullscreenMode() {
+  const shell = document.querySelector('.et-shell');
+  const active = shell.classList.toggle('fullscreen');
+  document.body.classList.toggle('et-fullscreen-active', active);
+  document.getElementById('fullscreenBtn').textContent = active ? 'Exit Fullscreen' : 'Fullscreen';
+  if (active) requestBrowserFullscreen();
+  else exitBrowserFullscreen();
+  const key = cacheKey(activeDevice, activeGroup);
+  if (resultCache[key]) {
+    requestAnimationFrame(() => renderTelemetry(resultCache[key]));
+  }
+}
+
+function renderCustomTabs() {
+  const mount = document.getElementById('customTelemetryTabs');
+  mount.innerHTML = customTabs.map(tab => `
+    <button type="button" class="et-tab et-custom-tab ${activeGroup === tab.id ? 'active' : ''}" data-group="${escapeHtml(tab.id)}" onclick="switchTelemetryGroup('${escapeJs(tab.id)}')">
+      ${escapeHtml(tab.name)}
+      <span class="et-tab-remove" onclick="removeCustomTab(event, '${escapeJs(tab.id)}')" title="Remove custom tab">&times;</span>
+    </button>
+  `).join('');
+}
+
+function loadCustomTabs() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(customTabsKey) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistCustomTabs() {
+  localStorage.setItem(customTabsKey, JSON.stringify(customTabs));
+}
+
+function openCustomTabModal() {
+  document.getElementById('customTabName').value = '';
+  document.getElementById('customTabCommands').value = '';
+  const modal = document.getElementById('customTelemetryModal');
+  modal.style.display = 'flex';
+  requestAnimationFrame(() => {
+    modal.classList.add('visible');
+    document.getElementById('customTabName').focus();
+  });
+}
+
+function closeCustomTabModal(event) {
+  if (event && event.target !== document.getElementById('customTelemetryModal')) return;
+  const modal = document.getElementById('customTelemetryModal');
+  modal.classList.remove('visible');
+  setTimeout(() => { modal.style.display = 'none'; }, 180);
+}
+
+function saveCustomTab() {
+  const name = document.getElementById('customTabName').value.trim();
+  const commands = parseCustomCommands(document.getElementById('customTabCommands').value);
+  if (!name || !commands.length) return;
+  const tab = {
+    id: `custom:${Date.now().toString(36)}`,
+    name: name.slice(0, 18),
+    commands,
+  };
+  customTabs.push(tab);
+  persistCustomTabs();
+  renderCustomTabs();
+  closeCustomTabModal();
+  switchTelemetryGroup(tab.id);
+}
+
+function parseCustomCommands(text) {
+  return text.split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const splitAt = line.indexOf(':');
+      if (splitAt > 0) {
+        return {
+          label: line.slice(0, splitAt).trim(),
+          command: line.slice(splitAt + 1).trim(),
+        };
+      }
+      return { label: line.replace(/^show\s+/i, '').slice(0, 40), command: line };
+    })
+    .filter(item => item.command.toLowerCase().startsWith('show '))
+    .slice(0, 12);
+}
+
+function removeCustomTab(event, id) {
+  event.stopPropagation();
+  customTabs = customTabs.filter(tab => tab.id !== id);
+  persistCustomTabs();
+  Object.keys(resultCache).forEach(key => {
+    if (key.endsWith(`::${id}`)) delete resultCache[key];
+  });
+  if (activeGroup === id) activeGroup = 'l2';
+  renderCustomTabs();
+  switchTelemetryGroup(activeGroup);
+}
+
+function tileSpanClass(output) {
+  const container = document.getElementById('telemetryGroups');
+  const availableWidth = Math.max(container?.clientWidth || window.innerWidth, 320);
+  const maxLineLength = maxOutputLineLength(output);
+  const estimatedWidth = maxLineLength * 7.2 + 34;
+  if (estimatedWidth > availableWidth * 0.52) return 'span-full';
+  if (estimatedWidth > availableWidth * 0.30) return 'span-half';
+  return 'span-third';
+}
+
+function outputFitClass(output) {
+  const maxLineLength = maxOutputLineLength(output);
+  if (maxLineLength > 220) return 'fit-micro';
+  if (maxLineLength > 170) return 'fit-dense';
+  if (maxLineLength > 120) return 'fit-compact';
+  return '';
+}
+
+function maxOutputLineLength(output) {
+  return String(output || '')
+    .split('\n')
+    .reduce((max, line) => Math.max(max, line.replace(/\t/g, '  ').length), 0);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function escapeJs(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+document.getElementById('pollSeconds')?.addEventListener('change', resetTimer);
+window.addEventListener('resize', () => {
+  const key = cacheKey(activeDevice, activeGroup);
+  if (resultCache[key]) renderTelemetry(resultCache[key]);
+});
+renderCustomTabs();
+if (activeDevice) pollActiveDevice();
+</script>
+{% endblock %}

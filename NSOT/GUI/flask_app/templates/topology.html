@@ -1,25 +1,22 @@
 {% extends "base.html" %}
 {% from '_macros.html' import next_steps %}
-{% block title %}Topology - NAutoBuff{% endblock %}
+{% block title %}Network Graph — NAutoBuff{% endblock %}
+{% block breadcrumb %}Virtual Lab / Network Graph{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Network Topology</h1>
-  <p class="page-description">Interactive visualization of your network infrastructure</p>
+  <p class="page-description">Interactive visualization of your virtual network infrastructure</p>
 </div>
 
-<div class="iframe-container iframe-invert">
-  <iframe
-    id="graphFrame"
-    src="{{ graph_url }}"
-    title="Network Topology Graph"
-  ></iframe>
+<div class="iframe-container iframe-invert" style="border-color:rgba(0,212,255,0.15);">
+  <iframe id="graphFrame" src="{{ graph_url }}" title="Network Topology Graph"></iframe>
 </div>
 
 {{ next_steps([
-  {'url': '/dashboard',        'title': 'Dashboard',        'desc': 'Live telemetry and metrics',        'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'},
-  {'url': '/ipam',             'title': 'IPAM',             'desc': 'Check IP assignments',              'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'},
-  {'url': '/configure-device', 'title': 'Configure Device', 'desc': 'Push configs to any device',       'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 19.07A10 10 0 0 0 4.93 4.93"/></svg>'},
-  {'url': '/add-device',       'title': 'Add Device',       'desc': 'Expand the topology',              'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="9.5" y1="10.5" x2="14.5" y2="10.5"/></svg>'}
+  {'url': '/dashboard',        'title': 'Dashboard',        'desc': 'Live telemetry and metrics',   'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'},
+  {'url': '/ipam',             'title': 'IPAM',             'desc': 'Check IP assignments',         'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'},
+  {'url': '/configure-device', 'title': 'Configure Device', 'desc': 'Push configs to any device',  'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 19.07A10 10 0 0 0 4.93 4.93"/></svg>'},
+  {'url': '/add-device',       'title': 'Add Device',       'desc': 'Expand the topology',          'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="9.5" y1="10.5" x2="14.5" y2="10.5"/></svg>'}
 ], label="Quick actions") }}
 {% endblock %}

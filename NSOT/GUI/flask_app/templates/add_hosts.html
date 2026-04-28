@@ -1,132 +1,150 @@
 {% extends "base.html" %}
-{% block title %}Add Hosts - NAutoBuff{% endblock %}
+{% block title %}Add Hosts — NAutoBuff{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Add Hosts</h1>
-  <p class="page-description">Build or append host entries to your inventory</p>
+  <p class="page-description">Add or update host entries in your inventory</p>
 </div>
 
-<div id="oob-banner" style="display:none; max-width: 700px; margin: 0 auto var(--space-4);">
-  <div class="alert alert-info" style="display:flex; align-items:center; gap: var(--space-3);">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+<!-- OOB Banner -->
+<div id="oob-banner" style="display:none; max-width:740px; margin:0 auto var(--space-5);">
+  <div style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-4); background:rgba(0,212,255,0.06); border:1px solid rgba(0,212,255,0.3); border-radius:12px; border-left:3px solid var(--vlab);">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--vlab)" stroke-width="2" style="flex-shrink:0">
       <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
     </svg>
-    <div>
-      OOB network detected: <strong id="oob-subnet-text"></strong> &mdash;
+    <div style="font-size:13px; color:var(--nb-text-2);">
+      OOB network detected: <strong style="color:var(--vlab)" id="oob-subnet-text"></strong> &mdash;
       this host is <strong id="oob-host-text"></strong> on <strong id="oob-iface-text"></strong>.
-      Management IPs you enter must be on this subnet.
+      Management IPs must be on this subnet.
     </div>
   </div>
 </div>
 
-<div class="card card-elevated" style="max-width: 700px; margin: 0 auto;">
-  <div class="card-body">
-    <form method="POST" class="form" id="hosts-form">
-      <div class="form-group">
-        <label class="form-label">Save Mode</label>
-        <select name="save_mode" class="form-select" required>
-          <option value="append">Append to Existing File</option>
-          <option value="new">Create New File</option>
-        </select>
-      </div>
+<div class="v2-card" style="max-width:740px; margin:0 auto;">
+  <form method="POST" class="form" id="hosts-form">
 
-      <div id="device-form-list">
-        <div class="device-form form-fieldset">
-          <legend class="form-legend">Host Configuration</legend>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Hostname</label>
-              <input type="text" name="hostname[]" class="form-input" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Username</label>
-              <input type="text" name="username[]" class="form-input" required>
-            </div>
+    <div id="device-form-list">
+      <div class="device-form v2-fieldset">
+        <div class="v2-fieldset-header">
+          <span class="v2-legend">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--vlab)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            Host Configuration
+          </span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Hostname</label>
+            <input type="text" name="hostname[]" class="form-input" placeholder="R1" required>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Password</label>
-              <input type="password" name="password[]" class="form-input" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Management IP <span id="oob-label-hint" class="oob-hint" style="display:none;"></span></label>
-              <input type="text" name="management_ip[]" class="form-input mgmt-ip-field" placeholder="10.0.0.10" required>
-            </div>
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" name="username[]" class="form-input" placeholder="admin" required>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Subnet (CIDR bits)</label>
-              <input type="number" name="subnet_cidr[]" class="form-input" placeholder="24" min="0" max="32" required style="max-width: 150px;">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Vendor</label>
-              <select name="vendor[]" class="form-select" required>
-                <option value="" disabled selected>Select Vendor</option>
-                <option value="arista">Arista</option>
-                <option value="cisco">Cisco</option>
-                <option value="juniper">Juniper</option>
-                <option value="linux">Linux</option>
-              </select>
-            </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" name="password[]" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Management IP <span id="oob-label-hint" class="oob-badge" style="display:none;"></span></label>
+            <input type="text" name="management_ip[]" class="form-input mgmt-ip-field" placeholder="10.0.0.10" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">CIDR Prefix</label>
+            <input type="text" name="subnet_cidr[]" class="form-input" placeholder="/24" required style="max-width:120px;">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Vendor</label>
+            <select name="vendor[]" class="form-select" required>
+              <option value="" disabled selected>Select Vendor</option>
+              <option value="arista">Arista</option>
+              <option value="cisco">Cisco</option>
+              <option value="juniper">Juniper</option>
+              <option value="linux">Linux</option>
+            </select>
           </div>
         </div>
       </div>
+    </div>
 
-      {% if message %}
-      <div class="alert alert-success">
-        <span class="alert-icon">&#10003;</span>
-        <div class="alert-content">{{ message }}</div>
-      </div>
-      {% endif %}
+    {% if message %}
+    <div class="alert alert-success">
+      <span class="alert-icon">&#10003;</span>
+      <div class="alert-content">{{ message }}</div>
+    </div>
+    {% endif %}
 
-      <div class="form-actions form-actions-center">
-        <button type="button" class="btn btn-secondary" onclick="addDeviceForm()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Add Host
-        </button>
-        <button type="submit" class="btn btn-primary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-            <polyline points="17 21 17 13 7 13 7 21"/>
-            <polyline points="7 3 7 8 15 8"/>
-          </svg>
-          Save hosts.csv
-        </button>
-      </div>
-    </form>
-  </div>
+    <div class="form-actions form-actions-center">
+      <button type="button" class="btn btn-secondary" onclick="addDeviceForm()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Host
+      </button>
+      <button type="submit" class="btn btn-primary" style="--btn-color:var(--vlab); --btn-glow:rgba(0,212,255,0.3);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save hosts.csv
+      </button>
+    </div>
+  </form>
 </div>
 
 <style>
-.fieldset-header {
+.v2-card {
+  background: var(--nb-surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: var(--space-6);
+}
+.v2-fieldset {
+  background: rgba(0,212,255,0.03);
+  border: 1px solid rgba(0,212,255,0.15);
+  border-radius: 12px;
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+.v2-fieldset-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--space-4);
 }
-.fieldset-header .form-legend {
-  margin-bottom: 0;
-  padding: 0;
+.v2-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vlab);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
-.oob-hint {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
-  color: var(--color-primary);
-  background: var(--color-primary-light, rgba(99,102,241,0.1));
+.oob-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vlab);
+  background: rgba(0,212,255,0.1);
+  border: 1px solid rgba(0,212,255,0.3);
   padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  margin-left: var(--space-2);
+  border-radius: 99px;
+  margin-left: 6px;
 }
-.alert-info {
-  background: var(--color-primary-light, rgba(99,102,241,0.08));
-  border: 1px solid var(--color-primary);
-  color: var(--color-text-primary);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+.page-header-eyebrow.vlab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--vlab);
+  background: rgba(0,212,255,0.1);
+  border: 1px solid rgba(0,212,255,0.25);
+  padding: 4px 10px;
+  border-radius: 99px;
+  margin-bottom: var(--space-3);
 }
 </style>
 
@@ -142,19 +160,15 @@ document.addEventListener("DOMContentLoaded", () => {
     .then(r => r.json())
     .then(data => {
       if (!data.subnet) return;
-
-      // Show banner
       document.getElementById("oob-subnet-text").textContent = data.subnet;
       document.getElementById("oob-host-text").textContent = data.host_ip;
       document.getElementById("oob-iface-text").textContent = data.interface;
       document.getElementById("oob-banner").style.display = "block";
 
-      // Update hint label
       const hint = document.getElementById("oob-label-hint");
       hint.textContent = "must be on " + data.subnet;
       hint.style.display = "inline";
 
-      // Update placeholder on all existing mgmt IP fields
       oobPlaceholder = data.subnet.replace(/\.\d+\/\d+$/, ".X");
       document.querySelectorAll(".mgmt-ip-field").forEach(applyOobToField);
     })
@@ -163,26 +177,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function addDeviceForm() {
   const deviceForm = document.createElement('div');
-  deviceForm.classList.add('device-form', 'form-fieldset');
+  deviceForm.classList.add('device-form', 'v2-fieldset');
+  const subnetTxt = document.getElementById('oob-subnet-text')?.textContent || '';
   deviceForm.innerHTML = `
-    <div class="fieldset-header">
-      <span class="form-legend">Host Configuration</span>
+    <div class="v2-fieldset-header">
+      <span class="v2-legend">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--vlab)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Host Configuration
+      </span>
       <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.device-form').remove()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         Remove
       </button>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Hostname</label>
-        <input type="text" name="hostname[]" class="form-input" required>
+        <input type="text" name="hostname[]" class="form-input" placeholder="R2" required>
       </div>
       <div class="form-group">
         <label class="form-label">Username</label>
-        <input type="text" name="username[]" class="form-input" required>
+        <input type="text" name="username[]" class="form-input" placeholder="admin" required>
       </div>
     </div>
     <div class="form-row">
@@ -191,14 +206,14 @@ function addDeviceForm() {
         <input type="password" name="password[]" class="form-input" required>
       </div>
       <div class="form-group">
-        <label class="form-label">Management IP <span class="oob-hint" style="${oobPlaceholder !== '10.0.0.10' ? '' : 'display:none;'}">must be on ${document.getElementById('oob-subnet-text')?.textContent || ''}</span></label>
+        <label class="form-label">Management IP${oobPlaceholder !== '10.0.0.10' ? '<span class="oob-badge">must be on ' + subnetTxt + '</span>' : ''}</label>
         <input type="text" name="management_ip[]" class="form-input mgmt-ip-field" placeholder="${oobPlaceholder}" required>
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Subnet (CIDR bits)</label>
-        <input type="number" name="subnet_cidr[]" class="form-input" placeholder="24" min="0" max="32" required style="max-width: 150px;">
+      <div class="form-group" style="max-width:200px;">
+        <label class="form-label">CIDR Prefix</label>
+        <input type="text" name="subnet_cidr[]" class="form-input" placeholder="/24" required>
       </div>
       <div class="form-group">
         <label class="form-label">Vendor</label>

@@ -1,482 +1,559 @@
 {% extends "base.html" %}
-{% block title %}NAutoBuff - Network Automation Hub{% endblock %}
+{% block title %}NAutoBuff — Network Automation Platform{% endblock %}
+{% block breadcrumb %}Home{% endblock %}
 
 {% block content %}
-<!-- Hero Section -->
-<div class="homepage-hero">
-  <h1 class="homepage-title">Network Automation Hub</h1>
-  <p class="homepage-subtitle">Build, configure, manage, and monitor your network infrastructure with ease</p>
-</div>
 
-<!-- Pipeline Navigation -->
-<div class="pipeline-container">
-  <!-- Pipeline Header -->
-  <div class="pipeline-header">
-    <div class="pipeline-label">NMAS</div>
-    <div class="pipeline-connector-line"></div>
-  </div>
+<!-- ═══ HERO ══════════════════════════════════════════════════════════════════ -->
+<section class="hp-hero">
 
-  <!-- Pipeline Stages -->
-  <div class="pipeline-stages">
-    <!-- Stage 1: Build -->
-    <div class="pipeline-stage {% if not current_user.is_operator() %}stage-locked{% endif %}">
-      <div class="stage-header">
-        <div class="stage-number">1</div>
-        <div class="stage-info">
-          <h3 class="stage-title">Build</h3>
-          <p class="stage-subtitle">Create your infrastructure</p>
-        </div>
-        {% if not current_user.is_operator() %}
-        <span class="stage-lock-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Operator+
-        </span>
-        {% endif %}
-      </div>
-      <div class="stage-actions">
-        {% if current_user.is_operator() %}
-        <a href="{{ url_for('add_hosts') }}" class="stage-action">
-        {% else %}
-        <div class="stage-action stage-action-disabled">
-        {% endif %}
-          <div class="action-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="8.5" cy="7" r="4"/>
-              <line x1="20" y1="8" x2="20" y2="14"/>
-              <line x1="23" y1="11" x2="17" y2="11"/>
-            </svg>
-          </div>
-          <div class="action-content">
-            <span class="action-title">Add Hosts</span>
-            <span class="action-desc">Build hosts.csv inventory</span>
-          </div>
-        {% if current_user.is_operator() %}
-        </a>
-        {% else %}
-        </div>
-        {% endif %}
-        {% if current_user.is_operator() %}
-        <a href="{{ url_for('build_topology') }}" class="stage-action">
-        {% else %}
-        <div class="stage-action stage-action-disabled">
-        {% endif %}
-          <div class="action-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-              <polyline points="2 17 12 22 22 17"/>
-              <polyline points="2 12 12 17 22 12"/>
-            </svg>
-          </div>
-          <div class="action-content">
-            <span class="action-title">Build Topology</span>
-            <span class="action-desc">Generate & deploy topology</span>
-          </div>
-        {% if current_user.is_operator() %}
-        </a>
-        {% else %}
-        </div>
-        {% endif %}
-      </div>
-      <div class="stage-connector">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </div>
+  <!-- Animated network canvas background -->
+  <canvas id="netCanvas" class="hp-canvas"></canvas>
+
+  <!-- Scan line overlay -->
+  <div class="hp-scan"></div>
+
+  <div class="hp-hero-inner">
+    <div class="hp-eyebrow">
+      <span class="hp-eyebrow-dot"></span>
+      The Source of Truth for your network
     </div>
 
-    <!-- Stage 2: Configure -->
-    <div class="pipeline-stage {% if not current_user.is_operator() %}stage-locked{% endif %}">
-      <div class="stage-header">
-        <div class="stage-number">2</div>
-        <div class="stage-info">
-          <h3 class="stage-title">Configure</h3>
-          <p class="stage-subtitle">Set up your devices</p>
-        </div>
-        {% if not current_user.is_operator() %}
-        <span class="stage-lock-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Operator+
-        </span>
-        {% endif %}
-      </div>
-      <div class="stage-actions">
-        {% if current_user.is_operator() %}
-        <a href="{{ url_for('add_device') }}" class="stage-action">
-        {% else %}
-        <div class="stage-action stage-action-disabled">
-        {% endif %}
-          <div class="action-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
-              <line x1="12" y1="8" x2="12" y2="16"/>
-              <line x1="8" y1="12" x2="16" y2="12"/>
-            </svg>
-          </div>
-          <div class="action-content">
-            <span class="action-title">Add Device</span>
-            <span class="action-desc">Add to existing network</span>
-          </div>
-        {% if current_user.is_operator() %}
-        </a>
-        {% else %}
-        </div>
-        {% endif %}
-        {% if current_user.is_operator() %}
-        <a href="{{ url_for('configure_device') }}" class="stage-action">
-        {% else %}
-        <div class="stage-action stage-action-disabled">
-        {% endif %}
-          <div class="action-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
-          </div>
-          <div class="action-content">
-            <span class="action-title">Configure Device</span>
-            <span class="action-desc">Interfaces, VLANs, routing</span>
-          </div>
-        {% if current_user.is_operator() %}
-        </a>
-        {% else %}
-        </div>
-        {% endif %}
-      </div>
-      <div class="stage-connector">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </div>
-    </div>
+    <h1 class="hp-headline">
+      NAutoBuff
+    </h1>
 
-    <!-- Stage 3: Manage -->
-    <div class="pipeline-stage">
-      <div class="stage-header">
-        <div class="stage-number">3</div>
-        <div class="stage-info">
-          <h3 class="stage-title">Manage</h3>
-          <p class="stage-subtitle">Operate your network</p>
-        </div>
-      </div>
-      <div class="stage-actions">
-        <a href="{{ url_for('tools') }}" class="stage-action">
-          <div class="action-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-            </svg>
-          </div>
-          <div class="action-content">
-            <span class="action-title">Tools</span>
-            <span class="action-desc">Diagnostics & utilities</span>
-          </div>
-          <div class="action-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </div>
-        </a>
-        <a href="{{ url_for('ipam') }}" class="stage-action">
-          <div class="action-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <ellipse cx="12" cy="5" rx="9" ry="3"/>
-              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-            </svg>
-          </div>
-          <div class="action-content">
-            <span class="action-title">IPAM</span>
-            <span class="action-desc">IP address management</span>
-          </div>
-          <div class="action-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </div>
-        </a>
-      </div>
-      <div class="stage-connector">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </div>
-    </div>
+    <p class="hp-subhead">
+      Unified topology orchestration, IP management, automated configuration,
+      and real-time telemetry — in a single platform.
+    </p>
 
-    <!-- Stage 4: Monitor -->
-    <div class="pipeline-stage">
-      <div class="stage-header">
-        <div class="stage-number">4</div>
-        <div class="stage-info">
-          <h3 class="stage-title">Monitor</h3>
-          <p class="stage-subtitle">Observe & analyze</p>
-        </div>
-      </div>
-      <div class="stage-actions">
-        <a href="{{ url_for('dashboard') }}" class="stage-action">
-          <div class="action-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="7" height="7"/>
-              <rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/>
-            </svg>
-          </div>
-          <div class="action-content">
-            <span class="action-title">Dashboard</span>
-            <span class="action-desc">Grafana monitoring</span>
-          </div>
-          <div class="action-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </div>
-        </a>
-        <a href="{{ url_for('topology') }}" class="stage-action">
-          <div class="action-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="18" cy="18" r="3"/>
-              <circle cx="6" cy="6" r="3"/>
-              <path d="M13 6h3a2 2 0 0 1 2 2v7"/>
-              <line x1="6" y1="9" x2="6" y2="21"/>
-            </svg>
-          </div>
-          <div class="action-content">
-            <span class="action-title">Topology</span>
-            <span class="action-desc">Network visualization</span>
-          </div>
-          <div class="action-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </div>
-        </a>
-      </div>
+    <div class="hp-cta-row">
+      {% if current_user.is_authenticated and current_user.is_operator() %}
+      <a href="{{ url_for('build_topology') }}" class="hp-cta hp-cta-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Launch Virtual Lab
+      </a>
+      {% endif %}
+      <a href="{{ url_for('ipam') }}" class="hp-cta hp-cta-secondary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        Explore Network
+      </a>
     </div>
   </div>
-</div>
+</section>
+
+<!-- ═══ PLATFORM CAPABILITIES ══════════════════════════════════════════════ -->
+<section class="hp-caps">
+  <div class="hp-section-label">Platform Capabilities</div>
+
+  <div class="hp-cap-grid">
+
+    <!-- TOPOLOGY & LAB -->
+    <div class="hp-cap-card cap-topo">
+      <div class="hp-cap-glow cap-topo-glow"></div>
+      <div class="hp-cap-head">
+        <div class="hp-cap-icon cap-topo-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </div>
+        <div>
+          <div class="hp-cap-tag cap-topo-tag">Containerlab</div>
+          <h2 class="hp-cap-title">Topology &amp; Lab</h2>
+        </div>
+      </div>
+      <p class="hp-cap-desc">Spin up containerized network environments, register hosts, and visualize your topology in real time.</p>
+      <div class="hp-feature-list">
+        {% if current_user.is_authenticated and current_user.role == 'admin' %}
+        <a href="{{ url_for('hosts_inventory') }}" class="hp-feature-item cap-topo-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>Hosts Inventory</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <a href="{{ url_for('build_topology') }}" class="hp-feature-item cap-topo-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <span>Build Topology</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <a href="{{ url_for('add_device') }}" class="hp-feature-item cap-topo-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          <span>Add Device</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        {% else %}
+        <div class="hp-feature-item locked">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Lab Tools</span>
+          <span class="hp-lock-badge">Operator+</span>
+        </div>
+        {% endif %}
+        <a href="{{ url_for('topology') }}" class="hp-feature-item cap-topo-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          <span>Network Graph</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+      <div class="hp-cap-footer cap-topo-footer">
+        {% if current_user.is_authenticated and current_user.is_operator() %}
+        <a href="{{ url_for('build_topology') }}" class="hp-mode-launch vlab-launch">
+          Enter Virtual Lab
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- CONFIGURE & MANAGE -->
+    <div class="hp-cap-card cap-cfg">
+      <div class="hp-cap-glow cap-cfg-glow"></div>
+      <div class="hp-cap-head">
+        <div class="hp-cap-icon cap-cfg-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+        <div>
+          <div class="hp-cap-tag cap-cfg-tag">Netmiko · SSH</div>
+          <h2 class="hp-cap-title">Configure &amp; Manage</h2>
+        </div>
+      </div>
+      <p class="hp-cap-desc">Push configurations, manage IP allocations, run diagnostics, and rollback to golden configs across virtual and physical devices.</p>
+      <div class="hp-feature-list">
+        {% if current_user.is_authenticated and current_user.is_operator() %}
+        <a href="{{ url_for('configure_device') }}" class="hp-feature-item cap-cfg-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Configure Device</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        {% else %}
+        <div class="hp-feature-item locked">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Configure Device</span>
+          <span class="hp-lock-badge">Operator+</span>
+        </div>
+        {% endif %}
+        <a href="{{ url_for('ipam') }}" class="hp-feature-item cap-cfg-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          <span>IP Address Management</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <a href="{{ url_for('tools') }}" class="hp-feature-item cap-cfg-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <span>Tools &amp; Diagnostics</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+      <div class="hp-cap-footer cap-cfg-footer">
+        <a href="{{ url_for('tools') }}" class="hp-mode-launch cfg-launch">
+          Enter Physical Lab
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- MONITOR & AUTOMATE -->
+    <div class="hp-cap-card cap-mon">
+      <div class="hp-cap-glow cap-mon-glow"></div>
+      <div class="hp-cap-head">
+        <div class="hp-cap-icon cap-mon-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <div>
+          <div class="hp-cap-tag cap-mon-tag">gNMI · SNMP · AI</div>
+          <h2 class="hp-cap-title">Monitor &amp; Automate</h2>
+        </div>
+      </div>
+      <p class="hp-cap-desc">Stream real-time telemetry, visualize device metrics, and automate workflows with Claude AI and Jenkins CI/CD pipelines.</p>
+      <div class="hp-feature-list">
+        <a href="{{ url_for('dashboard') }}" class="hp-feature-item cap-mon-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Telemetry Dashboard</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <a href="{{ url_for('telemetry_dashboard') }}" class="hp-feature-item cap-mon-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7" y="11" width="3" height="5"/><rect x="12" y="7" width="3" height="9"/><rect x="17" y="9" width="3" height="7"/></svg>
+          <span>Engineer Telemetry</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <div class="hp-feature-item cap-mon-item" style="cursor:default;" onclick="openHealthCheck(event)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          <span>Claude AI Assistant</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+        <div class="hp-feature-item cap-mon-item" style="cursor:pointer;" onclick="openJenkins(event)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Jenkins CI/CD</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hp-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </div>
+      <div class="hp-cap-footer cap-mon-footer">
+        <a href="{{ url_for('dashboard') }}" class="hp-mode-launch cap-mon-launch">
+          View Telemetry
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ FOOTER STRIP ═══════════════════════════════════════════════════════════ -->
+<section class="hp-footer-strip">
+  <div class="hp-footer-credit">
+    Created by <span class="hp-footer-name">Ashwin Chandrasekaran</span>
+  </div>
+  <div class="hp-footer-sep"></div>
+  <div class="hp-footer-powered">
+    <span class="hp-footer-label">Powered by</span>
+    <div class="hp-tech-pills">
+      <span class="hp-pill">Containerlab</span>
+      <span class="hp-pill-dot"></span>
+      <span class="hp-pill">Netmiko</span>
+      <span class="hp-pill-dot"></span>
+      <span class="hp-pill">SNMP</span>
+      <span class="hp-pill-dot"></span>
+      <span class="hp-pill">gNMI</span>
+      <span class="hp-pill-dot"></span>
+      <span class="hp-pill">Grafana</span>
+      <span class="hp-pill-dot"></span>
+      <span class="hp-pill">InfluxDB</span>
+      <span class="hp-pill-dot"></span>
+      <span class="hp-pill">Jenkins CI/CD</span>
+      <span class="hp-pill-dot"></span>
+      <span class="hp-pill">Claude AI</span>
+      <span class="hp-pill-dot"></span>
+      <span class="hp-pill">MCP</span>
+    </div>
+  </div>
+</section>
 
 <style>
-/* Pipeline Container */
-.pipeline-container {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: var(--space-6) 0;
-}
-
-.pipeline-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-8);
-}
-
-.pipeline-label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wide);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.pipeline-connector-line {
-  flex: 1;
-  height: 2px;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-accent), transparent);
-  border-radius: var(--radius-full);
-}
-
-/* Pipeline Stages */
-.pipeline-stages {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.pipeline-stage {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-5);
-  transition: all var(--transition-base);
+/* ── HERO ─────────────────────────────────────────────────── */
+.hp-hero {
   position: relative;
-}
-
-.pipeline-stage:hover {
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-md);
-}
-
-/* Stage Header */
-.stage-header {
+  min-height: 480px;
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.stage-number {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
-  color: white;
-  font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.stage-info {
-  flex: 1;
-}
-
-.stage-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  margin: 0;
-}
-
-.stage-subtitle {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
-  margin: 0;
-}
-
-/* Stage Actions */
-.stage-actions {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-3);
-}
-
-.stage-action {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background-color: var(--color-bg-secondary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  text-decoration: none;
-  color: inherit;
-  transition: all var(--transition-fast);
-}
-
-.stage-action:hover {
-  background-color: var(--color-primary-light);
-  border-color: var(--color-primary);
-  transform: translateX(4px);
-}
-
-.action-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-primary);
-  flex-shrink: 0;
-}
-
-.action-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.action-title {
-  display: block;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-}
-
-.action-desc {
-  display: block;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  white-space: nowrap;
+  margin: calc(-1 * var(--sp-8)) calc(-1 * var(--sp-8)) var(--sp-12);
+  padding: var(--sp-16) var(--sp-8);
   overflow: hidden;
-  text-overflow: ellipsis;
+  border-radius: 0 0 24px 24px;
 }
 
-.action-arrow {
-  color: var(--color-text-muted);
-  opacity: 0;
-  transform: translateX(-4px);
-  transition: all var(--transition-fast);
+.hp-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none; z-index: 0;
 }
 
-.stage-action:hover .action-arrow {
-  opacity: 1;
-  transform: translateX(0);
+/* Scan line */
+.hp-scan {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent, transparent 2px,
+    rgba(0,212,255,0.012) 2px, rgba(0,212,255,0.012) 4px
+  );
 }
 
-/* Stage Connector */
-.stage-connector {
-  position: absolute;
-  left: 50%;
-  bottom: -20px;
-  transform: translateX(-50%);
-  color: var(--color-border);
-  z-index: 1;
+/* Radial glow */
+.hp-hero::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 0%, rgba(0,212,255,0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 85% 80%, rgba(255,122,61,0.08) 0%, transparent 60%);
 }
 
-.pipeline-stage:last-child .stage-connector {
-  display: none;
+.hp-hero-inner {
+  position: relative; z-index: 2;
+  max-width: 780px;
 }
 
-/* Locked stage */
-.stage-locked {
-  opacity: 0.5;
-  pointer-events: none;
+.hp-eyebrow {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em;
+  color: var(--t3); margin-bottom: var(--sp-5);
+}
+.hp-eyebrow-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--vlab);
+  box-shadow: 0 0 8px var(--vlab);
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
+
+.hp-headline {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 5vw, 56px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--t1);
+  margin-bottom: var(--sp-5);
+}
+.hp-headline-accent {
+  background: linear-gradient(90deg, var(--vlab) 0%, #4D9FFF 50%, var(--plab) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.stage-lock-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 2px 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-left: auto;
+.hp-subhead {
+  font-size: 15px; line-height: 1.7; color: var(--t2);
+  max-width: 520px; margin-bottom: var(--sp-8);
 }
 
-.stage-action-disabled {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background-color: var(--color-bg-secondary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  color: inherit;
-  cursor: not-allowed;
+/* CTAs */
+.hp-cta-row { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+.hp-cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 24px; border-radius: 10px;
+  font-size: 14px; font-weight: 600; text-decoration: none;
+  transition: all 0.2s ease;
+}
+.hp-cta-primary {
+  background: var(--vlab); color: var(--nb-base);
+  box-shadow: 0 4px 20px rgba(0,212,255,0.35);
+}
+.hp-cta-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,212,255,0.5); }
+.hp-cta-secondary {
+  background: rgba(255,255,255,0.05); color: var(--t1);
+  border: 1px solid var(--nb-border);
+}
+.hp-cta-secondary:hover { background: rgba(255,255,255,0.08); border-color: var(--t3); transform: translateY(-2px); }
+
+/* ── PLATFORM CAPABILITIES ──────────────────────────────────── */
+.hp-caps { margin-bottom: var(--sp-12); }
+.hp-section-label {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--t3);
+  margin-bottom: var(--sp-5);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .stage-actions {
-    grid-template-columns: 1fr;
-  }
+.hp-cap-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-4);
+}
+@media (max-width: 1100px) { .hp-cap-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 680px)  { .hp-cap-grid { grid-template-columns: 1fr; } }
 
-  .stage-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
-  }
+.hp-cap-card {
+  position: relative; border-radius: 18px; overflow: hidden;
+  background: var(--nb-surface); border: 1px solid var(--nb-border);
+  padding: var(--sp-5);
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.hp-cap-card:hover { transform: translateY(-3px); }
+.cap-topo:hover { box-shadow: 0 16px 48px rgba(0,212,255,0.1), 0 0 0 1px rgba(0,212,255,0.18); }
+.cap-cfg:hover  { box-shadow: 0 16px 48px rgba(130,100,255,0.1), 0 0 0 1px rgba(130,100,255,0.18); }
+.cap-mon:hover  { box-shadow: 0 16px 48px rgba(255,122,61,0.1), 0 0 0 1px rgba(255,122,61,0.18); }
 
-  .pipeline-container {
-    padding: var(--space-4) 0;
-  }
+.hp-cap-glow {
+  position: absolute; top: -50px; right: -50px;
+  width: 180px; height: 180px; border-radius: 50%;
+  pointer-events: none; z-index: 0; opacity: 0.4;
+  transition: opacity 0.3s;
+}
+.hp-cap-card:hover .hp-cap-glow { opacity: 0.9; }
+.cap-topo-glow { background: radial-gradient(circle, rgba(0,212,255,0.18) 0%, transparent 70%); }
+.cap-cfg-glow  { background: radial-gradient(circle, rgba(130,100,255,0.18) 0%, transparent 70%); }
+.cap-mon-glow  { background: radial-gradient(circle, rgba(255,122,61,0.18) 0%, transparent 70%); }
+
+.hp-cap-head {
+  display: flex; align-items: center; gap: var(--sp-3); position: relative; z-index: 1;
+}
+.hp-cap-icon {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.cap-topo-icon { background: rgba(0,212,255,0.1);   color: var(--vlab); border: 1px solid rgba(0,212,255,0.2);   box-shadow: 0 0 16px rgba(0,212,255,0.12); }
+.cap-cfg-icon  { background: rgba(130,100,255,0.1); color: #8264FF;    border: 1px solid rgba(130,100,255,0.2); box-shadow: 0 0 16px rgba(130,100,255,0.12); }
+.cap-mon-icon  { background: rgba(255,122,61,0.1);  color: var(--plab); border: 1px solid rgba(255,122,61,0.2);  box-shadow: 0 0 16px rgba(255,122,61,0.12); }
+
+.hp-cap-tag {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.09em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 99px; margin-bottom: 4px; display: inline-block;
+}
+.cap-topo-tag { color: var(--vlab); background: rgba(0,212,255,0.08);   border: 1px solid rgba(0,212,255,0.18); }
+.cap-cfg-tag  { color: #8264FF;    background: rgba(130,100,255,0.08); border: 1px solid rgba(130,100,255,0.18); }
+.cap-mon-tag  { color: var(--plab); background: rgba(255,122,61,0.08);  border: 1px solid rgba(255,122,61,0.18); }
+
+.hp-cap-title {
+  font-family: var(--font-display); font-size: 17px; font-weight: 700;
+  color: var(--t1); letter-spacing: 0.01em; line-height: 1.2;
+}
+
+.hp-cap-desc {
+  font-size: 12px; line-height: 1.65; color: var(--t3);
+  position: relative; z-index: 1;
+}
+
+/* Feature list — shared across all cards */
+.hp-feature-list {
+  display: flex; flex-direction: column; gap: 2px;
+  position: relative; z-index: 1; flex: 1;
+}
+.hp-feature-item {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 8px 10px; border-radius: 7px;
+  font-size: 12.5px; color: var(--t2); text-decoration: none;
+  transition: all 0.15s ease; border: 1px solid transparent;
+}
+.hp-feature-item:hover {
+  background: rgba(255,255,255,0.04); color: var(--t1);
+  border-color: rgba(255,255,255,0.06);
+}
+.cap-topo-item:hover { color: var(--vlab) !important; }
+.cap-cfg-item:hover  { color: #8264FF !important; }
+.cap-mon-item:hover  { color: var(--plab) !important; }
+.hp-feature-item.locked { cursor: default; opacity: 0.4; }
+.hp-arrow { margin-left: auto; opacity: 0; transition: all 0.15s; flex-shrink: 0; }
+.hp-feature-item:hover .hp-arrow { opacity: 1; transform: translateX(3px); }
+.hp-lock-badge {
+  margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--warn); background: var(--warn-dim);
+  padding: 2px 7px; border-radius: 99px;
+}
+
+/* Card footer */
+.hp-cap-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: var(--sp-3); margin-top: auto;
+  position: relative; z-index: 1;
+}
+.cap-topo-footer { border-top: 1px solid rgba(0,212,255,0.1); }
+.cap-cfg-footer  { border-top: 1px solid rgba(130,100,255,0.1); }
+.cap-mon-footer  { border-top: 1px solid rgba(255,122,61,0.1); }
+
+.hp-mode-launch {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  padding: 6px 13px; border-radius: 7px; text-decoration: none;
+  transition: all 0.2s ease; white-space: nowrap;
+}
+.vlab-launch { color: var(--vlab); background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.22); }
+.vlab-launch:hover { background: rgba(0,212,255,0.16); box-shadow: 0 4px 14px rgba(0,212,255,0.2); transform: translateX(2px); }
+.plab-launch { color: var(--plab); background: rgba(255,122,61,0.08); border: 1px solid rgba(255,122,61,0.22); }
+.plab-launch:hover { background: rgba(255,122,61,0.16); box-shadow: 0 4px 14px rgba(255,122,61,0.2); transform: translateX(2px); }
+.cfg-launch { color: #8264FF; background: rgba(130,100,255,0.08); border: 1px solid rgba(130,100,255,0.22); }
+.cfg-launch:hover { background: rgba(130,100,255,0.16); box-shadow: 0 4px 14px rgba(130,100,255,0.2); transform: translateX(2px); }
+.cap-mon-launch { color: var(--plab); background: rgba(255,122,61,0.08); border: 1px solid rgba(255,122,61,0.22); }
+.cap-mon-launch:hover { background: rgba(255,122,61,0.16); box-shadow: 0 4px 14px rgba(255,122,61,0.2); transform: translateX(2px); }
+
+/* ── FOOTER STRIP ───────────────────────────────────────────── */
+.hp-footer-strip {
+  display: flex; align-items: center; gap: var(--sp-5); flex-wrap: wrap;
+  padding: var(--sp-4) var(--sp-6);
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--nb-border);
+  border-radius: 14px;
+  margin-top: var(--sp-4);
+}
+.hp-footer-credit {
+  font-family: var(--font-mono); font-size: 11px; color: var(--t3);
+  white-space: nowrap; flex-shrink: 0;
+}
+.hp-footer-name {
+  color: var(--vlab); font-weight: 600;
+}
+.hp-footer-sep {
+  width: 1px; height: 20px; background: var(--nb-border); flex-shrink: 0;
+}
+.hp-footer-powered {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+}
+.hp-footer-label {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--t3);
+  white-space: nowrap; flex-shrink: 0;
+}
+.hp-tech-pills { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.hp-pill {
+  font-family: var(--font-mono); font-size: 11px; color: var(--t2);
+  font-weight: 500;
+}
+.hp-pill-dot {
+  width: 3px; height: 3px; border-radius: 50%; background: var(--t4);
 }
 </style>
+
+<script>
+/* ── Animated network canvas ───────────────────────────────── */
+(function() {
+  const canvas = document.getElementById('netCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width  = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const NODE_COUNT = 32;
+  const CONNECT_DIST = 160;
+  const nodes = [];
+
+  for (let i = 0; i < NODE_COUNT; i++) {
+    nodes.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: Math.random() * 2 + 1.5,
+      hue: Math.random() < 0.7 ? 'cyan' : 'orange'
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Update positions
+    nodes.forEach(n => {
+      n.x += n.vx;
+      n.y += n.vy;
+      if (n.x < 0 || n.x > canvas.width)  n.vx *= -1;
+      if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
+    });
+
+    // Draw edges
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[i].x - nodes[j].x;
+        const dy = nodes[i].y - nodes[j].y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < CONNECT_DIST) {
+          const alpha = (1 - dist / CONNECT_DIST) * 0.18;
+          const isCyan = nodes[i].hue === 'cyan' && nodes[j].hue === 'cyan';
+          ctx.strokeStyle = isCyan
+            ? `rgba(0,212,255,${alpha})`
+            : `rgba(255,122,61,${alpha * 0.6})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(nodes[i].x, nodes[i].y);
+          ctx.lineTo(nodes[j].x, nodes[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw nodes
+    nodes.forEach(n => {
+      const color = n.hue === 'cyan' ? '0,212,255' : '255,122,61';
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${color},0.6)`;
+      ctx.fill();
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = `rgba(${color},0.8)`;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    });
+
+    requestAnimationFrame(draw);
+  }
+
+  draw();
+})();
+
+</script>
 {% endblock %}

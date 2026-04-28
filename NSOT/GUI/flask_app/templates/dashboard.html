@@ -1,36 +1,103 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - NAutoBuff{% endblock %}
+{% block title %}Dashboard — NAutoBuff{% endblock %}
+{% block breadcrumb %}Physical Lab / Dashboard{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">Network Dashboard</h1>
-  <p class="page-description">Real-time network monitoring and metrics via Grafana</p>
-</div>
+<section class="grafana-shell" id="grafanaShell">
+  <div class="page-header grafana-header">
+    <div>
+      <h1 class="page-title">Monitoring Dashboard</h1>
+      <p class="page-description">Live telemetry and metrics via Grafana + InfluxDB + gNMI</p>
+    </div>
+    <button type="button" id="grafanaFullscreenBtn" class="btn btn-ghost btn-sm" onclick="toggleGrafanaFullscreen()">Fullscreen</button>
+  </div>
 
-<div class="iframe-container">
-  <iframe
-    id="grafanaFrame"
-    src="{{ grafana_dashboard_url }}"
-    title="Grafana Dashboard"
-    style="width:100%;height:80vh;border:none;border-radius:var(--radius-md);"
-  ></iframe>
-</div>
+  <div class="iframe-container grafana-frame">
+    <iframe src="{{ grafana_dashboard_url }}" title="Grafana Dashboard" allowfullscreen></iframe>
+  </div>
+</section>
 
-<div style="margin-top:var(--space-3);display:flex;justify-content:flex-end;gap:var(--space-2);">
-  <a href="{{ influxdb_url }}" target="_blank" class="btn btn-secondary btn-sm">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;">
-      <ellipse cx="12" cy="5" rx="9" ry="3"/>
-      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-    </svg>
-    Open InfluxDB
-  </a>
-  <a href="{{ grafana_dashboard_url }}" target="_blank" class="btn btn-secondary btn-sm">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;">
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-      <polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/>
-    </svg>
-    Open in Grafana
-  </a>
-</div>
+<style>
+.grafana-shell {
+  max-width: 1600px;
+}
+
+.grafana-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.grafana-frame {
+  height: calc(100vh - var(--topbar-h) - 160px);
+  border-color: rgba(255,122,61,0.15);
+}
+
+.grafana-shell.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  max-width: none;
+  margin: 0;
+  padding: var(--sp-4);
+  overflow-y: auto;
+  background: var(--nb-base);
+}
+
+.grafana-shell.fullscreen .grafana-header {
+  margin-bottom: var(--sp-3);
+  padding-bottom: var(--sp-3);
+  flex-shrink: 0;
+}
+
+.grafana-shell.fullscreen .grafana-frame {
+  height: calc(100vh - 118px);
+  min-height: 640px;
+  border-radius: var(--r-md);
+}
+
+body.grafana-fullscreen-active {
+  overflow: hidden;
+}
+
+body.grafana-fullscreen-active .nb-sidebar,
+body.grafana-fullscreen-active .nb-topbar,
+body.grafana-fullscreen-active #sidebarOverlay {
+  display: none !important;
+}
+
+body.grafana-fullscreen-active .nb-main {
+  margin-left: 0;
+  padding-top: 0;
+  z-index: 10001;
+}
+
+body.grafana-fullscreen-active .nb-content {
+  max-width: none;
+  padding: 0;
+}
+
+@media (max-width: 720px) {
+  .grafana-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .grafana-header .btn {
+    width: fit-content;
+  }
+}
+</style>
+
+<script>
+function toggleGrafanaFullscreen() {
+  const shell = document.getElementById('grafanaShell');
+  const active = shell.classList.toggle('fullscreen');
+  document.body.classList.toggle('grafana-fullscreen-active', active);
+  document.getElementById('grafanaFullscreenBtn').textContent = active ? 'Exit Fullscreen' : 'Fullscreen';
+  if (active) requestBrowserFullscreen();
+  else exitBrowserFullscreen();
+}
+</script>
 {% endblock %}

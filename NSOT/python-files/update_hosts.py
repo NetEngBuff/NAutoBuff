@@ -11,6 +11,16 @@ csv_relative_path = os.path.join(
 CSV_FILE_PATH = os.path.abspath(csv_relative_path)  # Get absolute path
 
 
+def _vendor_from_kind(kind):
+    return {
+        "ceos": "arista",
+        "cisco_iol": "cisco",
+        "crpd": "juniper",
+        "vjunosswitch": "juniper",
+        "linux": "linux",
+    }.get((kind or "").strip().lower(), "")
+
+
 def regenerate_hosts_csv(devices):
     current_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.abspath(os.path.join(current_dir, "..", "IPAM", "hosts.csv"))
@@ -37,7 +47,7 @@ def regenerate_hosts_csv(devices):
                     "password": dev.get("password", ""),
                     "management_ip": dev.get("ip_address", ""),
                     "subnet_cidr": dev.get("subnet_cidr", ""),
-                    "vendor": dev.get("vendor", ""),
+                    "vendor": dev.get("vendor", "") or _vendor_from_kind(dev.get("kind", "")),
                     "old_password": "",
                 }
             )

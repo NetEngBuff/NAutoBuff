@@ -1,99 +1,17 @@
-{% macro next_steps(steps, label="What's next?") %}
-<div class="nxt-section">
-  <div class="nxt-label">{{ label }}</div>
-  <div class="nxt-grid">
-    {% for s in steps %}
-    <a href="{{ s.url }}" class="nxt-card">
-      <div class="nxt-icon">{{ s.icon|safe }}</div>
-      <div class="nxt-body">
-        <div class="nxt-title">{{ s.title }}</div>
-        <div class="nxt-desc">{{ s.desc }}</div>
-      </div>
-      <svg class="nxt-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-      </svg>
+{% macro next_steps(links, label="Next Steps") %}
+<div class="next-steps">
+  <div class="next-steps-label">{{ label }}</div>
+  <div class="next-steps-grid">
+    {% for link in links %}
+    <a href="{{ link.url }}" class="next-step-link">
+      <span class="next-step-icon">{{ link.icon | safe }}</span>
+      <span class="next-step-info">
+        <span class="next-step-title">{{ link.title }}</span>
+        <span class="next-step-desc">{{ link.desc }}</span>
+      </span>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:.35;flex-shrink:0;"><polyline points="9 18 15 12 9 6"/></svg>
     </a>
     {% endfor %}
   </div>
 </div>
-
-<style>
-.nxt-section {
-  max-width: 1200px;
-  margin: var(--space-8) auto 0;
-  padding: 0 var(--space-4);
-}
-.nxt-label {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-tertiary);
-  margin-bottom: var(--space-3);
-}
-.nxt-grid {
-  display: flex;
-  flex-direction: row;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.nxt-card {
-  flex: 1 1 180px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  text-decoration: none;
-  color: inherit;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
-}
-.nxt-card:hover {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-light, rgba(99,102,241,0.1));
-  transform: translateY(-1px);
-}
-.nxt-icon {
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  background: var(--color-primary-light, rgba(99,102,241,0.1));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-primary);
-}
-.nxt-body {
-  flex: 1;
-  min-width: 0;
-}
-.nxt-title {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.nxt-desc {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.nxt-arrow {
-  flex-shrink: 0;
-  color: var(--color-text-tertiary);
-  transition: color var(--transition-fast), transform var(--transition-fast);
-}
-.nxt-card:hover .nxt-arrow {
-  color: var(--color-primary);
-  transform: translateX(2px);
-}
-</style>
 {% endmacro %}

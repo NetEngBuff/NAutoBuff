@@ -1,60 +1,69 @@
 {% extends "base.html" %}
-{% block title %}Hosts Inventory - NAutoBuff{% endblock %}
+{% block title %}Hosts Inventory — NAutoBuff{% endblock %}
+{% block breadcrumb %}Admin / Hosts Inventory{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">Hosts Inventory</h1>
-  <p class="page-description">Full device inventory from hosts.csv — admin access only</p>
+  <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-4); flex-wrap:wrap;">
+    <div>
+      <h1 class="page-title">Hosts Inventory</h1>
+      <p class="page-description">Admin-managed device inventory backed directly by hosts.csv</p>
+    </div>
+    <a href="{{ url_for('add_hosts') }}" class="btn btn-primary" style="--btn-color:var(--vlab); --btn-glow:rgba(0,212,255,0.3);">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Host
+    </a>
+  </div>
 </div>
 
 <div class="table-container">
-  <table class="table table-striped">
+  <table class="table">
     <thead>
       <tr>
         <th>Hostname</th>
-        <th>Management IP</th>
-        <th>Subnet</th>
         <th>Vendor</th>
+        <th>Management IP</th>
+        <th>CIDR</th>
         <th>Username</th>
         <th>Password</th>
-        <th>Old Password</th>
+        <th style="width:60px;"></th>
       </tr>
     </thead>
     <tbody>
-      {% for h in hosts %}
-      <tr>
-        <td style="font-weight:var(--font-weight-semibold);">{{ h.hostname }}</td>
-        <td class="font-mono">{{ h.management_ip }}</td>
-        <td class="font-mono">{{ h.get('subnet_cidr', '—') }}</td>
+      {% for host in hosts %}
+      <tr id="row-{{ host.hostname }}">
+        <td class="hostname">{{ host.hostname }}</td>
         <td>
-          {% if h.get('vendor') %}
-          <span style="font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);
-            border:1px solid var(--color-primary);border-radius:var(--radius-sm);
-            padding:2px 8px;color:var(--color-primary);">{{ h.vendor }}</span>
-          {% else %}—{% endif %}
+          {% set v = host.vendor | lower if host.vendor else '' %}
+          {% if v %}
+          <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;font-family:var(--font-mono);padding:2px 8px;border-radius:99px;
+            background:{% if v == 'arista' %}rgba(0,212,255,0.08){% elif v == 'cisco' %}rgba(0,180,255,0.08){% elif v == 'juniper' %}rgba(0,224,153,0.08){% else %}rgba(255,255,255,0.05){% endif %};
+            color:{% if v == 'arista' %}var(--vlab){% elif v == 'cisco' %}#4DB8FF{% elif v == 'juniper' %}var(--ok){% else %}var(--t3){% endif %};
+            border:1px solid {% if v == 'arista' %}rgba(0,212,255,0.2){% elif v == 'cisco' %}rgba(77,184,255,0.2){% elif v == 'juniper' %}rgba(0,224,153,0.2){% else %}rgba(255,255,255,0.08){% endif %};">
+            {{ host.vendor }}
+          </span>
+          {% else %}
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--t4);">—</span>
+          {% endif %}
         </td>
-        <td class="font-mono">{{ h.username }}</td>
+        <td class="ip-address font-mono">{{ host.management_ip }}</td>
+        <td class="font-mono" style="color:var(--t3);">{{ host.subnet_cidr|cidr_prefix if host.subnet_cidr else '—' }}</td>
+        <td class="font-mono">{{ host.username }}</td>
         <td>
-          <div style="display:flex;align-items:center;gap:var(--space-2);">
-            <span class="font-mono" id="pwd-{{ loop.index }}" style="filter:blur(4px);transition:filter 0.2s;">{{ h.password }}</span>
-            <button onclick="togglePwd('{{ loop.index }}')" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:2px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="font-mono pw-mask" data-pw="{{ host.password }}">••••••••</span>
+            <button onclick="togglePw(this)" style="background:none;border:none;cursor:pointer;color:var(--t3);padding:0;display:flex;align-items:center;" title="Show/hide">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
         </td>
         <td>
-          {% if h.get('old_password') %}
-          <div style="display:flex;align-items:center;gap:var(--space-2);">
-            <span class="font-mono" id="oldpwd-{{ loop.index }}" style="filter:blur(4px);transition:filter 0.2s;">{{ h.old_password }}</span>
-            <button onclick="toggleOldPwd('{{ loop.index }}')" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:2px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-            </button>
-          </div>
-          {% else %}—{% endif %}
+          <button class="btn-del-host" onclick="confirmDelete('{{ host.hostname }}')" title="Remove host">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+          </button>
         </td>
       </tr>
       {% endfor %}
@@ -64,19 +73,89 @@
 
 {% if not hosts %}
 <div class="empty-state">
+  <div class="empty-state-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
   <h3 class="empty-state-title">No hosts found</h3>
-  <p class="empty-state-description">Add hosts via the Add Hosts page first.</p>
+  <p class="empty-state-description">Add hosts to populate hosts.csv.</p>
+  <a href="{{ url_for('add_hosts') }}" class="btn btn-primary" style="margin-top:var(--sp-4);">Add Host</a>
 </div>
 {% endif %}
 
+<!-- Delete confirmation modal -->
+<div class="modal-overlay" id="deleteModal" onclick="closeDeleteModal(event)">
+  <div class="rollback-modal" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Remove Host</h2>
+      <button class="modal-close" onclick="closeDeleteModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-error" style="margin-bottom:var(--sp-4);">
+        <span class="alert-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </span>
+        <div class="alert-content">
+          This will permanently remove <strong id="delete-hostname-display"></strong> from hosts.csv. This cannot be undone.
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+      <form id="delete-form" method="POST" action="{{ url_for('delete_host') }}" style="display:inline;">
+        <input type="hidden" name="hostname" id="delete-hostname-input">
+        <button type="submit" class="btn btn-danger">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Remove Host
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+.btn-del-host {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--r-md); color: var(--t4);
+  cursor: pointer; transition: all 150ms ease;
+}
+.btn-del-host:hover {
+  background: rgba(255,77,106,0.1);
+  border-color: rgba(255,77,106,0.3);
+  color: var(--err);
+}
+</style>
+
 <script>
-function togglePwd(i) {
-  const el = document.getElementById('pwd-' + i);
-  el.style.filter = el.style.filter ? '' : 'blur(4px)';
+function togglePw(btn) {
+  const span = btn.previousElementSibling;
+  if (span.textContent === '••••••••') {
+    span.textContent = span.dataset.pw;
+    span.style.color = 'var(--ok)';
+  } else {
+    span.textContent = '••••••••';
+    span.style.color = '';
+  }
 }
-function toggleOldPwd(i) {
-  const el = document.getElementById('oldpwd-' + i);
-  el.style.filter = el.style.filter ? '' : 'blur(4px)';
+
+function confirmDelete(hostname) {
+  document.getElementById('delete-hostname-display').textContent = hostname;
+  document.getElementById('delete-hostname-input').value = hostname;
+  const modal = document.getElementById('deleteModal');
+  modal.style.display = 'flex';
+  requestAnimationFrame(() => modal.classList.add('visible'));
 }
+
+function closeDeleteModal(e) {
+  if (e && e.target !== document.getElementById('deleteModal')) return;
+  const modal = document.getElementById('deleteModal');
+  modal.classList.remove('visible');
+  setTimeout(() => { modal.style.display = 'none'; }, 250);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDeleteModal();
+});
 </script>
 {% endblock %}

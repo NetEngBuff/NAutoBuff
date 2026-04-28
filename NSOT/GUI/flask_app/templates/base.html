@@ -1,1192 +1,700 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{% block title %}NAutoBuff{% endblock %}</title>
 
-  <!-- Prevent FOUC: Apply theme immediately before any rendering -->
-  <script>
-    (function() {
-      const savedTheme = localStorage.getItem('theme') || 'light';
-      document.documentElement.setAttribute('data-theme', savedTheme);
-    })();
-  </script>
+  <!-- Apply saved theme immediately to prevent FOUC -->
+  <script>(function(){var t=localStorage.getItem('nb-theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-
-  <!-- Main CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <!-- v2 Design System -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/v2.css') }}">
 
   {% block head %}{% endblock %}
 </head>
 
 <body>
-  <!-- Navbar -->
-  <nav class="navbar">
-    <div class="navbar-left">
-      {% if request.endpoint != 'homepage' %}
-        <a href="{{ url_for('homepage') }}" class="navbar-back" title="Back to Home">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-        </a>
-      {% endif %}
-      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">
-        <span id="themeIcon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/>
-            <line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-          </svg>
-        </span>
-      </button>
-    </div>
 
-    <div class="navbar-center">
-      <a href="{{ url_for('homepage') }}" class="navbar-logo">
-        <span class="navbar-logo-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-            <line x1="6" y1="6" x2="6.01" y2="6"/>
-            <line x1="6" y1="18" x2="6.01" y2="18"/>
-          </svg>
-          NAutoBuff
-        </span>
+<!-- ═══════════════════════════════ SIDEBAR ═══════════════════════════════ -->
+<aside class="nb-sidebar" id="nbSidebar">
+
+  <!-- Logo -->
+  <div class="nb-logo">
+    <a href="{{ url_for('homepage') }}" class="nb-logo-link">
+      <div class="nb-logo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
+          <rect x="2" y="2" width="20" height="8" rx="2"/>
+          <rect x="2" y="14" width="20" height="8" rx="2"/>
+          <line x1="6" y1="6" x2="6.01" y2="6"/>
+          <line x1="6" y1="18" x2="6.01" y2="18"/>
+        </svg>
+      </div>
+      <div class="nb-logo-text">
+        <span class="nb-logo-title">NAUTOBUFF</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- Nav -->
+  <nav class="nb-nav" id="nbNav">
+
+    <!-- VIRTUAL LAB EXTRAS (operator-only, Containerlab topology tools) -->
+    {% if current_user.is_authenticated and current_user.is_operator() %}
+    <div class="nb-nav-section" id="vlab-section">
+      <div class="nb-nav-label vlab">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        Virtual Lab
+      </div>
+      <a href="{{ url_for('build_topology') }}" class="nb-nav-link vlab {% if request.endpoint == 'build_topology' %}active{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        Build Topology
+      </a>
+      <a href="{{ url_for('add_device') }}" class="nb-nav-link vlab {% if request.endpoint == 'add_device' %}active{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Add Device
+      </a>
+    </div>
+    <div class="nb-nav-divider"></div>
+    {% endif %}
+
+    <!-- CORE FEATURES — available in both Virtual and Physical Lab -->
+    <div class="nb-nav-section" id="plab-section">
+      <div class="nb-nav-label">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Core Features
+      </div>
+      {% if current_user.is_authenticated and current_user.role == 'admin' %}
+      <a href="{{ url_for('hosts_inventory') }}" class="nb-nav-link {% if request.endpoint in ['hosts_inventory', 'add_hosts'] %}active{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Hosts Inventory
+      </a>
+      {% endif %}
+      <a href="{{ url_for('topology') }}" class="nb-nav-link {% if request.endpoint == 'topology' %}active vlab{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Network Graph
+      </a>
+      <a href="{{ url_for('ipam') }}" class="nb-nav-link {% if request.endpoint == 'ipam' %}active{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        IPAM
+      </a>
+      {% if current_user.is_authenticated and current_user.is_operator() %}
+      <a href="{{ url_for('configure_device') }}" class="nb-nav-link {% if request.endpoint == 'configure_device' %}active{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Configure Device
+      </a>
+      {% endif %}
+      <a href="{{ url_for('tools') }}" class="nb-nav-link {% if request.endpoint == 'tools' %}active{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        Tools
+      </a>
+      <a href="{{ url_for('dashboard') }}" class="nb-nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </a>
+      <a href="{{ url_for('telemetry_dashboard') }}" class="nb-nav-link {% if request.endpoint == 'telemetry_dashboard' %}active{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7" y="11" width="3" height="5"/><rect x="12" y="7" width="3" height="9"/><rect x="17" y="9" width="3" height="7"/></svg>
+        Engineer Telemetry
       </a>
     </div>
 
-    <div class="navbar-right">
-      {% if current_user.is_authenticated and current_user.is_operator() %}
-      <button class="navbar-rollback-btn" onclick="showRollbackModal()" title="Rollback Configuration">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="1 4 1 10 7 10"/>
-          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-        </svg>
-        <span class="navbar-rollback-text">Rollback</span>
-      </button>
-      {% endif %}
-      <div class="status-indicator" id="clabStatus" title="Checking status...">
-        <span class="status-dot neutral" id="statusDot"></span>
-        <span id="statusText">Clab</span>
-      </div>
-      {% if current_user.is_authenticated %}
-      <div style="display:flex;align-items:center;gap:var(--space-2);">
-        <span style="font-size:var(--font-size-xs);color:var(--color-text-muted);">{{ current_user.username }}</span>
-        <span style="font-size:10px;font-weight:var(--font-weight-semibold);border:1px solid;border-radius:var(--radius-sm);padding:1px 6px;
-          color:{% if current_user.role == 'admin' %}var(--color-error){% elif current_user.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-text-muted){% endif %};
-          border-color:{% if current_user.role == 'admin' %}var(--color-error){% elif current_user.role == 'operator' %}var(--color-warning,#f59e0b){% else %}var(--color-border){% endif %};">
-          {{ current_user.role }}
-        </span>
-        <a href="{{ url_for('logout') }}" style="color:var(--color-text-muted);display:flex;align-items:center;" title="Log out">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-        </a>
-      </div>
-      {% else %}
-      <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm">Log in</a>
-      {% endif %}
-      <button class="navbar-menu-btn" onclick="toggleSideMenu()" title="Menu">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="3" y1="12" x2="21" y2="12"/>
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
-      </button>
+    <div class="nb-nav-divider"></div>
+
+    <!-- SYSTEM -->
+    <div class="nb-nav-section">
+      <div class="nb-nav-label">System</div>
+      <a href="#" class="nb-nav-link" onclick="openHealthCheck(event)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Health Check
+      </a>
+      <a href="#" class="nb-nav-link" onclick="openMcpSetup(event)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+        Claude Integration
+      </a>
+      <a href="{{ grafana_dashboard_url }}" target="_blank" class="nb-nav-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Grafana ↗
+      </a>
+      <a href="{{ influxdb_url }}" target="_blank" class="nb-nav-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        InfluxDB ↗
+      </a>
+      <a href="#" class="nb-nav-link" onclick="openJenkins(event)" id="menu-jenkins-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Jenkins ↗
+      </a>
     </div>
+
+    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+    <div class="nb-nav-divider"></div>
+    <div class="nb-nav-section">
+      <div class="nb-nav-label">Admin</div>
+      <a href="{{ url_for('admin_users') }}" class="nb-nav-link {% if request.endpoint == 'admin_users' %}active{% endif %}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        User Management
+      </a>
+    </div>
+    {% endif %}
+
+    <!-- Jenkins ngrok inline -->
+    <div id="menu-ngrok-row" style="display:none;padding:4px 16px 12px;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input id="menu-ngrok-input" class="form-input" readonly placeholder="ngrok URL"
+          style="font-size:11px;height:28px;padding:0 8px;flex:1;min-width:0;font-family:var(--font-mono);">
+        <button onclick="copyMenuNgrok()"
+          style="flex-shrink:0;padding:0 8px;height:28px;border:1px solid var(--nb-border);border-radius:var(--r-sm);background:var(--nb-elevated);cursor:pointer;font-size:11px;color:var(--t2);">
+          Copy
+        </button>
+      </div>
+      <div style="font-size:10px;color:var(--t3);margin-top:3px;" id="menu-ngrok-hint"></div>
+    </div>
+
   </nav>
 
-  <!-- Global Rollback Modal -->
-  <div class="modal-overlay" id="rollbackModal" onclick="closeRollbackModal(event)">
-    <div class="rollback-modal" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <h2 class="modal-title">Rollback to Golden Configuration</h2>
-        <button class="modal-close" onclick="closeRollbackModal()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Device</label>
-          <select id="rollbackDevice" class="form-select">
-            <option value="">Select Device</option>
-            {% if devices %}
-              {% for device in devices %}
-              <option value="{{ device }}">{{ device }}</option>
-              {% endfor %}
-            {% endif %}
-          </select>
-        </div>
-        <div class="alert alert-warning" style="margin-top: var(--space-4);">
-          <span class="alert-icon">⚠️</span>
-          <div class="alert-content">
-            <strong>Warning:</strong> This will restore the device to its last saved golden configuration. Any changes made after the backup will be lost.
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeRollbackModal()">Cancel</button>
-        <button class="btn btn-danger" onclick="executeRollback()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="1 4 1 10 7 10"/>
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-          </svg>
-          Execute Rollback
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Claude Integration MCP Modal -->
-  <div class="modal-overlay" id="mcpSetupModal" onclick="closeMcpSetup(event)">
-    <div class="rollback-modal" style="max-width:660px;" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <h2 class="modal-title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
-          Claude Integration (MCP)
-        </h2>
-        <button onclick="closeMcpSetup()" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);font-size:20px;">&times;</button>
-      </div>
-      <div class="modal-body" style="padding:16px 20px 20px;">
-
-        <p style="margin:0 0 14px;color:var(--color-text-muted);font-size:13px;">
-          Connect NAutoBuff MCP servers to Claude so you can query and configure devices directly from any Claude interface.
-        </p>
-
-        <!-- Tabs -->
-        <div style="display:flex;gap:0;border-bottom:1px solid var(--color-border);margin-bottom:16px;">
-          <button id="mcp-tab-desktop" onclick="switchMcpTab('desktop')" style="padding:7px 16px;font-size:12px;font-weight:600;border:none;border-bottom:2px solid var(--color-primary);background:none;cursor:pointer;color:var(--color-text);margin-bottom:-1px;">Claude Desktop</button>
-          <button id="mcp-tab-cli" onclick="switchMcpTab('cli')" style="padding:7px 16px;font-size:12px;font-weight:600;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--color-text-muted);margin-bottom:-1px;">Claude Code CLI</button>
-        </div>
-
-        <!-- Desktop tab -->
-        <div id="mcp-panel-desktop">
-          <div style="margin-bottom:16px;">
-            <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Option 1 — Same machine (OrbStack / local)</div>
-            <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 8px;">Paste this into <code style="background:var(--color-surface-raised);padding:1px 4px;border-radius:3px;">~/Library/Application Support/Claude/claude_desktop_config.json</code></p>
-            <div style="position:relative;">
-              <pre id="mcpConfigLocal" style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:12px;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-all;"></pre>
-              <button onclick="copyMcpConfig('mcpConfigLocal')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-surface);cursor:pointer;color:var(--color-text-muted);">Copy</button>
-            </div>
-          </div>
-
-          <div style="margin-bottom:16px;">
-            <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Option 2 — Remote server (SSH tunnel)</div>
-            <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 6px;">First, open a tunnel from your laptop (keep it running):</p>
-            <div style="position:relative;margin-bottom:8px;">
-              <pre id="mcpSshTunnel" style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:12px;font-size:11px;overflow-x:auto;margin:0;"></pre>
-              <button onclick="copyMcpConfig('mcpSshTunnel')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-surface);cursor:pointer;color:var(--color-text-muted);">Copy</button>
-            </div>
-            <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 6px;">Then use this config in Claude Desktop:</p>
-            <div style="position:relative;">
-              <pre id="mcpConfigRemote" style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:12px;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-all;"></pre>
-              <button onclick="copyMcpConfig('mcpConfigRemote')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-surface);cursor:pointer;color:var(--color-text-muted);">Copy</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Claude Code CLI tab -->
-        <div id="mcp-panel-cli" style="display:none;">
-          <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 14px;">
-            Run these two commands on the machine where NAutoBuff is running. They register the MCP servers with Claude Code CLI for the current user.
-          </p>
-
-          <div style="margin-bottom:16px;">
-            <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Local (same machine)</div>
-            <div style="position:relative;">
-              <pre id="mcpCliLocal" style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:12px;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-all;"></pre>
-              <button onclick="copyMcpConfig('mcpCliLocal')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-surface);cursor:pointer;color:var(--color-text-muted);">Copy</button>
-            </div>
-          </div>
-
-          <div style="margin-bottom:16px;">
-            <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Remote server (SSH tunnel)</div>
-            <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 6px;">First, open a tunnel from your laptop (keep it running):</p>
-            <div style="position:relative;margin-bottom:8px;">
-              <pre id="mcpCliSshTunnel" style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:12px;font-size:11px;overflow-x:auto;margin:0;"></pre>
-              <button onclick="copyMcpConfig('mcpCliSshTunnel')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-surface);cursor:pointer;color:var(--color-text-muted);">Copy</button>
-            </div>
-            <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 6px;">Then on your laptop:</p>
-            <div style="position:relative;">
-              <pre id="mcpCliRemote" style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:12px;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-all;"></pre>
-              <button onclick="copyMcpConfig('mcpCliRemote')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-surface);cursor:pointer;color:var(--color-text-muted);">Copy</button>
-            </div>
-          </div>
-
-          <div style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--color-text-muted);margin-bottom:0;">
-            <strong style="color:var(--color-text);">Tip:</strong> Servers are saved to <code style="background:var(--color-surface);padding:1px 4px;border-radius:3px;">~/.claude.json</code> (user scope). Run <code style="background:var(--color-surface);padding:1px 4px;border-radius:3px;">claude mcp list</code> to verify.
-          </div>
-        </div>
-
-        <!-- Shared note -->
-        <div style="background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--color-text-muted);margin-top:14px;">
-          <strong style="color:var(--color-text);">Note:</strong> MCP HTTP servers (ports 8001/8002) must be enabled. Check <em>Health Check</em> in this menu. To enable: <code style="background:var(--color-surface);padding:1px 4px;border-radius:3px;">touch NSOT/misc/.mcp_http_enabled &amp;&amp; python3 pilot-config/pilot.py</code>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Health Check Modal -->
-  <div class="modal-overlay" id="healthCheckModal" onclick="closeHealthCheck(event)">
-    <div class="rollback-modal" style="max-width:640px;" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <h2 class="modal-title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          Service Health Check
-        </h2>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <button onclick="loadHealthCheck()" title="Refresh"
-            style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:4px;display:flex;align-items:center;">
-            <svg id="hc-refresh-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-          </button>
-          <button class="modal-close" onclick="closeHealthCheck()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="modal-body" style="padding:0;">
-        <div id="hc-loading" style="padding:32px;text-align:center;color:var(--color-text-muted);">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-          <div style="margin-top:8px;font-size:var(--font-size-sm);">Checking services…</div>
-        </div>
-        <table id="hc-table" style="display:none;width:100%;border-collapse:collapse;">
-          <thead>
-            <tr style="border-bottom:1px solid var(--color-border);">
-              <th style="padding:10px 20px;text-align:left;font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;">Service</th>
-              <th style="padding:10px 12px;text-align:center;font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;">Status</th>
-              <th style="padding:10px 20px 10px 0;text-align:right;font-size:var(--font-size-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="hc-tbody"></tbody>
-        </table>
-        <div style="padding:12px 20px;border-top:1px solid var(--color-border);text-align:right;">
-          <button onclick="nukeAllServices(this)"
-            style="padding:6px 14px;font-size:12px;border-radius:var(--radius-sm);border:1px solid #ef4444;background:rgba(239,68,68,.08);color:#ef4444;cursor:pointer;font-weight:600;">
-            Nuke All Services
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Side Menu -->
-  <div class="menu-overlay" id="menuOverlay" onclick="toggleSideMenu()"></div>
-  <aside class="side-menu" id="sideMenu">
-    <div class="side-menu-header">
-      <span class="side-menu-title">Navigation</span>
-      <button class="side-menu-close" onclick="toggleSideMenu()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-    <div class="side-menu-content">
+  <!-- Sidebar footer: status + user -->
+  <div class="nb-sidebar-footer">
+    <div class="nb-status-row">
+      <span class="nb-status-dot neutral" id="statusDot"></span>
+      <span id="statusText" style="flex:1;font-size:11px;">Checking…</span>
       {% if current_user.is_authenticated and current_user.is_operator() %}
-      <div class="side-menu-section">
-        <span class="side-menu-section-title">Build</span>
-      </div>
-      <nav class="side-menu-nav">
-        <a href="{{ url_for('add_hosts') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="8.5" cy="7" r="4"/>
-            <line x1="20" y1="8" x2="20" y2="14"/>
-            <line x1="23" y1="11" x2="17" y2="11"/>
-          </svg>
-          Add Hosts
-        </a>
-        <a href="{{ url_for('build_topology') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-            <polyline points="2 17 12 22 22 17"/>
-            <polyline points="2 12 12 17 22 12"/>
-          </svg>
-          Build Topology
-        </a>
-      </nav>
-
-      <div class="side-menu-section">
-        <span class="side-menu-section-title">Configure</span>
-      </div>
-      <nav class="side-menu-nav">
-        <a href="{{ url_for('add_device') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
-            <line x1="12" y1="8" x2="12" y2="16"/>
-            <line x1="8" y1="12" x2="16" y2="12"/>
-          </svg>
-          Add Device
-        </a>
-        <a href="{{ url_for('configure_device') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-          Configure Device
-        </a>
-      </nav>
+      <button class="nb-icon-btn" onclick="showRollbackModal()" title="Rollback Config"
+        style="color:var(--err);border-color:rgba(255,77,106,0.2);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      </button>
       {% endif %}
+    </div>
 
-      <div class="side-menu-section">
-        <span class="side-menu-section-title">Manage</span>
-      </div>
-      <nav class="side-menu-nav">
-        <a href="{{ url_for('tools') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-          </svg>
-          Tools
-        </a>
-        <a href="{{ url_for('ipam') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <ellipse cx="12" cy="5" rx="9" ry="3"/>
-            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-          </svg>
-          IPAM
-        </a>
-      </nav>
+    {% if current_user.is_authenticated %}
+    <div class="nb-user-row">
+      <span class="nb-user-name">{{ current_user.username }}</span>
+      <span class="nb-role-badge nb-role-{{ current_user.role }}">{{ current_user.role }}</span>
+      <a href="{{ url_for('logout') }}" class="nb-icon-btn" title="Log out">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </a>
+    </div>
+    {% else %}
+    <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm btn-block">Log In</a>
+    {% endif %}
+  </div>
+</aside>
 
-      <div class="side-menu-section">
-        <span class="side-menu-section-title">Monitor</span>
-      </div>
-      <nav class="side-menu-nav">
-        <a href="{{ url_for('dashboard') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7"/>
-            <rect x="14" y="3" width="7" height="7"/>
-            <rect x="14" y="14" width="7" height="7"/>
-            <rect x="3" y="14" width="7" height="7"/>
-          </svg>
-          Dashboard
-        </a>
-        <a href="{{ url_for('topology') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="18" cy="18" r="3"/>
-            <circle cx="6" cy="6" r="3"/>
-            <path d="M13 6h3a2 2 0 0 1 2 2v7"/>
-            <line x1="6" y1="9" x2="6" y2="21"/>
-          </svg>
-          Topology
-        </a>
-        <a href="#" class="side-menu-link" onclick="openHealthCheck(event)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-          </svg>
-          Health Check
-        </a>
-      </nav>
+<!-- Mobile backdrop -->
+<div id="sidebarOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99;backdrop-filter:blur(4px);" onclick="closeMobileSidebar()"></div>
 
-      {% if current_user.is_authenticated and current_user.role == 'admin' %}
-      <div class="side-menu-section">
-        <span class="side-menu-section-title">Admin</span>
-      </div>
-      <nav class="side-menu-nav">
-        <a href="{{ url_for('hosts_inventory') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10 9 9 9 8 9"/>
-          </svg>
-          Hosts Inventory
-        </a>
-        <a href="{{ url_for('admin_users') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-          User Management
-        </a>
-      </nav>
+<!-- ═══════════════════════════════ TOPBAR ════════════════════════════════ -->
+<div class="nb-topbar">
+  <div class="nb-topbar-left">
+    <button class="nb-mobile-toggle" onclick="toggleMobileSidebar()" title="Menu">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="nb-breadcrumb">
+      {% if request.endpoint and request.endpoint != 'homepage' %}
+      <span class="nb-breadcrumb-page">{% block breadcrumb %}{{ request.endpoint|replace('_',' ')|title }}{% endblock %}</span>
       {% endif %}
-
-      <div class="side-menu-section">
-        <span class="side-menu-section-title">External Links</span>
-      </div>
-      <nav class="side-menu-nav">
-        <a href="{{ grafana_dashboard_url }}" target="_blank" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-          </svg>
-          Grafana
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto;opacity:0.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </a>
-        <a href="{{ influxdb_url }}" target="_blank" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <ellipse cx="12" cy="5" rx="9" ry="3"/>
-            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-          </svg>
-          InfluxDB
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto;opacity:0.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </a>
-        <a id="menu-jenkins-link" href="#" target="_blank" class="side-menu-link" onclick="openJenkins(event)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-          Jenkins
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto;opacity:0.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </a>
-        <div id="menu-ngrok-row" style="display:none;padding:4px 12px 8px 44px;">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <input id="menu-ngrok-input" class="form-input" readonly placeholder="ngrok URL"
-              style="font-size:11px;height:28px;padding:0 8px;flex:1;min-width:0;">
-            <button onclick="copyMenuNgrok()" title="Copy webhook URL"
-              style="flex-shrink:0;padding:0 8px;height:28px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface-raised);cursor:pointer;font-size:11px;color:var(--color-text-muted);">
-              Copy
-            </button>
-          </div>
-          <div style="font-size:10px;color:var(--color-text-muted);margin-top:3px;" id="menu-ngrok-hint"></div>
-        </div>
-      </nav>
-
-      <div class="side-menu-section">
-        <span class="side-menu-section-title">Help</span>
-      </div>
-      <nav class="side-menu-nav">
-        <a href="#" class="side-menu-link" onclick="openMcpSetup(event)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/>
-          </svg>
-          Claude Desktop Setup
-        </a>
-      </nav>
-      <nav class="side-menu-nav">
-        <a href="{{ url_for('about') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-          About
-        </a>
-        <a href="{{ url_for('contact') }}" class="side-menu-link">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-            <polyline points="22,6 12,13 2,6"/>
-          </svg>
-          Contact
-        </a>
-      </nav>
     </div>
-  </aside>
+  </div>
+  <div class="nb-topbar-right">
+    <button class="nb-theme-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle light / dark mode">
+      <!-- Sun icon (shown in light mode — click to go dark) -->
+      <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+      <!-- Moon icon (shown in dark mode — click to go light) -->
+      <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    </button>
+  </div>
+</div>
 
-  <!-- Main Content -->
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
+<!-- ═══════════════════════════════ MODALS ════════════════════════════════ -->
 
-  <!-- Chatbot Toggle -->
-  <button class="chat-toggle" id="chatToggle" onclick="toggleChatbot()" title="AI Assistant">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    </svg>
-  </button>
-
-  <!-- Chatbot Container -->
-  <div class="chat-container" id="chatContainer">
-    <div class="chat-header">
-      <div class="chat-header-title">
-        <div class="chat-header-icon">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-            <line x1="9" y1="9" x2="9.01" y2="9"/>
-            <line x1="15" y1="9" x2="15.01" y2="9"/>
-          </svg>
-        </div>
-        <span class="chat-header-text">NAUTOBUFF Assistant</span>
+<!-- Rollback Modal -->
+<div class="modal-overlay" id="rollbackModal" onclick="closeRollbackModal(event)">
+  <div class="rollback-modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title">Rollback to Golden Configuration</h2>
+      <button class="modal-close" onclick="closeRollbackModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Device</label>
+        <select id="rollbackDevice" class="form-select">
+          <option value="">Select Device</option>
+          {% if devices %}{% for device in devices %}<option value="{{ device }}">{{ device }}</option>{% endfor %}{% endif %}
+        </select>
       </div>
-      <div class="chat-header-actions">
-        <button class="chat-header-btn" onclick="expandChatbot()" title="Expand">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15 3 21 3 21 9"/>
-            <polyline points="9 21 3 21 3 15"/>
-            <line x1="21" y1="3" x2="14" y2="10"/>
-            <line x1="3" y1="21" x2="10" y2="14"/>
-          </svg>
-        </button>
-        <button class="chat-header-btn" onclick="closeChatbot()" title="Close">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
+      <div class="alert alert-warning" style="margin-top:var(--sp-4);">
+        <span class="alert-icon">⚠</span>
+        <div class="alert-content"><strong>Warning:</strong> This restores the device to its last golden configuration. Changes made after the backup will be lost.</div>
       </div>
     </div>
-    <div class="chat-model-bar">
-      <span class="chat-model-label">Model:</span>
-      <select class="chat-model-select" id="modelSelect" onchange="setOllamaModel(this.value)" title="Select Ollama model">
-        <option value="">Loading...</option>
-      </select>
-    </div>
-    <div class="chat-messages" id="chatMessages"></div>
-    <div class="chat-input">
-      <input type="text" class="chat-input-field" id="chatInput" placeholder="Ask me anything..." onkeypress="handleChatKeypress(event)">
-      <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="22" y1="2" x2="11" y2="13"/>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-        </svg>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeRollbackModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="executeRollback()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Execute Rollback
       </button>
     </div>
   </div>
+</div>
 
-  <script>
-    // ========== Theme Management ==========
-    function toggleTheme() {
-      const html = document.documentElement;
-      const currentTheme = html.getAttribute('data-theme');
-      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-
-      html.setAttribute('data-theme', newTheme);
-      localStorage.setItem('theme', newTheme);
-      updateThemeIcon(newTheme);
-    }
-
-    function updateThemeIcon(theme) {
-      const icon = document.getElementById('themeIcon');
-      if (theme === 'dark') {
-        icon.innerHTML = `
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-          </svg>
-        `;
-      } else {
-        icon.innerHTML = `
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/>
-            <line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-          </svg>
-        `;
-      }
-    }
-
-    // ========== Side Menu ==========
-    function toggleSideMenu() {
-      const menu = document.getElementById('sideMenu');
-      const overlay = document.getElementById('menuOverlay');
-      menu.classList.toggle('open');
-      overlay.classList.toggle('visible');
-    }
-
-    // ========== Clab Status ==========
-    function updateClabStatus() {
-      const dot = document.getElementById('statusDot');
-      const text = document.getElementById('statusText');
-
-      fetch('/clab-health')
-        .then(response => response.json())
-        .then(data => {
-          dot.className = 'status-dot';
-          if (data.status === 'up') {
-            dot.classList.add('online');
-            text.textContent = 'Online';
-          } else {
-            dot.classList.add('offline');
-            text.textContent = 'Offline';
-          }
-          document.getElementById('clabStatus').title = data.message || 'Status check complete';
-        })
-        .catch(() => {
-          dot.className = 'status-dot offline';
-          text.textContent = 'Error';
-        });
-    }
-
-    // ========== Chatbot ==========
-    let chatHistory = [];
-
-    function toggleChatbot() {
-      const container = document.getElementById('chatContainer');
-      container.classList.toggle('visible');
-      if (container.classList.contains('visible')) {
-        document.getElementById('chatInput').focus();
-        loadOllamaModels();
-      }
-    }
-
-    function loadOllamaModels() {
-      fetch('/api/ollama/models')
-        .then(r => r.json())
-        .then(data => {
-          const select = document.getElementById('modelSelect');
-          select.innerHTML = '';
-          if (!data.models.length) {
-            select.innerHTML = '<option value="">No models found</option>';
-            return;
-          }
-          data.models.forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = m;
-            opt.textContent = m;
-            if (m === data.selected) opt.selected = true;
-            select.appendChild(opt);
-          });
-        })
-        .catch(() => {
-          document.getElementById('modelSelect').innerHTML = '<option value="">Ollama unavailable</option>';
-        });
-    }
-
-    function setOllamaModel(model) {
-      if (!model) return;
-      fetch('/api/ollama/model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model })
-      });
-    }
-
-    function closeChatbot() {
-      const container = document.getElementById('chatContainer');
-      container.classList.remove('visible', 'expanded');
-      chatHistory = [];
-      document.getElementById('chatMessages').innerHTML = '';
-    }
-
-    function expandChatbot() {
-      document.getElementById('chatContainer').classList.toggle('expanded');
-    }
-
-    function handleChatKeypress(event) {
-      if (event.key === 'Enter') {
-        sendChatMessage();
-      }
-    }
-
-    function sendChatMessage() {
-      const input = document.getElementById('chatInput');
-      const message = input.value.trim();
-      if (!message) return;
-
-      const messages = document.getElementById('chatMessages');
-      const sendBtn = document.getElementById('chatSendBtn');
-
-      input.value = '';
-      input.disabled = true;
-      sendBtn.disabled = true;
-
-      // Add user message
-      const userDiv = document.createElement('div');
-      userDiv.className = 'chat-message chat-message-user';
-      userDiv.innerHTML = `
-        <span class="chat-message-label">You</span>
-        <div class="chat-message-content">${escapeHtml(message)}</div>
-      `;
-      messages.appendChild(userDiv);
-
-      // Add bot message placeholder with a unique ID per message
-      const responseId = 'botResponse_' + Date.now();
-      const botDiv = document.createElement('div');
-      botDiv.className = 'chat-message chat-message-bot';
-      botDiv.innerHTML = `
-        <span class="chat-message-label">Assistant</span>
-        <div class="chat-message-content" id="${responseId}">
-          <div class="chat-typing">
-            <span class="chat-typing-dot"></span>
-            <span class="chat-typing-dot"></span>
-            <span class="chat-typing-dot"></span>
+<!-- Claude MCP Modal -->
+<div class="modal-overlay" id="mcpSetupModal" onclick="closeMcpSetup(event)">
+  <div class="rollback-modal" style="max-width:660px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title">Claude Integration (MCP)</h2>
+      <button onclick="closeMcpSetup()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:22px;line-height:1;">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px 20px;">
+      <p style="margin:0 0 14px;color:var(--t3);font-size:13px;">Connect NAutoBuff MCP servers to Claude to query and configure devices from any Claude interface.</p>
+      <div style="display:flex;border-bottom:1px solid var(--nb-border);margin-bottom:16px;">
+        <button id="mcp-tab-desktop" onclick="switchMcpTab('desktop')" style="padding:7px 16px;font-size:12px;font-weight:600;border:none;border-bottom:2px solid var(--vlab);background:none;cursor:pointer;color:var(--t1);margin-bottom:-1px;">Claude Desktop</button>
+        <button id="mcp-tab-cli"     onclick="switchMcpTab('cli')"     style="padding:7px 16px;font-size:12px;font-weight:600;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--t3);margin-bottom:-1px;">Claude Code CLI</button>
+      </div>
+      <div id="mcp-panel-desktop">
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Option 1 — Same machine</div>
+          <div style="position:relative;">
+            <pre id="mcpConfigLocal" style="background:var(--nb-elevated);border:1px solid var(--nb-border);border-radius:var(--r-md);padding:12px;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);color:var(--ok);"></pre>
+            <button onclick="copyMcpConfig('mcpConfigLocal')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--nb-border);border-radius:var(--r-sm);background:var(--nb-surface);cursor:pointer;color:var(--t2);">Copy</button>
           </div>
         </div>
-      `;
-      messages.appendChild(botDiv);
-      messages.scrollTop = messages.scrollHeight;
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Option 2 — Remote server (SSH tunnel)</div>
+          <p style="font-size:12px;color:var(--t3);margin:0 0 6px;">Open SSH tunnel from your laptop:</p>
+          <div style="position:relative;margin-bottom:8px;">
+            <pre id="mcpSshTunnel" style="background:var(--nb-elevated);border:1px solid var(--nb-border);border-radius:var(--r-md);padding:12px;font-size:11px;overflow-x:auto;margin:0;font-family:var(--font-mono);color:var(--ok);"></pre>
+            <button onclick="copyMcpConfig('mcpSshTunnel')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--nb-border);border-radius:var(--r-sm);background:var(--nb-surface);cursor:pointer;color:var(--t2);">Copy</button>
+          </div>
+          <div style="position:relative;">
+            <pre id="mcpConfigRemote" style="background:var(--nb-elevated);border:1px solid var(--nb-border);border-radius:var(--r-md);padding:12px;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);color:var(--ok);"></pre>
+            <button onclick="copyMcpConfig('mcpConfigRemote')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--nb-border);border-radius:var(--r-sm);background:var(--nb-surface);cursor:pointer;color:var(--t2);">Copy</button>
+          </div>
+        </div>
+      </div>
+      <div id="mcp-panel-cli" style="display:none;">
+        <p style="font-size:12px;color:var(--t3);margin:0 0 14px;">Run these commands on the machine where NAutoBuff is running.</p>
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Local (same machine)</div>
+          <div style="position:relative;">
+            <pre id="mcpCliLocal" style="background:var(--nb-elevated);border:1px solid var(--nb-border);border-radius:var(--r-md);padding:12px;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);color:var(--ok);"></pre>
+            <button onclick="copyMcpConfig('mcpCliLocal')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--nb-border);border-radius:var(--r-sm);background:var(--nb-surface);cursor:pointer;color:var(--t2);">Copy</button>
+          </div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Remote server (SSH tunnel)</div>
+          <div style="position:relative;margin-bottom:8px;">
+            <pre id="mcpCliSshTunnel" style="background:var(--nb-elevated);border:1px solid var(--nb-border);border-radius:var(--r-md);padding:12px;font-size:11px;overflow-x:auto;margin:0;font-family:var(--font-mono);color:var(--ok);"></pre>
+            <button onclick="copyMcpConfig('mcpCliSshTunnel')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--nb-border);border-radius:var(--r-sm);background:var(--nb-surface);cursor:pointer;color:var(--t2);">Copy</button>
+          </div>
+          <div style="position:relative;">
+            <pre id="mcpCliRemote" style="background:var(--nb-elevated);border:1px solid var(--nb-border);border-radius:var(--r-md);padding:12px;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);color:var(--ok);"></pre>
+            <button onclick="copyMcpConfig('mcpCliRemote')" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:11px;border:1px solid var(--nb-border);border-radius:var(--r-sm);background:var(--nb-surface);cursor:pointer;color:var(--t2);">Copy</button>
+          </div>
+        </div>
+        <div style="background:var(--nb-elevated);border:1px solid var(--nb-border);border-radius:var(--r-md);padding:10px 12px;font-size:12px;color:var(--t3);">
+          <strong style="color:var(--t1);">Tip:</strong> Run <code style="font-family:var(--font-mono);background:var(--nb-surface);padding:1px 4px;border-radius:3px;">claude mcp list</code> to verify.
+        </div>
+      </div>
+      <div style="background:var(--nb-elevated);border:1px solid var(--nb-border);border-radius:var(--r-md);padding:10px 12px;font-size:12px;color:var(--t3);margin-top:14px;">
+        <strong style="color:var(--t1);">Note:</strong> MCP HTTP servers (ports 8001/8002) must be enabled. Check Health Check to enable them.
+      </div>
+    </div>
+  </div>
+</div>
 
-      chatHistory.push(`You: ${message}`);
+<!-- Health Check Modal -->
+<div class="modal-overlay" id="healthCheckModal" onclick="closeHealthCheck(event)">
+  <div class="rollback-modal" style="max-width:640px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title">Service Health Check</h2>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button onclick="loadHealthCheck()" title="Refresh" style="background:none;border:none;cursor:pointer;color:var(--t3);padding:4px;display:flex;align-items:center;">
+          <svg id="hc-refresh-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        </button>
+        <button class="modal-close" onclick="closeHealthCheck()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <div id="hc-loading" style="padding:32px;text-align:center;color:var(--t3);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        <div style="margin-top:8px;font-size:13px;">Checking services…</div>
+      </div>
+      <table id="hc-table" style="display:none;width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--nb-border);">
+            <th style="padding:10px 20px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;">Service</th>
+            <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;">Status</th>
+            <th style="padding:10px 20px 10px 0;text-align:right;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="hc-tbody"></tbody>
+      </table>
+      <div style="padding:12px 20px;border-top:1px solid var(--nb-border);text-align:right;">
+        <button onclick="nukeAllServices(this)" class="btn btn-danger btn-sm">Nuke All Services</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-      // Capture the specific element now — before any async work
-      const botResponseEl = document.getElementById(responseId);
+<!-- ═══════════════════════════════ MAIN ══════════════════════════════════ -->
+<main class="nb-main">
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+</main>
 
-      fetch('/chat-query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message, history: chatHistory.slice(0, -1) })
-      })
-      .then(response => {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        botResponseEl.innerHTML = '';
-        let fullResponse = '';
+<!-- ═══════════════════════════════ CHATBOT ═══════════════════════════════ -->
+<button class="chat-toggle" id="chatToggle" onclick="toggleChatbot()" title="AI Assistant">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+</button>
 
-        function readChunk() {
-          reader.read().then(({ done, value }) => {
-            if (done) {
-              chatHistory.push(`Bot: ${fullResponse}`);
-              input.disabled = false;
-              sendBtn.disabled = false;
-              input.focus();
-              return;
-            }
+<div class="chat-container" id="chatContainer">
+  <div class="chat-header">
+    <div class="chat-header-title">
+      <div class="chat-header-icon">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+      </div>
+      <span class="chat-header-text">NAUTOBUFF AI</span>
+    </div>
+    <div class="chat-header-actions">
+      <button class="chat-header-btn" onclick="expandChatbot()" title="Expand">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
+      <button class="chat-header-btn" onclick="closeChatbot()" title="Close">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="chat-model-bar">
+    <span class="chat-model-label">Model:</span>
+    <select class="chat-model-select" id="modelSelect" onchange="setOllamaModel(this.value)"><option value="">Loading…</option></select>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-input">
+    <input type="text" class="chat-input-field" id="chatInput"
+      placeholder="Ask anything about your network…" onkeypress="handleChatKeypress(event)">
+    <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
 
-            const chunk = decoder.decode(value, { stream: true });
-            fullResponse += chunk;
-            botResponseEl.textContent = fullResponse;
-            messages.scrollTop = messages.scrollHeight;
-            readChunk();
-          });
-        }
-        readChunk();
-      })
-      .catch(() => {
-        botResponseEl.textContent = 'Error contacting assistant.';
-        input.disabled = false;
-        sendBtn.disabled = false;
+<!-- ═══════════════════════════════ SCRIPTS ═══════════════════════════════ -->
+<script>
+// ── Theme toggle ─────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('nb-theme', next);
+}
+
+// ── Mobile sidebar ────────────────────────────────────────
+function toggleMobileSidebar() {
+  const sb = document.getElementById('nbSidebar');
+  const ov = document.getElementById('sidebarOverlay');
+  sb.classList.toggle('mobile-open');
+  ov.style.display = sb.classList.contains('mobile-open') ? 'block' : 'none';
+}
+function closeMobileSidebar() {
+  document.getElementById('nbSidebar').classList.remove('mobile-open');
+  document.getElementById('sidebarOverlay').style.display = 'none';
+}
+// Legacy compat
+function toggleSideMenu() { toggleMobileSidebar(); }
+
+// ── Clab status ───────────────────────────────────────────
+function updateClabStatus() {
+  fetch('/clab-health').then(r => r.json()).then(data => {
+    const isUp = data.status === 'up';
+    const dot = document.getElementById('statusDot');
+    if (dot) dot.className = 'nb-status-dot ' + (isUp ? 'online' : 'offline');
+    const stxt = document.getElementById('statusText');
+    if (stxt) stxt.textContent = 'clab ' + (isUp ? 'online' : 'offline');
+  }).catch(() => {
+    const d = document.getElementById('statusDot');
+    if (d) d.className = 'nb-status-dot offline';
+  });
+}
+
+// ── Rollback ──────────────────────────────────────────────
+function showRollbackModal() { document.getElementById('rollbackModal').classList.add('visible'); }
+function closeRollbackModal(event) {
+  if (!event || event.target === event.currentTarget) {
+    document.getElementById('rollbackModal').classList.remove('visible');
+    document.getElementById('rollbackDevice').value = '';
+  }
+}
+async function executeRollback() {
+  const deviceId = document.getElementById('rollbackDevice').value;
+  if (!deviceId) { alert('Please select a device'); return; }
+  if (!confirm(`Rollback ${deviceId} to golden configuration?`)) return;
+  try {
+    const res = await fetch('/rollback', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: deviceId })
+    });
+    const data = await res.json();
+    alert(data.status === 'success' ? `✅ ${data.message}` : `❌ ${data.message}`);
+    if (data.status === 'success') closeRollbackModal();
+  } catch(e) { alert(`❌ Error: ${e.message}`); }
+}
+
+// ── MCP Setup ─────────────────────────────────────────────
+function openMcpSetup(e) {
+  if (e) e.preventDefault();
+  const host = window.location.hostname;
+  const user = '{{ current_user.get_id() if current_user.is_authenticated else "your-user" }}';
+  document.getElementById('mcpConfigLocal').textContent = JSON.stringify({ mcpServers: { "nautobuff-query": { url: "http://localhost:8001/mcp" }, "nautobuff-config": { url: "http://localhost:8002/mcp" } } }, null, 2);
+  document.getElementById('mcpSshTunnel').textContent   = `ssh -N -L 8001:localhost:8001 -L 8002:localhost:8002 ${user}@${host}`;
+  document.getElementById('mcpConfigRemote').textContent = JSON.stringify({ mcpServers: { "nautobuff-query": { url: `http://${host}:8001/mcp` }, "nautobuff-config": { url: `http://${host}:8002/mcp` } } }, null, 2);
+  document.getElementById('mcpCliLocal').textContent    = `claude mcp add --transport http nautobuff-query http://localhost:8001/mcp\nclaude mcp add --transport http nautobuff-config http://localhost:8002/mcp`;
+  document.getElementById('mcpCliSshTunnel').textContent = `ssh -N -L 8001:localhost:8001 -L 8002:localhost:8002 ${user}@${host}`;
+  document.getElementById('mcpCliRemote').textContent   = `claude mcp add --transport http nautobuff-query http://localhost:8001/mcp\nclaude mcp add --transport http nautobuff-config http://localhost:8002/mcp`;
+  document.getElementById('mcpSetupModal').classList.add('visible');
+  closeMobileSidebar();
+}
+function closeMcpSetup(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('mcpSetupModal').classList.remove('visible');
+}
+function switchMcpTab(tab) {
+  const isD = tab === 'desktop';
+  document.getElementById('mcp-panel-desktop').style.display = isD ? 'block' : 'none';
+  document.getElementById('mcp-panel-cli').style.display     = isD ? 'none'  : 'block';
+  const b1 = document.getElementById('mcp-tab-desktop'), b2 = document.getElementById('mcp-tab-cli');
+  b1.style.borderBottomColor = isD ? 'var(--vlab)' : 'transparent'; b1.style.color = isD ? 'var(--t1)' : 'var(--t3)';
+  b2.style.borderBottomColor = isD ? 'transparent' : 'var(--vlab)'; b2.style.color = isD ? 'var(--t3)' : 'var(--t1)';
+}
+function copyMcpConfig(id) {
+  const text = document.getElementById(id).textContent;
+  const btn  = document.querySelector(`[onclick="copyMcpConfig('${id}')"]`);
+  const flash = () => { if (btn) { const o = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = o, 1500); } };
+  navigator.clipboard ? navigator.clipboard.writeText(text).then(flash).catch(() => _fallbackCopy(text, flash)) : _fallbackCopy(text, flash);
+}
+
+// ── Health Check ──────────────────────────────────────────
+let _hcInterval = null;
+function openHealthCheck(e) {
+  if (e) e.preventDefault();
+  closeMobileSidebar();
+  document.getElementById('healthCheckModal').classList.add('visible');
+  loadHealthCheck();
+  _hcInterval = setInterval(loadHealthCheck, 10000);
+}
+function closeHealthCheck(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('healthCheckModal').classList.remove('visible');
+  clearInterval(_hcInterval); _hcInterval = null;
+}
+function loadHealthCheck() {
+  const icon = document.getElementById('hc-refresh-icon');
+  icon.style.animation = 'spin 0.8s linear infinite';
+  fetch('/api/services').then(r => r.json()).then(services => {
+    icon.style.animation = '';
+    document.getElementById('hc-loading').style.display = 'none';
+    const tbody = document.getElementById('hc-tbody');
+    tbody.innerHTML = '';
+    services.forEach(svc => {
+      const isActive = svc.status === 'active', isFailed = svc.status === 'failed';
+      let dotColor = 'var(--t4)';
+      if (isActive) dotColor = 'var(--ok)'; if (isFailed) dotColor = 'var(--err)';
+      const badge = isActive
+        ? `<span style="font-size:11px;padding:2px 8px;border-radius:var(--r-full);background:var(--ok-dim);color:var(--ok);font-weight:600;">running</span>`
+        : isFailed
+        ? `<span style="font-size:11px;padding:2px 8px;border-radius:var(--r-full);background:var(--err-dim);color:var(--err);font-weight:600;">failed</span>`
+        : svc.status === 'unknown'
+        ? `<span style="font-size:11px;padding:2px 8px;border-radius:var(--r-full);background:rgba(74,94,122,.15);color:var(--t3);font-weight:600;">unknown</span>`
+        : `<span style="font-size:11px;padding:2px 8px;border-radius:var(--r-full);background:var(--warn-dim);color:var(--warn);font-weight:600;">stopped</span>`;
+      const disStart = isActive ? 'disabled' : '', disStop = !isActive ? 'disabled' : '';
+      const row = document.createElement('tr');
+      row.style.borderBottom = '1px solid var(--nb-border-dim)';
+      row.innerHTML = `
+        <td style="padding:11px 20px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="width:7px;height:7px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
+            <span style="font-size:13px;font-weight:500;">${svc.label}</span>
+          </div>
+          <div style="font-size:10px;color:var(--t3);margin-top:2px;padding-left:15px;font-family:var(--font-mono);">${svc.unit}</div>
+        </td>
+        <td style="padding:11px 12px;text-align:center;">${badge}</td>
+        <td style="padding:11px 20px 11px 0;text-align:right;white-space:nowrap;">
+          <button ${disStart} onclick="controlService('${svc.unit}','start',this)" style="padding:4px 10px;font-size:12px;border-radius:var(--r-sm);border:1px solid var(--nb-border);background:var(--nb-elevated);cursor:${disStart?'not-allowed':'pointer'};color:var(--t1);margin-right:4px;opacity:${disStart?'.35':'1'};font-family:var(--font-ui);">Start</button>
+          <button ${disStop}  onclick="controlService('${svc.unit}','stop',this)"  style="padding:4px 10px;font-size:12px;border-radius:var(--r-sm);border:1px solid var(--nb-border);background:var(--nb-elevated);cursor:${disStop?'not-allowed':'pointer'};color:var(--t1);margin-right:4px;opacity:${disStop?'.35':'1'};font-family:var(--font-ui);">Stop</button>
+          <button onclick="controlService('${svc.unit}','restart',this)" style="padding:4px 10px;font-size:12px;border-radius:var(--r-sm);border:1px solid var(--nb-border);background:var(--nb-elevated);cursor:pointer;color:var(--t1);font-family:var(--font-ui);">Restart</button>
+        </td>`;
+      tbody.appendChild(row);
+    });
+    document.getElementById('hc-table').style.display = 'table';
+  }).catch(() => { icon.style.animation = ''; });
+}
+function controlService(unit, action, btn) {
+  if (!btn || btn.disabled) return;
+  const row = btn.closest('tr');
+  const btns = row ? row.querySelectorAll('button') : [btn];
+  btns.forEach(b => { b.disabled = true; b.style.opacity = '0.35'; });
+  const orig = btn.textContent; btn.textContent = '…';
+  fetch('/api/services/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ unit, action }) })
+    .then(r => r.json()).then(d => {
+      d.error ? _hcToast('error', `${unit}: ${d.error}`) : _hcToast('ok', `${action} → ${unit}`);
+      setTimeout(loadHealthCheck, 1200);
+    }).catch(e => { _hcToast('error', `Request failed: ${e.message}`); btns.forEach(b => { b.disabled = false; b.style.opacity = '1'; }); btn.textContent = orig; });
+}
+function nukeAllServices(btn) {
+  if (!confirm('Stop and remove all NAutoBuff services? This cannot be undone without re-running pilot.sh.')) return;
+  btn.disabled = true; btn.textContent = '…';
+  fetch('/api/services/nuke', { method: 'POST' }).then(r => r.json()).then(d => {
+    if (d.error) { _hcToast('error', d.error); } else { _hcToast('ok', 'All services stopped.'); setTimeout(loadHealthCheck, 1500); }
+    btn.disabled = false; btn.textContent = 'Nuke All Services';
+  }).catch(e => { _hcToast('error', `Request failed: ${e.message}`); btn.disabled = false; btn.textContent = 'Nuke All Services'; });
+}
+function _hcToast(type, msg) {
+  const t = document.createElement('div');
+  t.textContent = (type === 'ok' ? '✔ ' : '✘ ') + msg;
+  t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:var(--r-md);font-size:13px;font-weight:600;z-index:99999;background:${type==='ok'?'var(--ok)':'var(--err)'};color:${type==='ok'?'var(--nb-base)':'white'};box-shadow:var(--sh-md);pointer-events:none;font-family:var(--font-ui)`;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 3000);
+}
+
+// ── Jenkins ───────────────────────────────────────────────
+let _jenkinsData = null;
+function openJenkins(e) {
+  e.preventDefault();
+  if (_jenkinsData && _jenkinsData.jenkins_url) { window.open(_jenkinsData.jenkins_url, '_blank'); return; }
+  fetch('/api/jenkins-status').then(r => r.json()).then(d => {
+    _jenkinsData = d; _renderNgrokRow(d);
+    if (d.jenkins_url) window.open(d.jenkins_url, '_blank');
+    else alert('Ngrok tunnel not running — Jenkins URL unavailable.');
+  }).catch(() => alert('Could not reach Jenkins status API.'));
+}
+function _renderNgrokRow(d) {
+  const row = document.getElementById('menu-ngrok-row');
+  const inp  = document.getElementById('menu-ngrok-input');
+  const hint = document.getElementById('menu-ngrok-hint');
+  if (d && d.webhook_url) {
+    inp.value = d.webhook_url;
+    hint.textContent = 'Webhook URL — paste in GitHub repo → Settings → Webhooks';
+    row.style.display = 'block';
+  } else { row.style.display = 'none'; }
+}
+function copyMenuNgrok() {
+  const inp = document.getElementById('menu-ngrok-input');
+  _fallbackCopy(inp.value, () => {
+    const btn = inp.nextElementSibling;
+    if (btn) { const o = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = o, 1500); }
+  });
+}
+
+// ── Chatbot ───────────────────────────────────────────────
+let chatHistory = [];
+function toggleChatbot() {
+  const c = document.getElementById('chatContainer');
+  c.classList.toggle('visible');
+  if (c.classList.contains('visible')) { document.getElementById('chatInput').focus(); loadOllamaModels(); }
+}
+function closeChatbot() {
+  document.getElementById('chatContainer').classList.remove('visible','expanded');
+  chatHistory = []; document.getElementById('chatMessages').innerHTML = '';
+}
+function expandChatbot() { document.getElementById('chatContainer').classList.toggle('expanded'); }
+function handleChatKeypress(e) { if (e.key === 'Enter') sendChatMessage(); }
+function loadOllamaModels() {
+  fetch('/api/ollama/models').then(r => r.json()).then(data => {
+    const sel = document.getElementById('modelSelect'); sel.innerHTML = '';
+    if (!data.models.length) { sel.innerHTML = '<option value="">No models found</option>'; return; }
+    data.models.forEach(m => {
+      const o = document.createElement('option'); o.value = m; o.textContent = m;
+      if (m === data.selected) o.selected = true; sel.appendChild(o);
+    });
+  }).catch(() => { document.getElementById('modelSelect').innerHTML = '<option value="">Ollama unavailable</option>'; });
+}
+function setOllamaModel(model) {
+  if (!model) return;
+  fetch('/api/ollama/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) });
+}
+function sendChatMessage() {
+  const input   = document.getElementById('chatInput');
+  const message = input.value.trim(); if (!message) return;
+  const messages = document.getElementById('chatMessages');
+  const sendBtn  = document.getElementById('chatSendBtn');
+  input.value = ''; input.disabled = true; sendBtn.disabled = true;
+  const userDiv = document.createElement('div');
+  userDiv.className = 'chat-message chat-message-user';
+  userDiv.innerHTML = `<span class="chat-message-label">You</span><div class="chat-message-content">${escapeHtml(message)}</div>`;
+  messages.appendChild(userDiv);
+  const rid = 'botR_' + Date.now();
+  const botDiv = document.createElement('div');
+  botDiv.className = 'chat-message chat-message-bot';
+  botDiv.innerHTML = `<span class="chat-message-label">Assistant</span><div class="chat-message-content" id="${rid}"><div class="chat-typing"><span class="chat-typing-dot"></span><span class="chat-typing-dot"></span><span class="chat-typing-dot"></span></div></div>`;
+  messages.appendChild(botDiv);
+  messages.scrollTop = messages.scrollHeight;
+  chatHistory.push(`You: ${message}`);
+  const botEl = document.getElementById(rid);
+  fetch('/chat-query', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, history: chatHistory.slice(0,-1) })
+  }).then(response => {
+    const reader = response.body.getReader(), decoder = new TextDecoder();
+    botEl.innerHTML = ''; let full = '';
+    function readChunk() {
+      reader.read().then(({ done, value }) => {
+        if (done) { chatHistory.push(`Bot: ${full}`); input.disabled = false; sendBtn.disabled = false; input.focus(); return; }
+        full += decoder.decode(value, { stream: true });
+        botEl.textContent = full; messages.scrollTop = messages.scrollHeight; readChunk();
       });
     }
+    readChunk();
+  }).catch(() => { botEl.textContent = 'Error contacting assistant.'; input.disabled = false; sendBtn.disabled = false; });
+}
+function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
 
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
+// ── Utility ───────────────────────────────────────────────
+function _fallbackCopy(text, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); if (cb) cb(); } catch(_) {}
+  document.body.removeChild(ta);
+}
 
-    // ========== Rollback Modal ==========
-    function showRollbackModal() {
-      const modal = document.getElementById('rollbackModal');
-      modal.classList.add('visible');
-    }
+// ── Browser Fullscreen ─────────────────────────────────────
+async function requestBrowserFullscreen() {
+  const el = document.documentElement;
+  if (document.fullscreenElement) return true;
+  try {
+    if (el.requestFullscreen) await el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    else return false;
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
 
-    function closeRollbackModal(event) {
-      if (!event || event.target === event.currentTarget) {
-        const modal = document.getElementById('rollbackModal');
-        modal.classList.remove('visible');
-        document.getElementById('rollbackDevice').value = '';
-      }
-    }
+async function exitBrowserFullscreen() {
+  try {
+    if (document.exitFullscreen && document.fullscreenElement) await document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  } catch (_) {}
+}
 
-    async function executeRollback() {
-      const deviceId = document.getElementById('rollbackDevice').value;
+// ── Init ──────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  updateClabStatus();
+  fetch('/api/jenkins-status').then(r => r.json()).then(d => { _jenkinsData = d; _renderNgrokRow(d); }).catch(() => {});
+});
+setInterval(updateClabStatus, 8000);
+</script>
 
-      if (!deviceId) {
-        alert('Please select a device');
-        return;
-      }
-
-      if (!confirm(`Are you sure you want to rollback ${deviceId} to its golden configuration?`)) {
-        return;
-      }
-
-      try {
-        const response = await fetch('/rollback', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ device_id: deviceId })
-        });
-
-        const data = await response.json();
-
-        if (data.status === 'success') {
-          alert(`✅ ${data.message}`);
-          closeRollbackModal();
-        } else {
-          alert(`❌ ${data.message}`);
-        }
-      } catch (error) {
-        alert(`❌ Error: ${error.message}`);
-      }
-    }
-
-    // ========== Health Check Modal ==========
-    let _hcInterval = null;
-
-    function openMcpSetup(e) {
-      if (e) e.preventDefault();
-      const host = window.location.hostname;
-      const user = '{{ current_user.get_id() if current_user.is_authenticated else "your-user" }}';
-
-      // Desktop tab
-      document.getElementById('mcpConfigLocal').textContent = JSON.stringify({
-        mcpServers: {
-          "nautobuff-query": { url: "http://localhost:8001/mcp" },
-          "nautobuff-config": { url: "http://localhost:8002/mcp" }
-        }
-      }, null, 2);
-
-      document.getElementById('mcpSshTunnel').textContent =
-        `ssh -N -L 8001:localhost:8001 -L 8002:localhost:8002 ${user}@${host}`;
-
-      document.getElementById('mcpConfigRemote').textContent = JSON.stringify({
-        mcpServers: {
-          "nautobuff-query": { url: `http://${host}:8001/mcp` },
-          "nautobuff-config": { url: `http://${host}:8002/mcp` }
-        }
-      }, null, 2);
-
-      // CLI tab
-      document.getElementById('mcpCliLocal').textContent =
-        `claude mcp add --transport http nautobuff-query http://localhost:8001/mcp\nclaude mcp add --transport http nautobuff-config http://localhost:8002/mcp`;
-
-      document.getElementById('mcpCliSshTunnel').textContent =
-        `ssh -N -L 8001:localhost:8001 -L 8002:localhost:8002 ${user}@${host}`;
-
-      document.getElementById('mcpCliRemote').textContent =
-        `claude mcp add --transport http nautobuff-query http://localhost:8001/mcp\nclaude mcp add --transport http nautobuff-config http://localhost:8002/mcp`;
-
-      document.getElementById('mcpSetupModal').classList.add('visible');
-      document.getElementById('sideMenu').classList.remove('open');
-      document.getElementById('menuOverlay').classList.remove('visible');
-    }
-
-    function closeMcpSetup(event) {
-      if (event && event.target !== event.currentTarget) return;
-      document.getElementById('mcpSetupModal').classList.remove('visible');
-    }
-
-    function switchMcpTab(tab) {
-      const isDesktop = tab === 'desktop';
-      document.getElementById('mcp-panel-desktop').style.display = isDesktop ? 'block' : 'none';
-      document.getElementById('mcp-panel-cli').style.display = isDesktop ? 'none' : 'block';
-      document.getElementById('mcp-tab-desktop').style.borderBottomColor = isDesktop ? 'var(--color-primary)' : 'transparent';
-      document.getElementById('mcp-tab-desktop').style.color = isDesktop ? 'var(--color-text)' : 'var(--color-text-muted)';
-      document.getElementById('mcp-tab-cli').style.borderBottomColor = isDesktop ? 'transparent' : 'var(--color-primary)';
-      document.getElementById('mcp-tab-cli').style.color = isDesktop ? 'var(--color-text-muted)' : 'var(--color-text)';
-    }
-
-    function copyMcpConfig(id) {
-      const text = document.getElementById(id).textContent;
-      const btn = document.querySelector(`[onclick="copyMcpConfig('${id}')"]`);
-      const flash = () => { if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1500); } };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(flash).catch(() => fallbackCopy(text, flash));
-      } else {
-        fallbackCopy(text, flash);
-      }
-    }
-
-    function fallbackCopy(text, cb) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try { document.execCommand('copy'); if (cb) cb(); } catch(e) {}
-      document.body.removeChild(ta);
-    }
-
-    function openHealthCheck(e) {
-      if (e) e.preventDefault();
-      document.getElementById('healthCheckModal').classList.add('visible');
-      loadHealthCheck();
-      _hcInterval = setInterval(loadHealthCheck, 10000);
-      // close side menu
-      document.getElementById('sideMenu').classList.remove('open');
-      document.getElementById('menuOverlay').classList.remove('visible');
-    }
-
-    function closeHealthCheck(event) {
-      if (event && event.target !== event.currentTarget) return;
-      document.getElementById('healthCheckModal').classList.remove('visible');
-      clearInterval(_hcInterval);
-      _hcInterval = null;
-    }
-
-    function loadHealthCheck() {
-      const icon = document.getElementById('hc-refresh-icon');
-      icon.style.animation = 'spin 0.8s linear infinite';
-      fetch('/api/services')
-        .then(r => r.json())
-        .then(services => {
-          icon.style.animation = '';
-          document.getElementById('hc-loading').style.display = 'none';
-          const tbody = document.getElementById('hc-tbody');
-          tbody.innerHTML = '';
-          services.forEach(svc => {
-            const isActive  = svc.status === 'active';
-            const isFailed  = svc.status === 'failed';
-            const isInactive = !isActive;
-
-            let dotColor = '#6b7280'; // neutral
-            if (isActive)  dotColor = 'var(--color-success, #10b981)';
-            if (isFailed)  dotColor = 'var(--color-error,   #ef4444)';
-
-            const badge = isActive  ? '<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,.12);color:#10b981;font-weight:600;">running</span>'
-                        : isFailed  ? '<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(239,68,68,.12);color:#ef4444;font-weight:600;">failed</span>'
-                        : svc.status === 'unknown' ? '<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(107,114,128,.1);color:#6b7280;font-weight:600;">unknown</span>'
-                        : '<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(245,158,11,.12);color:#f59e0b;font-weight:600;">stopped</span>';
-
-            const disStart   = isActive  ? 'disabled' : '';
-            const disStop    = isInactive ? 'disabled' : '';
-
-            const row = document.createElement('tr');
-            row.style.borderBottom = '1px solid var(--color-border)';
-            row.innerHTML = `
-              <td style="padding:12px 20px;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;${isActive ? 'box-shadow:0 0 0 2px rgba(16,185,129,.2)' : ''}"></span>
-                  <span style="font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);">${svc.label}</span>
-                </div>
-                <div style="font-size:10px;color:var(--color-text-muted);margin-top:2px;padding-left:16px;">${svc.unit}</div>
-              </td>
-              <td style="padding:12px;text-align:center;">${badge}</td>
-              <td style="padding:12px 20px 12px 0;text-align:right;white-space:nowrap;">
-                <button ${disStart} onclick="controlService('${svc.unit}','start',this)"
-                  style="padding:4px 10px;font-size:12px;border-radius:var(--radius-sm);border:1px solid var(--color-border);background:var(--color-surface-raised);cursor:${disStart ? 'not-allowed' : 'pointer'};color:var(--color-text);margin-right:4px;opacity:${disStart ? '.35' : '1'}">Start</button>
-                <button ${disStop} onclick="controlService('${svc.unit}','stop',this)"
-                  style="padding:4px 10px;font-size:12px;border-radius:var(--radius-sm);border:1px solid var(--color-border);background:var(--color-surface-raised);cursor:${disStop ? 'not-allowed' : 'pointer'};color:var(--color-text);margin-right:4px;opacity:${disStop ? '.35' : '1'}">Stop</button>
-                <button onclick="controlService('${svc.unit}','restart',this)"
-                  style="padding:4px 10px;font-size:12px;border-radius:var(--radius-sm);border:1px solid var(--color-border);background:var(--color-surface-raised);cursor:pointer;color:var(--color-text);">Restart</button>
-              </td>`;
-            tbody.appendChild(row);
-          });
-          document.getElementById('hc-table').style.display = 'table';
-        })
-        .catch(() => { icon.style.animation = ''; });
-    }
-
-    function controlService(unit, action, btn) {
-      if (!btn || btn.disabled) return;
-      // Disable all action buttons in the row while running
-      const row = btn.closest('tr');
-      const btns = row ? row.querySelectorAll('button') : [btn];
-      btns.forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
-      const orig = btn.textContent;
-      btn.textContent = '…';
-
-      fetch('/api/services/control', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ unit, action }),
-      })
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) {
-          _hcToast('error', `${unit}: ${d.error}`);
-        } else {
-          _hcToast('ok', `${action} → ${unit}`);
-        }
-        setTimeout(loadHealthCheck, 1200);
-      })
-      .catch(e => {
-        _hcToast('error', `Request failed: ${e.message}`);
-        btns.forEach(b => { b.disabled = false; b.style.opacity = '1'; });
-        btn.textContent = orig;
-      });
-    }
-
-    function nukeAllServices(btn) {
-      if (!confirm('Stop and remove all NAutoBuff services? This cannot be undone without re-running pilot.sh.')) return;
-      btn.disabled = true;
-      btn.textContent = '…';
-      fetch('/api/services/nuke', { method: 'POST' })
-        .then(r => r.json())
-        .then(d => {
-          if (d.error) {
-            _hcToast('error', d.error);
-            btn.disabled = false;
-            btn.textContent = 'Nuke All Services';
-          } else {
-            _hcToast('ok', 'All services stopped and removed.');
-            setTimeout(loadHealthCheck, 1500);
-            btn.disabled = false;
-            btn.textContent = 'Nuke All Services';
-          }
-        })
-        .catch(e => {
-          _hcToast('error', `Request failed: ${e.message}`);
-          btn.disabled = false;
-          btn.textContent = 'Nuke All Services';
-        });
-    }
-
-    function _hcToast(type, msg) {
-      const t = document.createElement('div');
-      t.textContent = (type === 'ok' ? '✔ ' : '✘ ') + msg;
-      t.style.cssText = `position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
-        padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;z-index:99999;
-        background:${type === 'ok' ? '#10b981' : '#ef4444'};color:#fff;
-        box-shadow:0 4px 12px rgba(0,0,0,.2);pointer-events:none;`;
-      document.body.appendChild(t);
-      setTimeout(() => t.remove(), 3000);
-    }
-
-    // ========== External Links (sidebar) ==========
-    let _jenkinsData = null;
-
-    function openJenkins(e) {
-      e.preventDefault();
-      const link = document.getElementById('menu-jenkins-link');
-      if (_jenkinsData && _jenkinsData.jenkins_url) {
-        window.open(_jenkinsData.jenkins_url, '_blank');
-      } else {
-        // fetch on first click
-        fetch('/api/jenkins-status')
-          .then(r => r.json())
-          .then(d => {
-            _jenkinsData = d;
-            _renderNgrokRow(d);
-            if (d.jenkins_url) window.open(d.jenkins_url, '_blank');
-            else alert('Ngrok tunnel not running — Jenkins URL unavailable.');
-          })
-          .catch(() => alert('Could not reach Jenkins status API.'));
-      }
-    }
-
-    function _renderNgrokRow(d) {
-      const row = document.getElementById('menu-ngrok-row');
-      const inp = document.getElementById('menu-ngrok-input');
-      const hint = document.getElementById('menu-ngrok-hint');
-      if (d && d.webhook_url) {
-        inp.value = d.webhook_url;
-        hint.textContent = 'Webhook URL (paste in GitHub repo → Settings → Webhooks)';
-        row.style.display = 'block';
-      } else {
-        row.style.display = 'none';
-      }
-    }
-
-    // Pre-load ngrok status when the side menu opens
-    const _origToggleSideMenu = toggleSideMenu;
-    toggleSideMenu = function() {
-      _origToggleSideMenu();
-      const menu = document.getElementById('sideMenu');
-      if (menu.classList.contains('open') && !_jenkinsData) {
-        fetch('/api/jenkins-status')
-          .then(r => r.json())
-          .then(d => { _jenkinsData = d; _renderNgrokRow(d); })
-          .catch(() => {});
-      }
-    };
-
-    function copyMenuNgrok() {
-      const inp = document.getElementById('menu-ngrok-input');
-      const btn = inp.nextElementSibling;
-      _copyText(inp.value, btn);
-    }
-
-    function _copyText(text, feedbackBtn) {
-      // Works on plain HTTP (no secure context required)
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      let ok = false;
-      try { ok = document.execCommand('copy'); } catch (_) {}
-      document.body.removeChild(ta);
-
-      if (feedbackBtn) {
-        const orig = feedbackBtn.textContent;
-        feedbackBtn.textContent = ok ? 'Copied!' : 'Failed';
-        setTimeout(() => { feedbackBtn.textContent = orig; }, 1500);
-      }
-    }
-
-    // ========== Initialize ==========
-    window.onload = () => {
-      const savedTheme = localStorage.getItem('theme') || 'light';
-      document.documentElement.setAttribute('data-theme', savedTheme);
-      updateThemeIcon(savedTheme);
-      updateClabStatus();
-    };
-
-    setInterval(updateClabStatus, 5000);
-  </script>
-
-  <style>
-    /* Rollback Button in Navbar */
-    .navbar-rollback-btn {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-2) var(--space-3);
-      background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-      color: white;
-      border: none;
-      border-radius: var(--radius-md);
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-medium);
-      cursor: pointer;
-      transition: all var(--transition-fast);
-      box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
-    }
-
-    .navbar-rollback-btn:hover {
-      background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
-    }
-
-    .navbar-rollback-btn:active {
-      transform: translateY(0);
-    }
-
-    @media (max-width: 768px) {
-      .navbar-rollback-text {
-        display: none;
-      }
-    }
-
-    /* Global Rollback Modal */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background-color: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(4px);
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      visibility: hidden;
-      transition: all 0.3s ease;
-    }
-
-    .modal-overlay.visible {
-      opacity: 1;
-      visibility: visible;
-    }
-
-    .rollback-modal {
-      background: var(--color-surface);
-      border-radius: var(--radius-xl);
-      max-width: 500px;
-      width: 90%;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: var(--shadow-xl);
-      transform: scale(0.9);
-      transition: transform 0.3s ease;
-    }
-
-    .modal-overlay.visible .rollback-modal {
-      transform: scale(1);
-    }
-  </style>
-
-  {% block scripts %}{% endblock %}
+{% block scripts %}{% endblock %}
 </body>
 </html>
