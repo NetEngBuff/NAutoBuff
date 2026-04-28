@@ -1,13 +1,13 @@
 ---
 devices:
-- hostname: R1
+- hostname: R2
   vendor: arista
   clear_config: 'no'
   interfaces:
   - name: Ethernet2
-    ip_address: 10.0.0.1
+    ip_address: 10.0.0.2
     subnet_mask: '24'
   bgp:
-    as_number: '65001'
+    as_number: '65002'
     redistribute_ospf: false
     redistribute_rip: false
