@@ -637,23 +637,10 @@ def provision_jenkins_firsttime():
       2. Writes wizard-skip state files
       3. Writes Groovy init script to create admin/admin
       4. Enables and starts Jenkins
-    Safe to re-run — skips if admin account already exists.
+    Safe to re-run — resets the local admin account to admin/admin.
     """
     groovy_dir = "/var/lib/jenkins/init.groovy.d"
     groovy_file = os.path.join(groovy_dir, "01-security.groovy")
-
-    # Skip if already configured
-    try:
-        r = subprocess.run(
-            ["sudo", "test", "-f", groovy_file],
-            capture_output=True
-        )
-        if r.returncode == 0:
-            print("ℹ️  Jenkins first-time config already applied — skipping")
-            subprocess.run(["sudo", "systemctl", "enable", "--now", "jenkins"], check=True)
-            return
-    except Exception:
-        pass
 
     print("⏳ Configuring Jenkins for first-time setup...")
 
@@ -687,11 +674,6 @@ import hudson.security.*
 import jenkins.install.InstallState
 
 def instance = Jenkins.get()
-if (instance.getSecurityRealm() instanceof HudsonPrivateSecurityRealm &&
-    instance.getSecurityRealm().getAllUsers().find { it.id == "admin" }) {
-    println("INFO: Jenkins admin already configured — skipping")
-    return
-}
 def realm = new HudsonPrivateSecurityRealm(false)
 realm.createAccount("admin", "admin")
 instance.setSecurityRealm(realm)
@@ -700,7 +682,7 @@ strategy.setAllowAnonymousRead(false)
 instance.setAuthorizationStrategy(strategy)
 instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
 instance.save()
-println("OK: Jenkins admin user and security configured")
+println("OK: Jenkins admin user reset and security configured")
 """
     subprocess.run(["sudo", "mkdir", "-p", groovy_dir], check=True)
     subprocess.run(
