@@ -30,16 +30,17 @@ NAutoBuff's NSoT lives in the `NSOT/` directory:
 | Feature | Description |
 |---|---|
 | **Topology Builder** | Deploy/destroy Containerlab topologies from the UI |
-| **Config Generator** | Build device configs from Jinja2 templates (BGP, OSPF, RIP, VLANs, DHCP, Subinterfaces) |
+| **Config Generator** | Build device configs from Jinja2 templates (interfaces, subinterfaces, static routes, BGP, OSPF, RIP, VLANs) |
 | **Config Push** | Push configs to devices via SSH (Netmiko) with CI/CD validation |
 | **Config Rollback** | Atomic configure-session replace to golden config — credentials auto-synced from inventory |
 | **Console Access** | Interactive browser-based SSH terminal for each device (xterm.js + WebSocket) |
-| **IPAM** | Live SNMP-polled IP address table; sync IPs from Containerlab with one button |
+| **IPAM** | Live SNMP-polled IP address table using the management IPs in `hosts.csv` |
 | **Device Health** | CPU, interface, route, and LLDP neighbor health checks |
 | **Telemetry** | gNMI streaming via gnmic → InfluxDB → Grafana dashboard |
 | **AI Assistant (NBot)** | Natural language queries AND configuration via Ollama LLM — full CI/CD pipeline triggered on configure |
 | **MCP Servers** | Claude/ChatGPT Desktop can query and configure devices via MCP tools |
-| **Service Health Check** | Start/stop/restart/nuke all project services from the burger menu |
+| **Service Health Check** | Start/stop/restart project services from the burger menu |
+| **Kill Switch** | Reset generated NAutoBuff services, lab state, runtime files, and optional installed packages |
 | **External Links** | Grafana, InfluxDB, and Jenkins URLs always accessible from the nav menu |
 | **Password Rotation** | Automatic credential rotation on all devices every 30 minutes |
 | **App Logging** | Timestamped log at `NSOT/logs/nautobuff.log` |
@@ -91,7 +92,7 @@ Every config change pushed through the web UI or AI chatbot goes through a full 
 mkdir -p ~/projects && cd ~/projects
 git clone git@github.com:<your-username>/NAutoBuff.git
 cd NAutoBuff/pilot-config
-chmod +x requirements.sh pilot.sh run_nautobuff.sh
+chmod +x requirements.sh pilot.sh run_nautobuff.sh kill_switch.sh
 ```
 
 ---
@@ -110,6 +111,23 @@ This installs everything the system needs (run once):
 - Optional: **MCP HTTP servers** for Claude/ChatGPT Desktop integration
 
 > **After it finishes — log out and back in** (or open a new terminal) so Docker group changes take effect.
+
+### Clean slate / reinstall
+
+If you want to remove runtime state created by `requirements.sh` and `pilot.sh`, run the kill switch from the repo you want to reset:
+
+```bash
+cd ~/projects/NAutoBuff/pilot-config
+./kill_switch.sh
+```
+
+For a full reset that also removes third-party packages and service data:
+
+```bash
+./kill_switch.sh --purge-packages --purge-data
+```
+
+The script prompts you to type `RESET` before it changes the machine. After it completes, run `./requirements.sh` and `./pilot.sh` again.
 
 ---
 
@@ -166,8 +184,9 @@ This is the only manual step. Jenkins needs GitHub to notify it when you push.
 ### Step 7 — Deploy a topology and start streaming telemetry
 
 1. Open the web UI → **Topology Builder** → deploy your lab
-2. Go to **IPAM** → click **Sync IPs from clab** to populate `hosts.csv`
-3. Telemetry starts flowing automatically: devices → gnmic → InfluxDB → Grafana
+2. Confirm device management IPs are present in **Hosts Inventory**. For virtual labs, use the OOB subnet described on the topology page.
+3. Open **IPAM**. The poller reads `hosts.csv` and discovers interface IPs over SNMP.
+4. Telemetry starts flowing automatically: devices → gnmic → InfluxDB → Grafana
 
 ---
 
@@ -191,7 +210,7 @@ Managed from **burger menu → Health Check** or via the command line:
 
 | Service | Purpose |
 |---|---|
-| `ipam.service` | SNMP polling every 10s → `IPAM/hosts.csv` |
+| `ipam.service` | SNMP polling every 10s → `IPAM/ipam_output.csv` |
 | `gnmic_nautobuff.service` | gNMI telemetry → InfluxDB |
 | `device_health_check.timer` | Periodic CPU/interface/route checks |
 | `password_update.service` | Credential rotation every 30 min |
@@ -227,14 +246,16 @@ sudo journalctl -u jenkins -f
 newgrp docker
 ```
 
-**IPAM shows "file not found"**
-- No topology is deployed yet — deploy a lab first, then click **Sync IPs from clab** in the IPAM page
+**IPAM shows no device IPs**
+- Confirm the topology is deployed and the devices are reachable on the management IPs in `NSOT/IPAM/hosts.csv`
+- In virtual labs, the host OOB interface should be `eth1.100` with `10.0.101.200/24`
+- Click **Restart IPAM Poller** on the IPAM page, then wait one polling interval
 
 **Telemetry not showing in Grafana**
 ```bash
 # Check gnmic is streaming
 sudo journalctl -u gnmic_nautobuff.service -n 30
-# Re-sync devices after deploying topology
+# Re-sync telemetry targets after deploying topology
 cd ~/projects/NAutoBuff && python3 NSOT/python-files/gnmi_hosts.py
 sudo systemctl restart gnmic_nautobuff.service
 ```
@@ -259,14 +280,15 @@ python3 -c "from pilot import provision_jenkins_job; provision_jenkins_job()"
 ```
 
 **Config push fails — wrong management IP**
-- Open IPAM page → click **Sync IPs from clab**
+- Check **Hosts Inventory**. Device management IPs should be user-entered lab management addresses, not Containerlab runtime `172.20.20.x` addresses.
+- For virtual labs, use the `10.0.101.0/24` OOB network and verify the host has `eth1.100`.
 
 **Rollback loses management connectivity**
 - Golden config didn't include `Management0` when saved
 - Fix: while devices are reachable, re-run **Tools → Golden Config Generator → All devices**
 
 **Rollback fails after topology redeploy**
-- Containerlab reassigns IPs on redeploy — open IPAM → **Sync IPs from clab**, then retry
+- Confirm `hosts.csv` still has the intended management IPs and credentials, then retry after the topology is reachable.
 
 **Windows/WSL: user not in sudoers**
 ```powershell

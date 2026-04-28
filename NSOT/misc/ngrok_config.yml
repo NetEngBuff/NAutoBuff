@@ -1,8 +1,0 @@
----
-version: "2"
-authtoken: 2o5BtZemUpatdb4qKUNE4twXCJo_2XqZKbd3BTKJ7aK96VWjk
-region: us
-tunnels:
-  jenkins:
-    addr: 8080
-    proto: http

@@ -66,3 +66,7 @@ pilot-config/.jenkins_creds
 
 # ── Claude Code ───────────────────────────────────────────────────────────────
 CLAUDE.md
+
+# Generated local integration/config payloads
+.mcp.json
+NSOT/templates/devices_config.yml
