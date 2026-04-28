@@ -110,6 +110,36 @@ def _auth():
     return (JENKINS_USER, JENKINS_TOKEN) if JENKINS_TOKEN else None
 
 
+def _jenkins_crumb():
+    try:
+        resp = requests.get(
+            "http://localhost:8080/crumbIssuer/api/json",
+            auth=_auth(),
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return {data["crumbRequestField"]: data["crumb"]}
+    except Exception as e:
+        print(f"Could not fetch Jenkins crumb: {e}")
+    return {}
+
+
+def trigger_jenkins_build():
+    """Trigger Jenkins directly so CI does not depend only on GitHub webhook delivery."""
+    try:
+        url = f"http://localhost:8080/job/{JENKINS_JOB_NAME}/build"
+        headers = _jenkins_crumb()
+        resp = requests.post(url, auth=_auth(), headers=headers, timeout=15)
+        if resp.status_code in (200, 201, 202, 302):
+            print("Jenkins build trigger queued via local API.")
+            return True
+        print(f"Jenkins direct trigger failed: HTTP {resp.status_code} — {resp.text[:300]}")
+    except Exception as e:
+        print(f"Jenkins direct trigger failed: {e}")
+    return False
+
+
 def get_latest_build_number():
     """Get current latest build number via localhost."""
     try:
@@ -181,6 +211,7 @@ def monitor_jenkins_job(pre_build=None):
 def push_and_monitor_jenkins():
     pre_build = get_latest_build_number() or 0
     if git_push():
+        trigger_jenkins_build()
         return monitor_jenkins_job(pre_build)
     return "Git push failed"
 
