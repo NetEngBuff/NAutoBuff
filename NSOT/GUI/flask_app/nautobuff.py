@@ -1555,6 +1555,23 @@ def configure_device():
             ):
                 vlans.append({"id": vlan_id, "name": vlan_name})
 
+            # Static routes
+            static_routes = []
+            for network, mask, nexthop, ad in zip(
+                request.form.getlist("static_network[]"),
+                request.form.getlist("static_mask[]"),
+                request.form.getlist("static_nexthop[]"),
+                request.form.getlist("static_ad[]"),
+            ):
+                static_routes.append(
+                    {
+                        "network": network,
+                        "mask": _cidr_value(mask),
+                        "nexthop": nexthop,
+                        "ad": ad,
+                    }
+                )
+
             # RIP
             rip = None
             rip_versions = request.form.getlist("rip_version[]")
@@ -1618,39 +1635,47 @@ def configure_device():
             redistribute_ospf_into_bgp = "redistribute_ospf_into_bgp" in request.form
             redistribute_rip_into_bgp = "redistribute_rip_into_bgp" in request.form
 
-            if bgp_asn and bgp_address_families:
+            if bgp_asn:
                 address_family_entries = {}
 
-                for af, net, mask, neighbor_ip, neighbor_as in zip(
-                    bgp_address_families,
-                    bgp_networks,
-                    bgp_masks,
-                    bgp_neighbors,
-                    bgp_remote_as,
-                ):
-                    if not (af and net and mask and neighbor_ip and neighbor_as):
+                def _bgp_af(index):
+                    if index < len(bgp_address_families) and bgp_address_families[index].strip():
+                        return bgp_address_families[index].strip()
+                    return "ipv4"
+
+                def _family(af):
+                    return address_family_entries.setdefault(
+                        af,
+                        {"type": af, "networks": [], "neighbors": []},
+                    )
+
+                max_network_rows = max(len(bgp_networks), len(bgp_masks))
+                for i in range(max_network_rows):
+                    net = bgp_networks[i].strip() if i < len(bgp_networks) else ""
+                    mask = bgp_masks[i].strip() if i < len(bgp_masks) else ""
+                    if not (net and mask):
                         continue
-
-                    if af not in address_family_entries:
-                        address_family_entries[af] = {
-                            "type": af,
-                            "networks": [],
-                            "neighbors": [],
-                        }
-
-                    address_family_entries[af]["networks"].append(
+                    _family(_bgp_af(i))["networks"].append(
                         {"ip": net, "mask": _cidr_value(mask)}
                     )
-                    address_family_entries[af]["neighbors"].append(
+
+                max_neighbor_rows = max(len(bgp_neighbors), len(bgp_remote_as))
+                for i in range(max_neighbor_rows):
+                    neighbor_ip = bgp_neighbors[i].strip() if i < len(bgp_neighbors) else ""
+                    neighbor_as = bgp_remote_as[i].strip() if i < len(bgp_remote_as) else ""
+                    if not (neighbor_ip and neighbor_as):
+                        continue
+                    _family(_bgp_af(i))["neighbors"].append(
                         {"ip": neighbor_ip, "remote_as": neighbor_as}
                     )
 
-                bgp = {
-                    "as_number": bgp_asn,
-                    "address_families": list(address_family_entries.values()),
-                    "redistribute_ospf": redistribute_ospf_into_bgp,
-                    "redistribute_rip": redistribute_rip_into_bgp,
-                }
+                if address_family_entries or redistribute_ospf_into_bgp or redistribute_rip_into_bgp:
+                    bgp = {
+                        "as_number": bgp_asn,
+                        "address_families": list(address_family_entries.values()),
+                        "redistribute_ospf": redistribute_ospf_into_bgp,
+                        "redistribute_rip": redistribute_rip_into_bgp,
+                    }
 
             custom_config = "\n".join(
                 line_block.strip()
@@ -1666,6 +1691,7 @@ def configure_device():
                     interfaces=interfaces,
                     subinterfaces=subinterfaces,
                     vlans=vlans,
+                    static_routes=static_routes,
                     rip=rip,
                     ospf=ospf,
                     bgp=bgp,

@@ -1,17 +1,15 @@
-router bgp {{ bgp_as }}
- {% if router_id -%}
-    router-id {{ router_id }}
- {% endif -%}
- {% if bgp_networks -%}
- {% for network in bgp_networks -%}
-    network {{ network.ip }} mask {{ network.mask }}
- {% endfor -%}
- {% endif -%}
- {% if bgp_neighbors -%}
- {% for neighbor in bgp_neighbors -%}
-    neighbor {{ neighbor.ip }} remote-as {{ neighbor.remote_as }}
- {% endfor -%}
- {% endif -%}
- {% if ospf_redistribute -%}
-    redistribute ospf {{ ospf_redistribute.process_id }}
- {% endif -%}
+router bgp {{ bgp.as_number }}
+{% for af in bgp.address_families %}
+ {% for network in af.networks %}
+ network {{ network.ip }}/{{ network.mask }}
+ {% endfor %}
+ {% for neighbor in af.neighbors %}
+ neighbor {{ neighbor.ip }} remote-as {{ neighbor.remote_as }}
+ {% endfor %}
+{% endfor %}
+{% if bgp.redistribute_ospf %}
+ redistribute ospf 1
+{% endif %}
+{% if bgp.redistribute_rip %}
+ redistribute rip
+{% endif %}

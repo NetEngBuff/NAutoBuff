@@ -14,6 +14,7 @@ def _has_l3_config(device):
             device.get("ospf"),
             device.get("bgp"),
             device.get("rip"),
+            device.get("static_routes"),
         ]
     )
 
@@ -48,6 +49,7 @@ def generate_device_configs():
         "bgp": env.get_template("bgp_template.j2"),
         "ospf": env.get_template("ospf_template.j2"),
         "rip": env.get_template("rip_template.j2"),
+        "static_routes": env.get_template("static_routes_template.j2"),
         "dhcp": env.get_template("dhcp_template.j2"),
         "l3_routing": env.get_template("l3_routing_template.j2"),
         "interfaces": env.get_template("interfaces_template.j2"),
@@ -56,6 +58,7 @@ def generate_device_configs():
         "bgp_cisco": env.get_template("bgp_template_cisco.j2"),
         "ospf_cisco": env.get_template("ospf_template_cisco.j2"),
         "rip_cisco": env.get_template("rip_template_cisco.j2"),
+        "static_routes_cisco": env.get_template("static_routes_template.j2"),
         "interfaces_cisco": env.get_template("interfaces_template_cisco.j2"),
     }
 
@@ -103,10 +106,10 @@ def generate_device_configs():
                 config += templates[template_key].render(
                     ospf_process=ospf_data["process_id"],
                     ospf_networks=ospf_data.get("networks", []),
-                    redistribute_connected=ospf_data.get(
-                        "redistribute_connected", False
-                    ),
-                    redistribute_bgp=ospf_data.get("redistribute_bgp", False),
+                    ospf_redistribute={
+                        **ospf_data.get("redistribute", {}),
+                        "as_number": device.get("bgp", {}).get("as_number", ""),
+                    },
                 )
 
         # BGP
@@ -131,6 +134,20 @@ def generate_device_configs():
                     bgp_redistribute=rip_data.get("redistribute", {}).get("bgp", False),
                     bgp_as=device.get("bgp", {}).get("as_number", ""),
                     bgp_metric=rip_data.get("redistribute", {}).get("metric", 1),
+                )
+
+        # Static routes
+        if "static_routes" in device:
+            if clear_config == "yes":
+                for route in device["static_routes"]:
+                    config += (
+                        f"no ip route {route['network']}/{route['mask']} "
+                        f"{route['nexthop']}\n"
+                    )
+            else:
+                template_key = "static_routes_cisco" if vendor == "cisco" else "static_routes"
+                config += templates[template_key].render(
+                    static_routes=device["static_routes"]
                 )
 
         # DHCP

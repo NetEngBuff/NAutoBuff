@@ -39,6 +39,7 @@ def build_device_data(
     bgp=None,
     vlans=None,
     rip=None,
+    static_routes=None,
     dhcp=None,
     custom_config=None,
 ):
@@ -139,6 +140,18 @@ def build_device_data(
             },
         }
 
+    if static_routes:
+        device_data["static_routes"] = [
+            {
+                "network": route["network"],
+                "mask": route["mask"],
+                "nexthop": route["nexthop"],
+                "ad": route.get("ad"),
+            }
+            for route in static_routes
+            if route.get("network") and route.get("mask") and route.get("nexthop")
+        ]
+
     if custom_config:
         custom_lines = [
             line.strip()
@@ -160,6 +173,7 @@ def create_yaml_from_form_data(
     bgp=None,
     vlans=None,
     rip=None,
+    static_routes=None,
     dhcp=None,
     custom_config=None,
 ):
@@ -173,6 +187,7 @@ def create_yaml_from_form_data(
         bgp,
         vlans,
         rip,
+        static_routes,
         dhcp,
         custom_config,
     )
@@ -188,6 +203,7 @@ def create_yaml_from_form_devices(
     bgp=None,
     vlans=None,
     rip=None,
+    static_routes=None,
     dhcp=None,
     custom_config=None,
 ):
@@ -202,6 +218,7 @@ def create_yaml_from_form_devices(
             bgp,
             vlans,
             rip,
+            static_routes,
             dhcp,
             custom_config,
         )

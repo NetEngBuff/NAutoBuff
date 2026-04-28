@@ -126,12 +126,12 @@
         <div class="pb-title">VLAN</div>
         <div class="pb-badge">0</div>
       </div>
-      <div class="protocol-bubble" data-protocol="stp" onclick="toggleProtocol('stp')">
+      <div class="protocol-bubble disabled" data-protocol="stp" title="STP generation is not implemented yet">
         <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="6" y2="19"/><line x1="12" y1="12" x2="18" y2="19"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg></div>
         <div class="pb-title">STP</div>
         <div class="pb-badge">0</div>
       </div>
-      <div class="protocol-bubble" data-protocol="vxlan" onclick="toggleProtocol('vxlan')">
+      <div class="protocol-bubble disabled" data-protocol="vxlan" title="VXLAN generation is not implemented yet">
         <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7"/><ellipse cx="12" cy="7" rx="8" ry="4"/><path d="M4 12c0 2.21 3.582 4 8 4s8-1.79 8-4"/></svg></div>
         <div class="pb-title">VXLAN</div>
         <div class="pb-badge">0</div>
@@ -170,7 +170,7 @@
         <div class="pb-title">OSPF</div>
         <div class="pb-badge">0</div>
       </div>
-      <div class="protocol-bubble" data-protocol="eigrp" onclick="toggleProtocol('eigrp')">
+      <div class="protocol-bubble disabled" data-protocol="eigrp" title="EIGRP generation is not implemented yet">
         <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
         <div class="pb-title">EIGRP</div>
         <div class="pb-badge">0</div>
@@ -180,12 +180,12 @@
         <div class="pb-title">RIP</div>
         <div class="pb-badge">0</div>
       </div>
-      <div class="protocol-bubble" data-protocol="isis" onclick="toggleProtocol('isis')">
+      <div class="protocol-bubble disabled" data-protocol="isis" title="IS-IS generation is not implemented yet">
         <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
         <div class="pb-title">IS-IS</div>
         <div class="pb-badge">0</div>
       </div>
-      <div class="protocol-bubble" data-protocol="mpls" onclick="toggleProtocol('mpls')">
+      <div class="protocol-bubble disabled" data-protocol="mpls" title="MPLS generation is not implemented yet">
         <div class="pb-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/><circle cx="7" cy="12" r="2"/><circle cx="17" cy="12" r="2"/></svg></div>
         <div class="pb-title">MPLS</div>
         <div class="pb-badge">0</div>
@@ -273,6 +273,8 @@
 .protocol-bubble { position:relative; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:var(--space-5) var(--space-3); text-align:center; cursor:pointer; transition:all 0.2s; }
 .protocol-bubble:hover { border-color:rgba(255,122,61,0.4); transform:translateY(-3px); background:rgba(255,122,61,0.04); }
 .protocol-bubble.active { border-color:var(--plab); background:rgba(255,122,61,0.07); box-shadow:0 0 0 2px rgba(255,122,61,0.2); }
+.protocol-bubble.disabled { opacity:0.45; cursor:not-allowed; filter:saturate(0.4); }
+.protocol-bubble.disabled:hover { transform:none; background:rgba(255,255,255,0.02); border-color:rgba(255,255,255,0.07); }
 .pb-icon { color:var(--nb-text-3); margin-bottom:var(--space-2); display:flex; align-items:center; justify-content:center; transition:color 0.2s; }
 .protocol-bubble:hover .pb-icon, .protocol-bubble.active .pb-icon { color:var(--plab); }
 .pb-title { font-size:11px; font-weight:700; color:var(--nb-text-2); text-transform:uppercase; letter-spacing:0.07em; }
@@ -439,10 +441,10 @@ const protocolConfigs = {
   interfaces: { title: 'Interface Configuration', fields: () => getInterfaceBlock() },
   subinterfaces: { title: 'Subinterface Configuration', fields: () => getSubinterfaceBlock() },
   vlan: { title: 'VLAN Configuration', fields: () => getVlanBlock() },
-  bgp: { title: 'BGP Configuration', fields: () => getBgpSection() },
-  ospf: { title: 'OSPF Configuration', fields: () => getOspfSection() },
+  bgp: { title: 'BGP Configuration', fields: (index) => getBgpSection(index) },
+  ospf: { title: 'OSPF Configuration', fields: (index) => getOspfSection(index) },
   eigrp: { title: 'EIGRP Configuration', fields: () => getEigrpBlock() },
-  rip: { title: 'RIP Configuration', fields: () => getRipBlock() },
+  rip: { title: 'RIP Configuration', fields: (index) => getRipBlock(index) },
   isis: { title: 'IS-IS Configuration', fields: () => getIsisBlock() },
   stp: { title: 'STP Configuration', fields: () => getStpBlock() },
   vxlan: { title: 'VXLAN Configuration', fields: () => getVxlanBlock() },
@@ -452,6 +454,7 @@ const protocolConfigs = {
 
 function toggleProtocol(protocol) {
   const bubble = document.querySelector(`[data-protocol="${protocol}"]`);
+  if (bubble?.classList.contains('disabled')) return;
   const container = document.getElementById('protocol-sections');
   if (activeProtocols.has(protocol)) {
     activeProtocols.delete(protocol);
@@ -486,8 +489,9 @@ function toggleProtocol(protocol) {
 }
 
 function addProtocolConfig(protocol) {
-  document.getElementById(`${protocol}-content`).insertAdjacentHTML('beforeend', protocolConfigs[protocol].fields());
-  protocolCounts[protocol] = (protocolCounts[protocol] || 0) + 1;
+  const index = protocolCounts[protocol] || 0;
+  document.getElementById(`${protocol}-content`).insertAdjacentHTML('beforeend', protocolConfigs[protocol].fields(index));
+  protocolCounts[protocol] = index + 1;
   updateBadge(protocol);
 }
 
@@ -512,13 +516,23 @@ function getSubinterfaceBlock() { return `<div class="config-block"><div class="
 
 function getVlanBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">VLAN ID</label><input type="text" name="vlan_id[]" class="form-input" placeholder="100"></div><div class="form-group"><label class="form-label">VLAN Name</label><input type="text" name="vlan_name[]" class="form-input" placeholder="Management"></div></div>${RMVBTN('vlan')}</div>`; }
 
-function getBgpSection() { return `<div class="config-block"><div class="form-group"><label class="form-label">ASN</label><input type="text" name="bgp_asn" class="form-input" style="max-width:200px;" placeholder="65001"></div><div class="form-row"><div class="form-group"><label class="form-label">Neighbor IP</label><input type="text" name="bgp_neighbor[]" class="form-input" placeholder="10.0.0.2"></div><div class="form-group"><label class="form-label">Remote ASN</label><input type="text" name="bgp_remote_as[]" class="form-input" placeholder="65002"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Address Family</label><input type="text" name="bgp_address_family[]" class="form-input" placeholder="ipv4"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Advertised Network</label><input type="text" name="bgp_network[]" class="form-input" placeholder="10.0.0.0"></div><div class="form-group"><label class="form-label">CIDR Prefix</label><input type="text" name="bgp_mask[]" class="form-input" placeholder="/24"></div></div><div class="checkbox-group"><label class="form-check"><input type="checkbox" name="redistribute_ospf_into_bgp" class="form-check-input"><span class="form-check-label">Redistribute OSPF</span></label><label class="form-check"><input type="checkbox" name="redistribute_rip_into_bgp" class="form-check-input"><span class="form-check-label">Redistribute RIP</span></label></div>${RMVBTN('bgp')}</div>`; }
+function getBgpSection(index = 0) {
+  const processFields = index === 0 ? `<div class="form-row"><div class="form-group"><label class="form-label">Local ASN</label><input type="text" name="bgp_asn" class="form-input" style="max-width:200px;" placeholder="65001"></div><div class="form-group"><label class="form-label">Address Family</label><input type="text" name="bgp_address_family[]" class="form-input" placeholder="ipv4"></div></div><div class="checkbox-group"><label class="form-check"><input type="checkbox" name="redistribute_ospf_into_bgp" class="form-check-input"><span class="form-check-label">Redistribute OSPF</span></label><label class="form-check"><input type="checkbox" name="redistribute_rip_into_bgp" class="form-check-input"><span class="form-check-label">Redistribute RIP</span></label></div>` : `<input type="hidden" name="bgp_address_family[]" value="ipv4">`;
+  return `<div class="config-block">${processFields}<div class="form-row"><div class="form-group"><label class="form-label">Neighbor IP</label><input type="text" name="bgp_neighbor[]" class="form-input" placeholder="10.0.0.2"></div><div class="form-group"><label class="form-label">Remote ASN</label><input type="text" name="bgp_remote_as[]" class="form-input" placeholder="65002"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Advertised Network</label><input type="text" name="bgp_network[]" class="form-input" placeholder="10.0.0.0"></div><div class="form-group"><label class="form-label">CIDR Prefix</label><input type="text" name="bgp_mask[]" class="form-input" placeholder="/24"></div></div>${RMVBTN('bgp')}</div>`;
+}
 
-function getOspfSection() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">Process ID</label><input type="text" name="ospf_process_id[]" class="form-input" placeholder="1"></div><div class="form-group"><label class="form-label">Network IP</label><input type="text" name="ospf_network[]" class="form-input" placeholder="10.0.0.0"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Wildcard Mask</label><input type="text" name="ospf_wildcard[]" class="form-input" placeholder="0.0.0.255"></div><div class="form-group"><label class="form-label">Area</label><input type="text" name="ospf_area[]" class="form-input" placeholder="0"></div></div><div class="checkbox-group"><label class="form-check"><input type="checkbox" name="ospf_redistribute_connected[]" class="form-check-input"><span class="form-check-label">Redistribute Connected</span></label><label class="form-check"><input type="checkbox" name="ospf_redistribute_bgp[]" class="form-check-input"><span class="form-check-label">Redistribute BGP</span></label></div>${RMVBTN('ospf')}</div>`; }
+function getOspfSection(index = 0) {
+  const processFields = index === 0 ? `<div class="form-group"><label class="form-label">Process ID</label><input type="text" name="ospf_process_id[]" class="form-input" placeholder="1"></div>` : `<input type="hidden" name="ospf_process_id[]" value="">`;
+  const redistributeFields = index === 0 ? `<div class="checkbox-group"><label class="form-check"><input type="checkbox" name="ospf_redistribute_connected[]" class="form-check-input"><span class="form-check-label">Redistribute Connected</span></label><label class="form-check"><input type="checkbox" name="ospf_redistribute_bgp[]" class="form-check-input"><span class="form-check-label">Redistribute BGP</span></label></div>` : '';
+  return `<div class="config-block"><div class="form-row">${processFields}<div class="form-group"><label class="form-label">Network IP</label><input type="text" name="ospf_network[]" class="form-input" placeholder="10.0.0.0"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Wildcard Mask</label><input type="text" name="ospf_wildcard[]" class="form-input" placeholder="0.0.0.255"></div><div class="form-group"><label class="form-label">Area</label><input type="text" name="ospf_area[]" class="form-input" placeholder="0"></div></div>${redistributeFields}${RMVBTN('ospf')}</div>`;
+}
 
 function getEigrpBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">AS Number</label><input type="text" name="eigrp_as[]" class="form-input" placeholder="100"></div><div class="form-group"><label class="form-label">Network</label><input type="text" name="eigrp_network[]" class="form-input" placeholder="10.0.0.0"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Wildcard Mask</label><input type="text" name="eigrp_wildcard[]" class="form-input" placeholder="0.0.0.255"></div></div>${RMVBTN('eigrp')}</div>`; }
 
-function getRipBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">RIP Version</label><input type="text" name="rip_version[]" class="form-input" placeholder="2"></div><div class="form-group"><label class="form-label">Network IP</label><input type="text" name="rip_network[]" class="form-input" placeholder="10.0.0.0"></div></div>${RMVBTN('rip')}</div>`; }
+function getRipBlock(index = 0) {
+  const versionField = index === 0 ? `<div class="form-group"><label class="form-label">RIP Version</label><input type="text" name="rip_version[]" class="form-input" placeholder="2"></div>` : `<input type="hidden" name="rip_version[]" value="">`;
+  return `<div class="config-block"><div class="form-row">${versionField}<div class="form-group"><label class="form-label">Network IP</label><input type="text" name="rip_network[]" class="form-input" placeholder="10.0.0.0"></div></div>${RMVBTN('rip')}</div>`;
+}
 
 function getIsisBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">Process Tag</label><input type="text" name="isis_tag[]" class="form-input" placeholder="1"></div><div class="form-group"><label class="form-label">NET Address</label><input type="text" name="isis_net[]" class="form-input" placeholder="49.0001.0000.0000.0001.00"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Level</label><select name="isis_level[]" class="form-select"><option value="level-1">Level 1</option><option value="level-2">Level 2</option><option value="level-1-2">Level 1-2</option></select></div></div>${RMVBTN('isis')}</div>`; }
 

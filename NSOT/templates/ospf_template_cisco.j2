@@ -7,7 +7,7 @@ router ospf {{ ospf_process }}
     network {{ network.ip }} {{ network.wildcard }} area {{ network.area }}
  {% endfor -%}
  {% endif -%}
- {% if ospf_redistribute and ospf_redistribute.bgp -%}
+ {% if ospf_redistribute and ospf_redistribute.bgp and ospf_redistribute.as_number -%}
     redistribute bgp {{ ospf_redistribute.as_number }} subnets
  {% endif %}
  {% if ospf_redistribute and ospf_redistribute.connected -%}
