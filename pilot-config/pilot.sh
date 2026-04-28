@@ -1,5 +1,7 @@
 #!/bin/bash
 set -e
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "${SCRIPT_DIR}"
 
 # 1. Load the environment (Reuse Python 3.12)
 export PYENV_ROOT="$HOME/.pyenv"
@@ -14,7 +16,7 @@ echo "Building Docker images for hosts..."
 sudo docker build -f Dockerfile_Hosts -t hosts:latest .
 
 echo "Applying Netplan configurations..."
-sudo cp netcfg.yaml /etc/netplan/100-netcfg.yaml
+sudo cp "${SCRIPT_DIR}/netcfg.yaml" /etc/netplan/100-netcfg.yaml
 sudo chmod 600 /etc/netplan/100-netcfg.yaml
 sudo netplan apply
 

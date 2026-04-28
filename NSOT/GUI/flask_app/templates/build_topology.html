@@ -9,7 +9,7 @@
     Virtual Lab
   </div>
   <h1 class="page-title">Build Topology</h1>
-  <p class="page-description">Create and deploy network topologies with Containerlab</p>
+  <p class="page-description">Create and deploy network topologies with Containerlab. For virtual labs, this host uses eth0.100 on VLAN 100 with the 10.0.101.0/24 OOB network, so configure device management IPs from that range in Hosts Inventory.</p>
 </div>
 
 <div class="v2-card" style="max-width:860px; margin:0 auto;">
@@ -484,6 +484,7 @@ function renderDeviceForms() {
     const pillHtml = device.mgmt_ip ? `
       <span class="pill-item"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${device.mgmt_ip}</span>
       <span class="pill-item"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${device.username}</span>
+      ${device.vendor ? `<span class="pill-item" style="color:var(--vlab);font-weight:700;">${device.vendor}</span>` : ""}
       <span class="pill-badge">from hosts.csv</span>` : "";
 
     form.innerHTML = `

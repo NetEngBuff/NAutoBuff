@@ -2,13 +2,14 @@ network:
   version: 2
   renderer: networkd
   ethernets:
-    eth1:
-      dhcp4: no
+    eth0:
+      dhcp4: true
+      optional: true
 
   vlans:
-    eth1.100:
+    eth0.100:
       id: 100
-      link: eth1
+      link: eth0
       addresses:
         - 10.0.101.200/24
       routes:

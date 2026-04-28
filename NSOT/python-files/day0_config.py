@@ -6,11 +6,27 @@ CONFIG_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "golden_configs"))
 TEMPLATE_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "templates"))
 
 
+def _normalize_mgmt_ip(mgmt_ip, default_prefix="24"):
+    mgmt_ip = (mgmt_ip or "").strip()
+    if not mgmt_ip:
+        return ""
+    if "/" not in mgmt_ip:
+        return f"{mgmt_ip}/{default_prefix}"
+
+    ip, prefix = mgmt_ip.split("/", 1)
+    ip = ip.strip()
+    prefix = prefix.strip().lstrip("/")
+    return f"{ip}/{prefix or default_prefix}"
+
+
 def generate_day0_config(device_name, mgmt_ip, username, password):
     env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
     template = env.get_template("day0_config.j2")
     rendered = template.render(
-        device_name=device_name, mgmt_ip=mgmt_ip, username=username, password=password
+        device_name=device_name,
+        mgmt_ip=_normalize_mgmt_ip(mgmt_ip),
+        username=username,
+        password=password,
     )
 
     os.makedirs(CONFIG_DIR, exist_ok=True)

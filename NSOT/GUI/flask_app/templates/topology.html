@@ -9,9 +9,19 @@
   <p class="page-description">Interactive visualization of your virtual network infrastructure</p>
 </div>
 
-<div class="iframe-container iframe-invert" style="border-color:rgba(0,212,255,0.15);">
-  <iframe id="graphFrame" src="{{ graph_url }}" title="Network Topology Graph"></iframe>
-</div>
+{% if graph_url %}
+  <div class="iframe-container iframe-invert" style="border-color:rgba(0,212,255,0.15);">
+    <iframe id="graphFrame" src="{{ graph_url }}" title="Network Topology Graph"></iframe>
+  </div>
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </div>
+    <h3 class="empty-state-title">No Running Topology</h3>
+    <p class="empty-state-description">Build a Containerlab topology to view the network graph.</p>
+  </div>
+{% endif %}
 
 {{ next_steps([
   {'url': '/dashboard',        'title': 'Dashboard',        'desc': 'Live telemetry and metrics',   'icon': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'},

@@ -73,6 +73,17 @@ def _is_topology_running():
         return False
 
 
+def _stop_containerlab_graph():
+    try:
+        subprocess.run(
+            ["sudo", "pkill", "-f", "containerlab graph"],
+            capture_output=True,
+            text=True,
+        )
+    except Exception as e:
+        print(f"[ℹ] Could not stop containerlab graph: {e}")
+
+
 def _topology_page_context(**extra):
     yaml_generated = bool(extra.pop("yaml_generated", False))
     context = {
@@ -229,9 +240,11 @@ def _restore_golden_configs(hostnames):
 
 def _sync_hosts_clab_ips():
     """
-    After a topology redeploy, update management_ip in hosts.csv with the
-    actual IPs assigned by containerlab so ipam.py and Netmiko use the right
-    addresses.
+    Keep the user-entered management IPs in hosts.csv intact.
+
+    Containerlab also assigns Docker network addresses to nodes, but those are
+    transport/runtime addresses. hosts.csv is the source of truth for the lab
+    management IP configured on Ethernet1.100 and shown in Engineer Telemetry.
     """
     try:
         result = subprocess.run(
@@ -258,26 +271,9 @@ def _sync_hosts_clab_ips():
         if not ip_map:
             return
 
-        hosts_csv = os.path.join(IPAM_DIR, "hosts.csv")
-        rows, fieldnames = [], []
-        with open(hosts_csv, newline="", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            fieldnames = list(reader.fieldnames or [])
-            rows = list(reader)
-
-        for row in rows:
-            hostname = row.get("hostname", "").strip()
-            if hostname in ip_map:
-                row["management_ip"] = ip_map[hostname]
-
-        with open(hosts_csv, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-            writer.writeheader()
-            writer.writerows(rows)
-
-        print(f"[✔] Synced clab management IPs: {ip_map}")
+        print(f"[ℹ] Containerlab runtime IPs detected, hosts.csv preserved: {ip_map}")
     except Exception as e:
-        print(f"[⚠] Could not sync clab IPs to hosts.csv: {e}")
+        print(f"[⚠] Could not inspect clab runtime IPs: {e}")
 
 
 def _reset_hosts_csv_passwords(default_password="admin"):
@@ -304,6 +300,18 @@ def _reset_hosts_csv_passwords(default_password="admin"):
         print("[✔] hosts.csv passwords reset to default after topology deploy")
     except Exception as e:
         print(f"[⚠] Could not reset hosts.csv passwords: {e}")
+
+
+def _apply_oob_netplan():
+    """Apply eth1.100 OOB netplan after Containerlab creates host:eth1."""
+    try:
+        subprocess.run(["sudo", "netplan", "apply"], check=True, capture_output=True, text=True)
+        print("[✔] OOB netplan applied")
+    except subprocess.CalledProcessError as e:
+        detail = e.stderr or e.stdout or str(e)
+        print(f"[⚠] Could not apply OOB netplan: {detail}")
+
+
 PILOT_DIR = os.path.join(BASE_DIR, "..", "..", "..", "pilot-config")
 ipam_file_path = os.path.join(IPAM_DIR, "ipam_output.csv")
 
@@ -346,6 +354,17 @@ def _cidr_prefix(value):
 def _cidr_value(value):
     prefix = _cidr_prefix(value)
     return prefix[1:] if prefix.startswith("/") else prefix
+
+
+def _split_ip_prefix(ip_with_prefix, default_prefix="24"):
+    value = (ip_with_prefix or "").strip()
+    if not value:
+        return "", ""
+    if "/" not in value:
+        return value, default_prefix
+    ip, prefix = value.split("/", 1)
+    prefix = prefix.strip().lstrip("/") or default_prefix
+    return ip.strip(), prefix
 
 
 @app.template_filter("cidr_prefix")
@@ -1115,11 +1134,7 @@ def build_topology():
             config = request.form.get(f"device_config_{i}")
             exec_lines = request.form.getlist(f"device_exec_{i}[]")
             ip_with_subnet = request.form.get(f"device_mgmt_ip_{i}", "")
-            ip_address = (
-                ip_with_subnet.split("/")[0]
-                if "/" in ip_with_subnet
-                else ip_with_subnet
-            )
+            ip_address, subnet_cidr = _split_ip_prefix(ip_with_subnet)
             username = request.form.get(f"device_username_{i}", "")
             password = request.form.get(f"device_password_{i}", "")
             vendor = (
@@ -1137,6 +1152,7 @@ def build_topology():
                     "exec": exec_lines,
                     "mgmt_ip": ip_with_subnet,
                     "ip_address": ip_address,
+                    "subnet_cidr": subnet_cidr,
                     "username": username,
                     "password": password,
                     "vendor": vendor,
@@ -1240,6 +1256,7 @@ def deploy_topology_route():
 
         deploy_output = result.stdout
         time.sleep(2)
+        _apply_oob_netplan()
         _reset_hosts_csv_passwords()
         _sync_hosts_clab_ips()
         update_gnmic_yaml_from_hosts()
@@ -1273,6 +1290,7 @@ def delete_topology_route():
         )
     )
     print("[INFO] Deleting topology...")
+    _stop_containerlab_graph()
 
     # If topo.yml is missing, try to find the lab name from clab-*/topology-data.json
     # and destroy by name — handles cases where the file was moved or gitignored away
@@ -1317,6 +1335,7 @@ def delete_topology_route():
 
         message = "✅ Topology deleted successfully."
         session["topology_yaml_generated"] = False
+        _stop_containerlab_graph()
         print("[✔] Topology destroyed and folder cleaned.")
 
     except subprocess.CalledProcessError as e:
@@ -1408,6 +1427,7 @@ def add_device():
                 text=True,
             )
             time.sleep(2)
+            _apply_oob_netplan()
             _reset_hosts_csv_passwords()
             _sync_hosts_clab_ips()
             _restore_golden_configs(existing_devices)
@@ -1962,11 +1982,10 @@ def ipam_data_json():
 @app.route("/ipam-sync-ips", methods=["POST"])
 @login_required
 def ipam_sync_ips():
-    """Sync management IPs in hosts.csv from containerlab, then restart ipam service."""
+    """Restart IPAM polling without rewriting hosts.csv management IPs."""
     try:
-        _sync_hosts_clab_ips()
         subprocess.run(["sudo", "systemctl", "restart", "ipam.service"], check=True)
-        return jsonify({"ok": True, "message": "IPs synced and IPAM restarted."})
+        return jsonify({"ok": True, "message": "IPAM poller restarted."})
     except Exception as e:
         return jsonify({"ok": False, "message": str(e)}), 500
 
@@ -2067,15 +2086,13 @@ def _wait_for_port(port, host="127.0.0.1", timeout=12):
 @app.route("/topology")
 @login_required
 def topology():
+    if not _is_topology_running():
+        _stop_containerlab_graph()
+        return render_template("topology.html", graph_url=None, is_topology_running=False)
+
     # Always kill any stale containerlab graph process so the topology view
     # reflects the current topo.yml after any redeploy.
-    try:
-        subprocess.run(
-            ["sudo", "pkill", "-f", "containerlab graph"],
-            capture_output=True,
-        )
-    except Exception:
-        pass
+    _stop_containerlab_graph()
     try:
         subprocess.Popen(
             ["sudo", "containerlab", "graph", "-t", topo_path],
@@ -2097,7 +2114,7 @@ def topology():
         interface_ip = "127.0.0.1"
 
     graph_url = f"http://{interface_ip}:50080"
-    return render_template("topology.html", graph_url=graph_url)
+    return render_template("topology.html", graph_url=graph_url, is_topology_running=True)
 
 
 @app.route("/hosts-data")
@@ -2109,8 +2126,8 @@ def hosts_data():
     try:
         with open(hosts_csv_path, newline="", encoding="utf-8-sig") as f:
             for row in csv.DictReader(f):
-                mgmt_ip = row.get("management_ip", "")
-                subnet = row.get("subnet_cidr", "24")
+                mgmt_ip = (row.get("management_ip") or "").strip()
+                subnet = (row.get("subnet_cidr") or "24").strip().lstrip("/")
                 vendor = (row.get("vendor") or "arista").strip().lower()
                 hosts.append({
                     "hostname": row.get("hostname", ""),

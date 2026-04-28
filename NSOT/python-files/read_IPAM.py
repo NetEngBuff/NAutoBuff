@@ -11,6 +11,13 @@ class IPAMReader:
 
     def preprocess_data(self, data):
         """Calculate row spans for the Device Name column."""
+        data = [
+            row for row in data
+            if not (
+                row.get("Interface Name") == "Management0"
+                and str(row.get("IP Address", "")).startswith("172.20.20.")
+            )
+        ]
         processed_data = []
         for device_name, rows in groupby(data, key=lambda x: x["Device Name"]):
             rows = list(rows)
