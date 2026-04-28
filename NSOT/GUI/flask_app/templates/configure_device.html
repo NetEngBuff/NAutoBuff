@@ -186,25 +186,25 @@
     </div>
   </form>
 
-  {% if jenkins_result == 'jenkins_success' %}
-  <div class="form-actions form-actions-center" id="push-button-wrapper" style="margin-top:var(--space-4); border:none;">
-    <button type="button" class="btn btn-primary" style="--btn-color:var(--plab); --btn-glow:rgba(255,122,61,0.3);" onclick="pushConfig()">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9 22 2z"/></svg>
-      Push Configuration
-    </button>
-  </div>
-  {% endif %}
-
-  {% if message and jenkins_result != 'jenkins_failure' %}
-  <div style="padding:0 var(--space-6) var(--space-2);">
+  <div class="config-result-panel {% if not message and jenkins_result != 'jenkins_success' %}empty{% endif %}" id="config-result-panel">
+    {% if message and jenkins_result != 'jenkins_failure' %}
     <div class="alert {% if '❌' in message or 'failed' in message|lower %}alert-error{% else %}alert-success{% endif %}">
       <span class="alert-icon">{% if '❌' in message or 'failed' in message|lower %}✕{% else %}✓{% endif %}</span>
       <div class="alert-content">{{ message }}</div>
     </div>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  <div id="push-message" style="padding:0 var(--space-6);"></div>
+    {% if jenkins_result == 'jenkins_success' %}
+    <div class="config-result-actions" id="push-button-wrapper">
+      <button type="button" class="btn btn-primary" style="--btn-color:var(--plab); --btn-glow:rgba(255,122,61,0.3);" onclick="pushConfig()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9 22 2z"/></svg>
+        Push Configuration
+      </button>
+    </div>
+    {% endif %}
+
+    <div id="push-message"></div>
+  </div>
 </div>
 
 {% if message and ('✅' in message or ('failed' not in message|lower and '❌' not in message)) %}
@@ -233,6 +233,12 @@
 .pipeline-debug { margin-bottom:var(--space-5); background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.25); border-left:3px solid var(--err); border-radius:10px; overflow:hidden; }
 .pipeline-debug-title { padding:var(--space-3) var(--space-4); color:var(--err); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; border-bottom:1px solid rgba(239,68,68,0.16); }
 .pipeline-debug pre { margin:0; padding:var(--space-4); max-height:220px; overflow:auto; white-space:pre-wrap; word-break:break-word; color:var(--nb-text-2); font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.55; }
+.config-result-panel { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); margin-top:var(--space-5); padding-top:var(--space-5); border-top:1px solid rgba(255,255,255,0.06); flex-wrap:wrap; }
+.config-result-panel.empty { display:none; }
+.config-result-panel .alert { flex:1 1 420px; margin:0; }
+.config-result-actions { display:flex; align-items:center; justify-content:flex-end; gap:var(--space-3); margin-left:auto; }
+#push-message { flex:1 1 100%; }
+#push-message .alert { margin-top:var(--space-3); }
 
 /* Mode toggle */
 .mode-toggle-bar { display:flex; gap:var(--space-2); padding:var(--space-2); background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; margin-bottom:var(--space-5); }
@@ -374,14 +380,13 @@ async function uploadConfigFile() {
     const response = await fetch('/upload-config', { method: 'POST', body: formData });
     const data = await response.json();
     _hideLoading();
-    const msgDiv = document.createElement('div');
-    msgDiv.className = data.status === 'success' ? 'alert alert-success' : 'alert alert-error';
-    msgDiv.innerHTML = `<span class="alert-icon">${data.status === 'success' ? '&#10003;' : '&#10005;'}</span><div class="alert-content">${data.message}</div>`;
-    document.querySelector('.v2-card').insertBefore(msgDiv, document.querySelector('.v2-card').firstChild);
+    document.getElementById('config-result-panel').classList.remove('empty');
+    document.getElementById('push-message').innerHTML = `<div class="${data.status === 'success' ? 'alert alert-success' : 'alert alert-error'}"><span class="alert-icon">${data.status === 'success' ? '&#10003;' : '&#10005;'}</span><div class="alert-content">${data.message}</div></div>`;
     if (data.status === 'success') clearFile();
   } catch (error) {
     _hideLoading();
-    alert('Error uploading config: ' + error.message);
+    document.getElementById('config-result-panel').classList.remove('empty');
+    document.getElementById('push-message').innerHTML = `<div class="alert alert-error"><span class="alert-icon">&#10005;</span><div class="alert-content">Error uploading config: ${error.message}</div></div>`;
   }
 }
 
@@ -594,6 +599,7 @@ async function pushConfig() {
   _hideLoading();
   const msgContainer = document.getElementById("push-message");
   const pushWrapper = document.getElementById("push-button-wrapper");
+  document.getElementById("config-result-panel").classList.remove("empty");
   if (result.status === "success") {
     msgContainer.innerHTML = `<div class="alert alert-success"><span class="alert-icon">&#10003;</span><div class="alert-content">Configuration pushed successfully.</div></div>`;
     if (pushWrapper) pushWrapper.style.display = "none";
