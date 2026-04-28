@@ -1461,12 +1461,16 @@ def configure_device():
     try:
         devices = hosts_reader.get_devices()
         if request.method == "POST":
+            submitted_form = request.form.to_dict(flat=False)
             device_id = request.form.get("device_id")
             device_vendor = _get_vendor_for_device(device_id) if device_id else None
             if not device_vendor:
                 return render_template(
                     "configure_device.html",
                     devices=devices,
+                    device_id=device_id,
+                    submitted_form=submitted_form,
+                    jenkins_result="jenkins_failure",
                     message=f"⚠️ No vendor set for {device_id}. Please update the host in Hosts Inventory.",
                 )
 
@@ -1636,7 +1640,8 @@ def configure_device():
                         jenkins_result="jenkins_failure",
                         device_id=device_id,
                         devices=devices,
-                        message="❌ Jenkins pipeline failed.",
+                        submitted_form=submitted_form,
+                        message=f"❌ Jenkins pipeline failed: {jenkins_result}",
                     )
 
             except Exception as pipeline_error:
@@ -1646,11 +1651,12 @@ def configure_device():
                     jenkins_result="jenkins_failure",
                     device_id=device_id,
                     devices=devices,
+                    submitted_form=submitted_form,
                     message=str(pipeline_error),
                 )
 
         return render_template(
-            "configure_device.html", jenkins_result=None, devices=devices
+            "configure_device.html", jenkins_result=None, devices=devices, submitted_form={}
         )
 
     except Exception as e:
@@ -1661,6 +1667,7 @@ def configure_device():
             device_id="unknown",
             message=str(e),
             devices=[],
+            submitted_form={},
         )
 
 

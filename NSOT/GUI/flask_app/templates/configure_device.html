@@ -13,6 +13,13 @@
 </div>
 
 <div class="v2-card" style="max-width:1120px; margin:0 auto;">
+  {% if jenkins_result == 'jenkins_failure' and message %}
+  <div class="pipeline-debug">
+    <div class="pipeline-debug-title">Pipeline Debug</div>
+    <pre>{{ message }}</pre>
+  </div>
+  {% endif %}
+
   <form method="POST" class="form" id="config-form" onsubmit="return showLoading()">
 
     <!-- Device Selection -->
@@ -188,7 +195,7 @@
   </div>
   {% endif %}
 
-  {% if message %}
+  {% if message and jenkins_result != 'jenkins_failure' %}
   <div style="padding:0 var(--space-6) var(--space-2);">
     <div class="alert {% if '❌' in message or 'failed' in message|lower %}alert-error{% else %}alert-success{% endif %}">
       <span class="alert-icon">{% if '❌' in message or 'failed' in message|lower %}✕{% else %}✓{% endif %}</span>
@@ -223,6 +230,9 @@
 .v2-section-label { font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--nb-text-3); white-space:nowrap; }
 .v2-section-line { flex:1; height:1px; background:rgba(255,255,255,0.06); }
 .form-hint { font-size:11px; color:var(--nb-text-3); font-weight:400; margin-left:4px; }
+.pipeline-debug { margin-bottom:var(--space-5); background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.25); border-left:3px solid var(--err); border-radius:10px; overflow:hidden; }
+.pipeline-debug-title { padding:var(--space-3) var(--space-4); color:var(--err); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; border-bottom:1px solid rgba(239,68,68,0.16); }
+.pipeline-debug pre { margin:0; padding:var(--space-4); max-height:220px; overflow:auto; white-space:pre-wrap; word-break:break-word; color:var(--nb-text-2); font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.55; }
 
 /* Mode toggle */
 .mode-toggle-bar { display:flex; gap:var(--space-2); padding:var(--space-2); background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; margin-bottom:var(--space-5); }
@@ -272,6 +282,7 @@
 <script>
 let uploadedFile = null;
 let currentMode = 'manual';
+const submittedForm = {{ submitted_form|default({})|tojson }};
 
 function toggleConfigMode(mode) {
   currentMode = mode;
@@ -472,6 +483,63 @@ function getMplsBlock() { return `<div class="config-block"><div class="form-row
 
 function getStaticRouteBlock() { return `<div class="config-block"><div class="form-row"><div class="form-group"><label class="form-label">Destination Network</label><input type="text" name="static_network[]" class="form-input" placeholder="192.168.1.0"></div><div class="form-group"><label class="form-label">CIDR Prefix</label><input type="text" name="static_mask[]" class="form-input" placeholder="/24"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Next Hop / Exit Interface</label><input type="text" name="static_nexthop[]" class="form-input" placeholder="10.0.0.1"></div><div class="form-group"><label class="form-label">Administrative Distance</label><input type="text" name="static_ad[]" class="form-input" placeholder="1" style="max-width:120px;"></div></div>${RMVBTN('static')}</div>`; }
 
+function submittedValues(name) {
+  return submittedForm[name] || submittedForm[name.replace('[]', '')] || [];
+}
+
+function submittedCount(names) {
+  return Math.max(...names.map(name => submittedValues(name).length), 0);
+}
+
+function restoreProtocol(protocol, names) {
+  const count = submittedCount(names);
+  if (!count) return;
+  if (!activeProtocols.has(protocol)) toggleProtocol(protocol);
+  for (let i = 0; i < count; i++) addProtocolConfig(protocol);
+}
+
+function restoreFieldValues(name) {
+  const values = submittedValues(name);
+  document.querySelectorAll(`[name="${name}"]`).forEach((field, index) => {
+    if (field.type === 'checkbox') {
+      field.checked = values.length > 0;
+    } else if (values[index] !== undefined) {
+      field.value = values[index];
+    }
+  });
+}
+
+function restoreSubmittedConfig() {
+  if (!submittedForm || Object.keys(submittedForm).length === 0) return;
+
+  const deviceValues = submittedValues('device_id');
+  if (deviceValues[0]) {
+    const deviceSelect = document.querySelector('select[name="device_id"]');
+    if (deviceSelect) {
+      deviceSelect.value = deviceValues[0];
+      onConfigDeviceSelect(deviceValues[0]);
+    }
+  }
+
+  const protocolFields = {
+    interfaces: ['interface_type[]', 'interface_number[]', 'interface_ip[]', 'interface_mask[]', 'switchport[]'],
+    subinterfaces: ['subinterface_parent[]', 'subinterface_id[]', 'subinterface_vlan[]', 'subinterface_ip[]', 'subinterface_mask[]'],
+    vlan: ['vlan_id[]', 'vlan_name[]'],
+    bgp: ['bgp_asn', 'bgp_neighbor[]', 'bgp_remote_as[]', 'bgp_address_family[]', 'bgp_network[]', 'bgp_mask[]', 'redistribute_ospf_into_bgp', 'redistribute_rip_into_bgp'],
+    ospf: ['ospf_process_id[]', 'ospf_network[]', 'ospf_wildcard[]', 'ospf_area[]', 'ospf_redistribute_connected[]', 'ospf_redistribute_bgp[]'],
+    eigrp: ['eigrp_as[]', 'eigrp_network[]', 'eigrp_wildcard[]'],
+    rip: ['rip_version[]', 'rip_network[]'],
+    isis: ['isis_tag[]', 'isis_net[]', 'isis_level[]'],
+    stp: ['stp_mode[]', 'stp_priority[]'],
+    vxlan: ['vxlan_vni[]', 'vxlan_vlan[]', 'vxlan_source[]', 'vxlan_mcast[]'],
+    mpls: ['mpls_router_id[]', 'mpls_interface[]', 'mpls_ldp[]', 'mpls_te[]'],
+    static: ['static_network[]', 'static_mask[]', 'static_nexthop[]', 'static_ad[]']
+  };
+
+  Object.entries(protocolFields).forEach(([protocol, names]) => restoreProtocol(protocol, names));
+  Object.values(protocolFields).flat().forEach(restoreFieldValues);
+}
+
 // Loading overlay
 const loadingTerms = [
   "Routing BGP packets to destination...","Configuring Layer 3 protocols...","Injecting routes into routing table...",
@@ -534,5 +602,7 @@ async function pushConfig() {
     msgContainer.innerHTML = `<div class="alert alert-error"><span class="alert-icon">&#10007;</span><div class="alert-content">Push failed: ${result.message}</div></div>`;
   }
 }
+
+document.addEventListener('DOMContentLoaded', restoreSubmittedConfig);
 </script>
 {% endblock %}

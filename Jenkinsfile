@@ -4,6 +4,7 @@ pipeline {
     environment {
         PROJECT_ROOT = "${env.WORKSPACE}"
         VIRTUAL_ENV  = "${env.WORKSPACE}/.ci-venv"
+        GIT_LFS_SKIP_SMUDGE = "1"
     }
 
     options {

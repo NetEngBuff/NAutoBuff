@@ -14,6 +14,36 @@ JENKINS_TOKEN = os.environ.get("JENKINS_TOKEN", "")
 NGROK_HEADERS = {"ngrok-skip-browser-warning": "true"}
 
 
+def _load_jenkins_creds_file():
+    global JENKINS_JOB_NAME, JENKINS_USER, JENKINS_TOKEN
+    if JENKINS_TOKEN:
+        return
+    creds_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "pilot-config", ".jenkins_creds")
+    )
+    if not os.path.exists(creds_path):
+        return
+    try:
+        with open(creds_path, encoding="utf-8") as f:
+            for line in f:
+                match = re.match(r"export\s+(JENKINS_(?:JOB_NAME|USER|TOKEN))=(.*)", line.strip())
+                if not match:
+                    continue
+                key, value = match.groups()
+                value = value.strip().strip('"').strip("'")
+                if key == "JENKINS_JOB_NAME":
+                    JENKINS_JOB_NAME = value or JENKINS_JOB_NAME
+                elif key == "JENKINS_USER":
+                    JENKINS_USER = value or JENKINS_USER
+                elif key == "JENKINS_TOKEN":
+                    JENKINS_TOKEN = value or JENKINS_TOKEN
+    except Exception as e:
+        print(f"Could not load Jenkins credentials file: {e}")
+
+
+_load_jenkins_creds_file()
+
+
 # --- Git Push Functions ---
 
 
