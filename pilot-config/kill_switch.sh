@@ -160,6 +160,7 @@ if [[ "${PURGE_DATA}" == "1" ]]; then
   sudo_run rm -rf /var/lib/jenkins /var/cache/jenkins /var/log/jenkins
   sudo_run rm -rf /var/lib/grafana /var/log/grafana /etc/grafana
   sudo_run rm -rf /var/lib/influxdb /var/lib/influxdb2 /etc/influxdb /etc/influxdb2
+  rm -rf "${HOME}/.influxdbv2"
   sudo_run rm -rf /usr/share/ollama /var/lib/ollama
 else
   echo "[8/8] Data purge skipped. Re-run with --purge-data to remove Jenkins/Grafana/InfluxDB/Ollama data."

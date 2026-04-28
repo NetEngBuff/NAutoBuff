@@ -9,6 +9,7 @@ import urllib.request
 import urllib.error
 import base64
 import http.cookiejar
+import urllib.parse
 
 
 def find_base_path():
@@ -47,6 +48,18 @@ def create_service_or_timer_file(file_name, file_content):
         print(f"❌ Error creating {file_name}: {e}")
 
 
+def _gnmic_has_targets(base_path):
+    gnmic_yaml = base_path / "gnmic-stream.yaml"
+    if not gnmic_yaml.exists():
+        return False
+    try:
+        import yaml
+        config = yaml.safe_load(gnmic_yaml.read_text()) or {}
+        return bool(config.get("targets"))
+    except Exception:
+        return False
+
+
 def deploy():
     try:
         subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
@@ -55,6 +68,7 @@ def deploy():
         print("❌ Failed to reload systemd daemon.")
         return
 
+    base_path = find_base_path()
     services = [
         "password_update.service",
         "device_health_check.timer",
@@ -67,11 +81,88 @@ def deploy():
     for service in services:
         try:
             subprocess.run(["sudo", "systemctl", "enable", service], check=True)
+            if service == "gnmic_nautobuff.service" and not _gnmic_has_targets(base_path):
+                subprocess.run(["sudo", "systemctl", "reset-failed", service], check=False)
+                print(f"✅ Enabled only: {service} (starts after topology targets exist)")
+                continue
             subprocess.run(["sudo", "systemctl", "start", service], check=True)
             print(f"✅ Enabled & started: {service}")
         except subprocess.CalledProcessError:
             print(f"❌ Failed to enable/start {service}")
 
+
+def _influx_request(opener, url, method="GET", data=None, headers=None, timeout=10):
+    body = None
+    if data is not None:
+        body = json.dumps(data).encode()
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers=headers or {},
+        method=method,
+    )
+    with opener.open(req, timeout=timeout) as response:
+        payload = response.read().decode()
+    return json.loads(payload) if payload else {}
+
+
+def _create_influx_token_via_http():
+    """
+    Influx CLI auth commands require an existing local token. On a clean host that
+    was initialized previously, the server can be ready while the CLI config is
+    missing. Use the local admin credentials to create the gNMI/Grafana token.
+    """
+    base_url = "http://localhost:8086"
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    signin_headers = {
+        "Authorization": "Basic " + base64.b64encode(b"admin:admin123").decode(),
+    }
+    signin = urllib.request.Request(
+        f"{base_url}/api/v2/signin",
+        headers=signin_headers,
+        method="POST",
+    )
+    opener.open(signin, timeout=10).read()
+
+    common_headers = {"Content-Type": "application/json"}
+    orgs = _influx_request(
+        opener,
+        f"{base_url}/api/v2/orgs?org={urllib.parse.quote('NAutoBuff')}",
+        headers=common_headers,
+    )
+    orgs_list = orgs.get("orgs", [])
+    if not orgs_list:
+        raise RuntimeError("InfluxDB org 'NAutoBuff' was not found")
+    org_id = orgs_list[0]["id"]
+
+    buckets = _influx_request(
+        opener,
+        f"{base_url}/api/v2/buckets?orgID={org_id}&name={urllib.parse.quote('NAutoBuff')}",
+        headers=common_headers,
+    )
+    bucket_list = buckets.get("buckets", [])
+    if not bucket_list:
+        raise RuntimeError("InfluxDB bucket 'NAutoBuff' was not found")
+    bucket_id = bucket_list[0]["id"]
+
+    auth = _influx_request(
+        opener,
+        f"{base_url}/api/v2/authorizations",
+        method="POST",
+        data={
+            "orgID": org_id,
+            "description": "gnmic-nautobuff",
+            "permissions": [
+                {"action": "read", "resource": {"type": "buckets", "id": bucket_id, "orgID": org_id}},
+                {"action": "write", "resource": {"type": "buckets", "id": bucket_id, "orgID": org_id}},
+            ],
+        },
+        headers=common_headers,
+    )
+    token = auth.get("token")
+    if not token:
+        raise RuntimeError("InfluxDB did not return a token")
+    return token
 
 def _build_grafana_dashboard(ds_uid, hostname_ip_map=None):
     """
@@ -346,6 +437,13 @@ def setup_monitoring(base_path):
                 token = (data[0] if isinstance(data, list) else data).get("token")
             except (json.JSONDecodeError, IndexError, KeyError):
                 pass
+
+    if not token:
+        try:
+            token = _create_influx_token_via_http()
+            print("✅ InfluxDB token created via local admin login")
+        except Exception as e:
+            print(f"⚠️  InfluxDB HTTP token fallback failed: {e}")
 
     if not token:
         print("❌ Could not obtain InfluxDB token — set it manually in gnmic-stream.yaml")
@@ -994,6 +1092,6 @@ if __name__ == "__main__":
     provision_jenkins_token()
     provision_jenkins_plugins()
     provision_jenkins_job()
-    main()
     base = find_base_path()
     setup_monitoring(base)
+    main()
