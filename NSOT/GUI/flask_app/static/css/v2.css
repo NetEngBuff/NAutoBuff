@@ -159,6 +159,7 @@ body::before {
   background-size: 52px 52px;
   pointer-events: none; z-index: 0;
 }
+body.console-open { overflow: hidden; }
 
 a { color: inherit; text-decoration: none; }
 svg { flex-shrink: 0; }
@@ -342,11 +343,11 @@ svg { flex-shrink: 0; }
 .nb-rollback-btn:hover { background: rgba(255,77,106,0.15); border-color: rgba(255,77,106,0.5); }
 
 /* ── Main content ──────────────────────────────────────────── */
-.nb-main { margin-left: var(--sidebar-w); padding-top: var(--topbar-h); min-height: 100vh; position: relative; z-index: 1; }
+.nb-main { margin-left: var(--sidebar-w); padding-top: var(--topbar-h); min-height: 100vh; position: relative; z-index: auto; }
 .nb-content { padding: var(--sp-8); max-width: 1440px; }
 
 /* ── Container (compat alias) ────────────────────────────────  */
-.container { padding: var(--sp-8); max-width: 1440px; }
+.container { padding: var(--sp-8); max-width: 1440px; width: 100%; box-sizing: border-box; }
 
 /* ── Page Header ─────────────────────────────────────────────  */
 .page-header {
@@ -383,7 +384,7 @@ svg { flex-shrink: 0; }
   background: var(--nb-surface); border: 1px solid var(--nb-border);
   border-radius: var(--r-lg); overflow: hidden;
   transition: border-color 200ms, box-shadow 200ms;
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: column; min-width: 0;
 }
 .tool-card:hover {
   border-color: rgba(0,212,255,0.18);
@@ -507,7 +508,7 @@ svg { flex-shrink: 0; }
 .font-mono  { font-family: var(--font-mono); font-size: 12px; }
 
 /* ── Grid utilities ──────────────────────────────────────────  */
-.grid { display: grid; }
+.grid { display: grid; min-width: 0; }
 .grid-cols-1 { grid-template-columns: 1fr; }
 .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }

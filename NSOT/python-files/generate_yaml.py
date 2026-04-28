@@ -12,11 +12,12 @@ def clean_empty(data):
 
 
 def create_yaml_from_form(device_data, filename="devices_config.yml"):
-    """Creates a YAML file from the provided device data."""
+    """Creates a YAML file from one device dict or a list of device dicts."""
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     yaml_file_path = os.path.join(base_dir, "templates", filename)
 
-    cleaned_data = clean_empty({"devices": [device_data]})
+    devices = device_data if isinstance(device_data, list) else [device_data]
+    cleaned_data = clean_empty({"devices": devices})
 
     with open(yaml_file_path, "w") as yaml_file:
         yaml_file.write("---\n")
@@ -39,6 +40,7 @@ def build_device_data(
     vlans=None,
     rip=None,
     dhcp=None,
+    custom_config=None,
 ):
     """Builds device data structure with only non-empty fields."""
     device_data = {
@@ -137,6 +139,15 @@ def build_device_data(
             },
         }
 
+    if custom_config:
+        custom_lines = [
+            line.strip()
+            for line in custom_config.splitlines()
+            if line.strip()
+        ]
+        if custom_lines:
+            device_data["custom_config"] = custom_lines
+
     return device_data
 
 
@@ -150,6 +161,7 @@ def create_yaml_from_form_data(
     vlans=None,
     rip=None,
     dhcp=None,
+    custom_config=None,
 ):
     """Generates YAML configuration file from form data."""
     device_data = build_device_data(
@@ -162,5 +174,37 @@ def create_yaml_from_form_data(
         vlans,
         rip,
         dhcp,
+        custom_config,
     )
     create_yaml_from_form(device_data)
+
+
+def create_yaml_from_form_devices(
+    device_ids,
+    vendor_lookup,
+    interfaces,
+    subinterfaces=None,
+    ospf=None,
+    bgp=None,
+    vlans=None,
+    rip=None,
+    dhcp=None,
+    custom_config=None,
+):
+    """Generates one YAML file containing the same config payload for many devices."""
+    devices = [
+        build_device_data(
+            device_id,
+            vendor_lookup(device_id),
+            interfaces,
+            subinterfaces,
+            ospf,
+            bgp,
+            vlans,
+            rip,
+            dhcp,
+            custom_config,
+        )
+        for device_id in device_ids
+    ]
+    create_yaml_from_form(devices)

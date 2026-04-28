@@ -5,6 +5,19 @@ import sys
 import time
 
 
+def _has_l3_config(device):
+    """Return True when this device payload includes routed L3 configuration."""
+    return any(
+        [
+            device.get("interfaces"),
+            device.get("subinterfaces"),
+            device.get("ospf"),
+            device.get("bgp"),
+            device.get("rip"),
+        ]
+    )
+
+
 def generate_device_configs():
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     yaml_file = os.path.join(base_dir, "templates", "devices_config.yml")
@@ -36,6 +49,7 @@ def generate_device_configs():
         "ospf": env.get_template("ospf_template.j2"),
         "rip": env.get_template("rip_template.j2"),
         "dhcp": env.get_template("dhcp_template.j2"),
+        "l3_routing": env.get_template("l3_routing_template.j2"),
         "interfaces": env.get_template("interfaces_template.j2"),
         "subinterfaces": env.get_template("subinterface_template.j2"),
         "vlan": env.get_template("vlan_template.j2"),
@@ -50,6 +64,9 @@ def generate_device_configs():
         clear_config = device.get("clear_config", "no")
         vendor = device.get("vendor", "arista").lower()
         hostname = device.get("hostname")
+
+        if clear_config != "yes" and _has_l3_config(device):
+            config += templates["l3_routing"].render()
 
         # Interfaces
         if "interfaces" in device:
@@ -123,6 +140,16 @@ def generate_device_configs():
                 config += "no service dhcp\n"
             else:
                 config += templates["dhcp"].render(dhcp=dhcp_data)
+
+        # Custom CLI
+        if clear_config != "yes" and "custom_config" in device:
+            custom_lines = [
+                str(line).rstrip()
+                for line in device.get("custom_config", [])
+                if str(line).strip()
+            ]
+            if custom_lines:
+                config += "\n".join(custom_lines) + "\n"
 
         # Write config to file
         filename = os.path.join(config_dir, f"{hostname}.cfg")

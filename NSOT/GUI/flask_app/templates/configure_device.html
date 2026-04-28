@@ -25,16 +25,19 @@
     <!-- Device Selection -->
     <div class="form-row" style="align-items:flex-start; max-width:600px;">
       <div class="form-group" style="flex:1.5">
-        <label class="form-label">Device</label>
-        <select name="device_id" class="form-select" required onchange="onConfigDeviceSelect(this.value)">
-          <option value="" disabled {% if not device_id %}selected{% endif %}>Select Device</option>
+        <label class="form-label">Devices</label>
+        <div class="device-check-list">
           {% for device in devices %}
-          <option value="{{ device }}" {% if device == device_id %}selected{% endif %}>{{ device }}</option>
+          <label class="device-check">
+            <input type="checkbox" name="device_id" value="{{ device }}" {% if device in device_ids|default([]) or device == device_id %}checked{% endif %} onchange="onConfigDeviceSelect()">
+            <span>{{ device }}</span>
+          </label>
           {% endfor %}
-        </select>
+        </div>
+        <div class="form-hint" style="margin-top:6px;">Select one or more devices.</div>
       </div>
       <div class="form-group" style="flex:1">
-        <label class="form-label">Vendor <span class="form-hint">(from hosts.csv)</span></label>
+        <label class="form-label">Vendors <span class="form-hint">(from hosts.csv)</span></label>
         <div id="vendor-badge" style="display:none; align-items:center; gap:8px; padding:8px 12px; background:rgba(255,122,61,0.08); border:1px solid rgba(255,122,61,0.3); border-radius:8px; font-size:13px; font-weight:600; color:var(--plab);">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <span id="vendor-badge-text">—</span>
@@ -57,6 +60,10 @@
       <button type="button" class="mode-btn" data-mode="upload" onclick="toggleConfigMode('upload')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Upload Config File
+      </button>
+      <button type="button" class="mode-btn" data-mode="custom" onclick="toggleConfigMode('custom')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Custom CLI
       </button>
     </div>
 
@@ -94,6 +101,16 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9 22 2z"/></svg>
           Push Configuration to Device
         </button>
+      </div>
+    </div>
+
+    <div id="custom-cli-section" style="display:none;">
+      <div class="config-block">
+        <div class="form-group">
+          <label class="form-label">CLI Commands</label>
+          <textarea name="custom_config[]" class="form-input custom-cli-input" rows="10" placeholder="interface Ethernet1&#10;description Uplink&#10;no shutdown"></textarea>
+          <div class="form-hint" style="margin-top:6px;">Enter one command per line. These lines are generated into the config and pushed through Jenkins.</div>
+        </div>
       </div>
     </div>
 
@@ -274,6 +291,13 @@
 .config-block { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:var(--space-4); margin-bottom:var(--space-3); position:relative; border-left:3px solid rgba(255,122,61,0.4); transition:all 0.2s; animation:fadeSlide 0.2s ease; }
 .config-block:hover { border-left-color:var(--plab); background:rgba(255,122,61,0.02); }
 .config-block:last-child { margin-bottom:0; }
+.device-check-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:8px; max-height:190px; overflow:auto; padding:10px; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.08); border-radius:10px; }
+.device-check { display:flex; align-items:center; gap:8px; min-width:0; padding:8px 10px; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); border-radius:8px; color:var(--nb-text-2); font-size:13px; cursor:pointer; transition:all 0.15s; }
+.device-check:hover { border-color:rgba(255,122,61,0.35); background:rgba(255,122,61,0.045); color:var(--nb-text-1); }
+.device-check:has(input:checked) { border-color:rgba(255,122,61,0.5); background:rgba(255,122,61,0.1); color:var(--plab); }
+.device-check input { accent-color:var(--plab); flex:0 0 auto; }
+.device-check span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.custom-cli-input { min-height:180px; resize:vertical; font-family:'JetBrains Mono',monospace; line-height:1.55; }
 
 /* Checkbox group */
 .checkbox-group { display:flex; flex-wrap:wrap; gap:var(--space-3); margin:var(--space-3) 0; padding:var(--space-3); background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid rgba(255,255,255,0.05); }
@@ -292,20 +316,24 @@ const submittedForm = {{ submitted_form|default({})|tojson }};
 
 function toggleConfigMode(mode) {
   currentMode = mode;
-  const manualBtn = document.querySelector('[data-mode="manual"]');
-  const uploadBtn = document.querySelector('[data-mode="upload"]');
+  const modeButtons = document.querySelectorAll('.mode-btn');
   const uploadSection = document.getElementById('upload-section');
+  const customSection = document.getElementById('custom-cli-section');
   const manualParts = document.querySelectorAll('.protocol-header, .protocol-grid, #protocol-sections');
 
+  modeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
+
   if (mode === 'upload') {
-    manualBtn.classList.remove('active');
-    uploadBtn.classList.add('active');
     uploadSection.style.display = 'block';
+    customSection.style.display = 'none';
+    manualParts.forEach(el => el.style.display = 'none');
+  } else if (mode === 'custom') {
+    uploadSection.style.display = 'none';
+    customSection.style.display = 'block';
     manualParts.forEach(el => el.style.display = 'none');
   } else {
-    uploadBtn.classList.remove('active');
-    manualBtn.classList.add('active');
     uploadSection.style.display = 'none';
+    customSection.style.display = 'none';
     manualParts.forEach(el => el.style.display = '');
   }
 }
@@ -354,28 +382,42 @@ function formatFileSize(bytes) {
 
 let configDeviceVendor = "";
 
-function onConfigDeviceSelect(deviceId) {
+function selectedConfigDevices() {
+  return Array.from(document.querySelectorAll('input[name="device_id"]:checked')).map(input => input.value).filter(Boolean);
+}
+
+function onConfigDeviceSelect() {
+  const deviceIds = selectedConfigDevices();
   const badge = document.getElementById('vendor-badge');
   const badgeText = document.getElementById('vendor-badge-text');
   const missing = document.getElementById('vendor-missing');
-  if (!deviceId) { badge.style.display = 'none'; missing.style.display = 'none'; configDeviceVendor = ""; return; }
+  if (!deviceIds.length) { badge.style.display = 'none'; missing.style.display = 'none'; configDeviceVendor = ""; return; }
   fetch('/hosts-data').then(r => r.json()).then(hosts => {
-    const host = hosts.find(h => h.hostname === deviceId);
-    const vendor = host?.vendor || "";
-    configDeviceVendor = vendor;
-    if (vendor) { badgeText.textContent = vendor.charAt(0).toUpperCase() + vendor.slice(1); badge.style.display = 'flex'; missing.style.display = 'none'; }
-    else { badge.style.display = 'none'; missing.style.display = 'block'; }
+    const selectedHosts = deviceIds.map(deviceId => hosts.find(h => h.hostname === deviceId)).filter(Boolean);
+    const missingVendors = selectedHosts.filter(host => !host.vendor).map(host => host.hostname);
+    const vendorSummary = selectedHosts.map(host => `${host.hostname}: ${(host.vendor || 'missing')}`).join(', ');
+    configDeviceVendor = vendorSummary;
+    if (selectedHosts.length && !missingVendors.length) {
+      badgeText.textContent = vendorSummary;
+      badge.style.display = 'flex';
+      missing.style.display = 'none';
+    } else {
+      badge.style.display = selectedHosts.length ? 'flex' : 'none';
+      badgeText.textContent = vendorSummary || '—';
+      missing.textContent = `No vendor set for ${missingVendors.join(', ')} — update in Hosts Inventory`;
+      missing.style.display = missingVendors.length ? 'block' : 'none';
+    }
   }).catch(() => {});
 }
 
 async function uploadConfigFile() {
-  const deviceId = document.querySelector('select[name="device_id"]').value;
-  if (!deviceId) { alert('Please select a device'); return; }
+  const deviceIds = selectedConfigDevices();
+  if (!deviceIds.length) { alert('Please select at least one device'); return; }
   if (!uploadedFile) { alert('Please select a config file'); return; }
   showLoading();
   const formData = new FormData();
   formData.append('config_file', uploadedFile);
-  formData.append('device_id', deviceId);
+  deviceIds.forEach(deviceId => formData.append('device_id', deviceId));
   try {
     const response = await fetch('/upload-config', { method: 'POST', body: formData });
     const data = await response.json();
@@ -518,12 +560,11 @@ function restoreSubmittedConfig() {
   if (!submittedForm || Object.keys(submittedForm).length === 0) return;
 
   const deviceValues = submittedValues('device_id');
-  if (deviceValues[0]) {
-    const deviceSelect = document.querySelector('select[name="device_id"]');
-    if (deviceSelect) {
-      deviceSelect.value = deviceValues[0];
-      onConfigDeviceSelect(deviceValues[0]);
-    }
+  if (deviceValues.length) {
+    document.querySelectorAll('input[name="device_id"]').forEach(input => {
+      input.checked = deviceValues.includes(input.value);
+    });
+    onConfigDeviceSelect();
   }
 
   const protocolFields = {
@@ -543,6 +584,10 @@ function restoreSubmittedConfig() {
 
   Object.entries(protocolFields).forEach(([protocol, names]) => restoreProtocol(protocol, names));
   Object.values(protocolFields).flat().forEach(restoreFieldValues);
+  if (submittedValues('custom_config[]').length) {
+    toggleConfigMode('custom');
+    restoreFieldValues('custom_config[]');
+  }
 }
 
 // Loading overlay
@@ -585,11 +630,15 @@ function _hideLoading() {
 }
 
 async function pushConfig() {
-  const deviceId = document.querySelector("select[name='device_id']").value;
+  const deviceIds = selectedConfigDevices();
+  if (!deviceIds.length) {
+    document.getElementById("push-message").innerHTML = `<div class="alert alert-error"><span class="alert-icon">&#10007;</span><div class="alert-content">Select at least one device.</div></div>`;
+    return;
+  }
   showLoading();
   let result;
   try {
-    const response = await fetch("/push-config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device_id: deviceId }) });
+    const response = await fetch("/push-config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device_ids: deviceIds }) });
     result = await response.json();
   } catch (e) {
     _hideLoading();
@@ -601,7 +650,7 @@ async function pushConfig() {
   const pushWrapper = document.getElementById("push-button-wrapper");
   document.getElementById("config-result-panel").classList.remove("empty");
   if (result.status === "success") {
-    msgContainer.innerHTML = `<div class="alert alert-success"><span class="alert-icon">&#10003;</span><div class="alert-content">Configuration pushed successfully.</div></div>`;
+    msgContainer.innerHTML = `<div class="alert alert-success"><span class="alert-icon">&#10003;</span><div class="alert-content">${result.message || 'Configuration pushed successfully.'}</div></div>`;
     if (pushWrapper) pushWrapper.style.display = "none";
     document.getElementById("config-form").reset();
   } else {
@@ -609,6 +658,9 @@ async function pushConfig() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', restoreSubmittedConfig);
+document.addEventListener('DOMContentLoaded', () => {
+  restoreSubmittedConfig();
+  onConfigDeviceSelect();
+});
 </script>
 {% endblock %}

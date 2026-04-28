@@ -20,6 +20,61 @@
   font-family:var(--font-ui); letter-spacing:0.03em;
 }
 .tools-mode-btn.active { background:var(--plab); color:var(--nb-base); }
+.console-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  background: rgba(0,0,0,0.88);
+  backdrop-filter: blur(8px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.console-window {
+  width: min(1200px, calc(100vw - 48px));
+  height: min(80vh, calc(100vh - 48px));
+  background: var(--nb-base);
+  border: 1px solid var(--nb-border);
+  border-radius: var(--r-xl);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--sh-xl);
+}
+.console-window.maximized {
+  width: calc(100vw - 48px);
+  height: calc(100vh - 48px);
+}
+.console-window.minimized {
+  height: auto;
+}
+.console-window.minimized #console-terminal {
+  display: none;
+}
+.console-traffic-controls {
+  display: flex;
+  gap: 6px;
+}
+.console-dot {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.22);
+}
+.console-dot.close { background: var(--err); }
+.console-dot.minimize { background: var(--warn); }
+.console-dot.maximize { background: var(--ok); }
+@media (max-width: 640px) {
+  .console-overlay { padding: 10px; }
+  .console-window { width: calc(100vw - 20px); height: calc(100vh - 20px); }
+  .console-window.maximized { width: calc(100vw - 20px); height: calc(100vh - 20px); }
+}
 </style>
 {% endblock %}
 
@@ -306,15 +361,15 @@ if (!document.getElementById('tools-spin-style')) {
 </script>
 
 <!-- Console Overlay -->
-<div id="console-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.88);backdrop-filter:blur(8px);flex-direction:column;align-items:center;justify-content:center;">
-  <div style="width:92vw;max-width:1200px;height:80vh;background:var(--nb-base);border:1px solid var(--nb-border);border-radius:var(--r-xl);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--sh-xl);">
+<div id="console-overlay" class="console-overlay">
+  <div class="console-window">
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:var(--nb-elevated);border-bottom:1px solid var(--nb-border);flex-shrink:0;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <div style="display:flex;gap:5px;">
-          <span style="width:12px;height:12px;border-radius:50%;background:var(--err);"></span>
-          <span style="width:12px;height:12px;border-radius:50%;background:var(--warn);"></span>
-          <span style="width:12px;height:12px;border-radius:50%;background:var(--ok);"></span>
+        <div class="console-traffic-controls">
+          <button type="button" class="console-dot close" onclick="closeConsole()" title="Close console" aria-label="Close console"></button>
+          <button type="button" class="console-dot minimize" onclick="toggleConsoleMinimize()" title="Minimize console" aria-label="Minimize console"></button>
+          <button type="button" class="console-dot maximize" onclick="toggleConsoleMaximize()" title="Maximize console" aria-label="Maximize console"></button>
         </div>
         <span id="console-title" style="color:var(--t1);font-weight:600;font-size:13px;font-family:var(--font-mono);">Console</span>
         <span id="console-status-dot" style="width:7px;height:7px;border-radius:50%;background:var(--t4);display:inline-block;"></span>
@@ -342,6 +397,9 @@ if (!document.getElementById('tools-spin-style')) {
     const device = document.getElementById('console-device').value;
     if (!device) { alert('Select a device first.'); return; }
     const overlay = document.getElementById('console-overlay');
+    const win = document.querySelector('.console-window');
+    win.classList.remove('minimized');
+    document.body.classList.add('console-open');
     overlay.style.display = 'flex';
     document.getElementById('console-title').textContent = device + ' — SSH Console';
     _setStatus('var(--t4)', 'Connecting…');
@@ -370,7 +428,29 @@ if (!document.getElementById('tools-spin-style')) {
   window.closeConsole = function () {
     if (_socket) { _socket.disconnect(); _socket=null; }
     _connected=false;
+    document.body.classList.remove('console-open');
     document.getElementById('console-overlay').style.display = 'none';
+  };
+  window.toggleConsoleMinimize = function () {
+    const win = document.querySelector('.console-window');
+    win.classList.toggle('minimized');
+    if (!win.classList.contains('minimized') && _fitAddon) {
+      setTimeout(() => {
+        _fitAddon.fit();
+        if (_socket && _connected) _socket.emit('ssh_resize', { cols:_term.cols, rows:_term.rows });
+      }, 0);
+    }
+  };
+  window.toggleConsoleMaximize = function () {
+    const win = document.querySelector('.console-window');
+    win.classList.remove('minimized');
+    win.classList.toggle('maximized');
+    if (_fitAddon) {
+      setTimeout(() => {
+        _fitAddon.fit();
+        if (_socket && _connected) _socket.emit('ssh_resize', { cols:_term.cols, rows:_term.rows });
+      }, 0);
+    }
   };
   window.clearConsole = function () { if (_term) _term.clear(); };
   window.addEventListener('resize', () => {

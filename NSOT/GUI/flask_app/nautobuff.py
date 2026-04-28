@@ -172,7 +172,7 @@ from user_db import (
 from ping import ping_local, ping_remote
 from goldenConfig import generate_configs
 from show_commands import execute_show_command, find_device_info
-from generate_yaml import create_yaml_from_form_data
+from generate_yaml import create_yaml_from_form_data, create_yaml_from_form_devices
 from config_Gen import conf_gen
 from update_topo import update_topology, get_hosts_from_csv
 from dhcp_updates import configure_dhcp_relay, configure_dhcp_server
@@ -1462,16 +1462,34 @@ def configure_device():
         devices = hosts_reader.get_devices()
         if request.method == "POST":
             submitted_form = request.form.to_dict(flat=False)
-            device_id = request.form.get("device_id")
-            device_vendor = _get_vendor_for_device(device_id) if device_id else None
-            if not device_vendor:
+            device_ids = [
+                device_id.strip()
+                for device_id in request.form.getlist("device_id")
+                if device_id.strip()
+            ]
+            device_id = device_ids[0] if device_ids else None
+            missing_vendor_devices = [
+                target for target in device_ids if not _get_vendor_for_device(target)
+            ]
+            if not device_ids:
                 return render_template(
                     "configure_device.html",
                     devices=devices,
+                    device_ids=device_ids,
                     device_id=device_id,
                     submitted_form=submitted_form,
                     jenkins_result="jenkins_failure",
-                    message=f"⚠️ No vendor set for {device_id}. Please update the host in Hosts Inventory.",
+                    message="⚠️ Select at least one device.",
+                )
+            if missing_vendor_devices:
+                return render_template(
+                    "configure_device.html",
+                    devices=devices,
+                    device_ids=device_ids,
+                    device_id=device_id,
+                    submitted_form=submitted_form,
+                    jenkins_result="jenkins_failure",
+                    message=f"⚠️ No vendor set for {', '.join(missing_vendor_devices)}. Please update Hosts Inventory.",
                 )
 
             # Interfaces
@@ -1611,17 +1629,24 @@ def configure_device():
                     "redistribute_rip": redistribute_rip_into_bgp,
                 }
 
+            custom_config = "\n".join(
+                line_block.strip()
+                for line_block in request.form.getlist("custom_config[]")
+                if line_block.strip()
+            )
+
             # Attempt to generate YAML and push via Jenkins
             try:
-                create_yaml_from_form_data(
-                    device_id=device_id,
-                    device_vendor=device_vendor,
+                create_yaml_from_form_devices(
+                    device_ids=device_ids,
+                    vendor_lookup=lambda target: _get_vendor_for_device(target),
                     interfaces=interfaces,
                     subinterfaces=subinterfaces,
                     vlans=vlans,
                     rip=rip,
                     ospf=ospf,
                     bgp=bgp,
+                    custom_config=custom_config,
                 )
                 conf_gen()
                 jenkins_result = push_and_monitor_jenkins()
@@ -1631,6 +1656,7 @@ def configure_device():
                         "configure_device.html",
                         jenkins_result="jenkins_success",
                         device_id=device_id,
+                        device_ids=device_ids,
                         devices=devices,
                         message="✅ Jenkins pipeline succeeded!",
                     )
@@ -1639,6 +1665,7 @@ def configure_device():
                         "configure_device.html",
                         jenkins_result="jenkins_failure",
                         device_id=device_id,
+                        device_ids=device_ids,
                         devices=devices,
                         submitted_form=submitted_form,
                         message=f"❌ Jenkins pipeline failed: {jenkins_result}",
@@ -1650,13 +1677,14 @@ def configure_device():
                     "configure_device.html",
                     jenkins_result="jenkins_failure",
                     device_id=device_id,
+                    device_ids=device_ids,
                     devices=devices,
                     submitted_form=submitted_form,
                     message=str(pipeline_error),
                 )
 
         return render_template(
-            "configure_device.html", jenkins_result=None, devices=devices, submitted_form={}
+            "configure_device.html", jenkins_result=None, devices=devices, submitted_form={}, device_ids=[]
         )
 
     except Exception as e:
@@ -1665,6 +1693,7 @@ def configure_device():
             "configure_device.html",
             jenkins_result="jenkins_failure",
             device_id="unknown",
+            device_ids=[],
             message=str(e),
             devices=[],
             submitted_form={},
@@ -1676,15 +1705,28 @@ def configure_device():
 @operator_required
 def push_config():
     data = request.get_json()
-    device_id = data.get("device_id")
+    device_ids = data.get("device_ids") or data.get("device_id")
+    if isinstance(device_ids, str):
+        device_ids = [device_ids]
+    device_ids = [device_id for device_id in (device_ids or []) if device_id]
+    if not device_ids:
+        return jsonify({"status": "error", "message": "No devices selected."})
 
-    # Run push_configuration function
-    push_status = push_configuration(device_id)
+    results = []
+    for device_id in device_ids:
+        push_status = push_configuration(device_id)
+        results.append((device_id, push_status))
 
-    if "successfully" in push_status:
-        return jsonify({"status": "success", "message": push_status})
-    else:
-        return jsonify({"status": "error", "message": push_status})
+    failures = [
+        f"{device_id}: {status}"
+        for device_id, status in results
+        if "successfully" not in status.lower()
+    ]
+    if failures:
+        return jsonify({"status": "error", "message": " | ".join(failures)})
+
+    pushed = ", ".join(device_id for device_id, _ in results)
+    return jsonify({"status": "success", "message": f"Configuration pushed successfully to {pushed}."})
 
 
 @app.route("/upload-config", methods=["POST"])
@@ -1696,15 +1738,21 @@ def upload_config():
     """
     try:
         # Get form data
-        device_id = request.form.get("device_id")
+        device_ids = [
+            device_id.strip()
+            for device_id in request.form.getlist("device_id")
+            if device_id.strip()
+        ]
         config_file = request.files.get("config_file")
 
-        if not device_id:
-            return jsonify({"status": "error", "message": "Device ID is required"})
+        if not device_ids:
+            return jsonify({"status": "error", "message": "Select at least one device."})
 
-        device_vendor = _get_vendor_for_device(device_id)
-        if not device_vendor:
-            return jsonify({"status": "error", "message": f"No vendor set for {device_id}. Please update the host in Hosts Inventory."})
+        missing_vendor_devices = [
+            device_id for device_id in device_ids if not _get_vendor_for_device(device_id)
+        ]
+        if missing_vendor_devices:
+            return jsonify({"status": "error", "message": f"No vendor set for {', '.join(missing_vendor_devices)}. Please update Hosts Inventory."})
 
         if not config_file:
             return jsonify({"status": "error", "message": "No config file provided"})
@@ -1715,13 +1763,22 @@ def upload_config():
         if not config_content.strip():
             return jsonify({"status": "error", "message": "Config file is empty"})
 
-        # Push configuration using Netmiko
-        success, message = push_uploaded_config(device_id, device_vendor, config_content)
+        results = []
+        for device_id in device_ids:
+            device_vendor = _get_vendor_for_device(device_id)
+            success, message = push_uploaded_config(device_id, device_vendor, config_content)
+            results.append((device_id, success, message))
 
-        if success:
-            return jsonify({"status": "success", "message": message})
-        else:
-            return jsonify({"status": "error", "message": message})
+        failures = [
+            f"{device_id}: {message}"
+            for device_id, success, message in results
+            if not success
+        ]
+        if failures:
+            return jsonify({"status": "error", "message": " | ".join(failures)})
+
+        pushed = ", ".join(device_id for device_id, _, _ in results)
+        return jsonify({"status": "success", "message": f"Configuration pushed successfully to {pushed}."})
 
     except Exception as e:
         print(f"Error in /upload-config: {e}")
