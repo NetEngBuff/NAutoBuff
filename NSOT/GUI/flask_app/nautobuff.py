@@ -86,11 +86,14 @@ def _stop_containerlab_graph():
 
 def _topology_page_context(**extra):
     yaml_generated = bool(extra.pop("yaml_generated", False))
+    is_topology_running = _is_topology_running()
+    has_topology_yaml = os.path.exists(topo_path)
     context = {
         "docker_images": get_docker_images(),
-        "has_topology_yaml": os.path.exists(topo_path),
+        "has_topology_yaml": has_topology_yaml,
         "yaml_generated": yaml_generated,
-        "is_topology_running": _is_topology_running(),
+        "is_topology_running": is_topology_running,
+        "can_view_yaml": has_topology_yaml and (yaml_generated or is_topology_running),
         "topology_yaml": "",
     }
     if context["has_topology_yaml"]:
