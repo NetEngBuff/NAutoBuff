@@ -7,6 +7,14 @@ from day0_config import generate_day0_config, generate_mgmt_day0_config
 TOPO_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "pilot-config", "topo.yml")
 )
+MGMT_CONFIG_PATH = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "golden_configs",
+        "goldenconfigs_mgmt.cfg",
+    )
+)
 
 
 # Custom YAML Dumper to prevent aliasing and ensure compact inline style for 2-item endpoint lists
@@ -44,7 +52,7 @@ def build_clab_topology(topo_name, devices, links):
     nodes["mgmt"] = {
         "kind": "ceos",
         "image": "ceos:4.33.2F",
-        "startup-config": "~/projects/NAutoBuff/NSOT/golden_configs/goldenconfigs_mgmt.cfg",
+        "startup-config": MGMT_CONFIG_PATH,
     }
     interface_counts["mgmt"] = 0
 

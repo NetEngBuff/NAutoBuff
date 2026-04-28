@@ -3,10 +3,11 @@ devices:
 - hostname: R1
   vendor: arista
   clear_config: 'no'
-  custom_config:
-  - ip routing
-- hostname: R2
-  vendor: arista
-  clear_config: 'no'
-  custom_config:
-  - ip routing
+  interfaces:
+  - name: Ethernet2
+    ip_address: 10.0.0.1
+    subnet_mask: '24'
+  bgp:
+    as_number: '65001'
+    redistribute_ospf: false
+    redistribute_rip: false

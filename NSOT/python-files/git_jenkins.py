@@ -73,9 +73,11 @@ def git_push():
 # --- Ngrok URL Fetcher ---
 
 
-def find_ngrok_log_file(
-    search_root=os.path.expanduser("~/projects/NAutoBuff/NSOT/logs"),
-):
+def find_ngrok_log_file(search_root=None):
+    if search_root is None:
+        search_root = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "logs")
+        )
     for root, dirs, files in os.walk(search_root):
         for file in files:
             if file == "ngrok.log":

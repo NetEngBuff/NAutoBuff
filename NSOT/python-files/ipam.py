@@ -44,6 +44,9 @@ def collect_device_info(device_name, management_ip):
                 iface_name = "N/A"
                 print(f"⚠️  Could not get full info for {ip} on {device_name}: {e}")
 
+            if iface_name == "Management0" and str(ip).startswith("172.20.20."):
+                continue
+
             device_info.append(
                 {
                     "Timestamp": timestamp,

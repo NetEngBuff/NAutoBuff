@@ -1,5 +1,7 @@
 #!/bin/bash
 set -e
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # 1. Load the environment (Reuse Python 3.12)
 export PYENV_ROOT="$HOME/.pyenv"
@@ -8,8 +10,8 @@ eval "$(pyenv init -)"
 pyenv shell 3.12.8
 
 # 2. Activate the existing VENV
-if [ -d "venv" ]; then
-    source venv/bin/activate
+if [ -d "${SCRIPT_DIR}/venv" ]; then
+    source "${SCRIPT_DIR}/venv/bin/activate"
 else
     echo "Error: venv not found! Run requirements.sh first."
     exit 1
@@ -20,7 +22,7 @@ sudo setcap cap_net_admin,cap_net_raw,cap_sys_admin+ep $(which containerlab)
 
 # 4. Jenkins credentials — loaded from .jenkins_creds (never committed to git)
 # To update: edit pilot-config/.jenkins_creds
-CREDS_FILE="$(dirname "$0")/.jenkins_creds"
+CREDS_FILE="${SCRIPT_DIR}/.jenkins_creds"
 if [ -f "$CREDS_FILE" ]; then
     source "$CREDS_FILE"
 else
@@ -35,4 +37,4 @@ echo "Launching NAutoBuff Flask App..."
 echo "Running on http://0.0.0.0:5555"
 
 # Direct path to your Flask app
-"$(dirname "$0")/venv/bin/python" ~/projects/NAutoBuff/NSOT/GUI/flask_app/nautobuff.py
+"${SCRIPT_DIR}/venv/bin/python" "${PROJECT_ROOT}/NSOT/GUI/flask_app/nautobuff.py"

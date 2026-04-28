@@ -12,12 +12,18 @@ import http.cookiejar
 
 
 def find_base_path():
-    current_dir = pathlib.Path(__file__).parent.absolute()
-    base_path = current_dir
-    while base_path.name != "NAutoBuff" and base_path.parent != base_path:
-        base_path = base_path.parent
-    if base_path.name != "NAutoBuff":
-        raise Exception("Could not find 'NAutoBuff' in the path hierarchy")
+    base_path = pathlib.Path(__file__).resolve().parent.parent
+    required_paths = [
+        base_path / "pilot-config",
+        base_path / "NSOT" / "python-files",
+        base_path / "NSOT" / "GUI" / "flask_app",
+    ]
+    missing = [str(path) for path in required_paths if not path.exists()]
+    if missing:
+        raise Exception(
+            "Could not identify the project root from pilot.py; missing: "
+            + ", ".join(missing)
+        )
     return base_path
 
 

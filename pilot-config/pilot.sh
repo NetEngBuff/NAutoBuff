@@ -30,7 +30,7 @@ echo "  Access the web UI at http://$(hostname -I | awk '{print $1}'):5555"
 echo ""
 
 # ── GitHub Webhook Instructions ──────────────────────────────────────────────
-NGROK_LOG=$(find ~/projects/NAutoBuff/NSOT/logs -name "ngrok.log" 2>/dev/null | head -1)
+NGROK_LOG=$(find "${SCRIPT_DIR}/../NSOT/logs" -name "ngrok.log" 2>/dev/null | head -1)
 NGROK_URL=""
 if [ -n "$NGROK_LOG" ]; then
     NGROK_URL=$(grep -oP 'url=https://[a-zA-Z0-9\-]+\.ngrok-free\.app' "$NGROK_LOG" 2>/dev/null | tail -1 | cut -d= -f2)
