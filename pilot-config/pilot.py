@@ -715,9 +715,10 @@ WantedBy=multi-user.target
     else:
         print("\nℹ️  MCP HTTP servers not enabled — Claude Code via SSH uses .mcp.json (no ports needed)")
 
-    # Optional: enable Ollama service if it was installed
-    if shutil.which("ollama"):
-        print("\n[INFO] Ollama detected — enabling ollama.service...")
+    # Enable Ollama only if user opted in during requirements.sh
+    ollama_flag = base_path / "NSOT" / "misc" / ".ollama_enabled"
+    if ollama_flag.exists():
+        print("\n[INFO] Ollama enabled — starting ollama.service...")
         try:
             subprocess.run(["sudo", "systemctl", "enable", "ollama"], check=True)
             subprocess.run(["sudo", "systemctl", "start", "ollama"], check=True)
@@ -725,7 +726,7 @@ WantedBy=multi-user.target
         except subprocess.CalledProcessError:
             print("⚠️  Could not enable ollama.service — start it manually with: sudo systemctl start ollama")
     else:
-        print("\nℹ️  Ollama not installed — AI chatbot will be disabled in the web UI")
+        print("\nℹ️  AI chatbot not enabled — skipping ollama.service")
 
 
 def provision_jenkins_firsttime():
@@ -756,6 +757,12 @@ def provision_jenkins_firsttime():
             ver = line.split()[2]
             break
     if ver:
+        subprocess.run(
+            ["sudo", "bash", "-c",
+             "mkdir -p /var/lib/jenkins /var/cache/jenkins && "
+             "chown jenkins:jenkins /var/lib/jenkins /var/cache/jenkins"],
+            check=True
+        )
         for state_file in [
             "/var/lib/jenkins/jenkins.install.UpgradeWizard.state",
             "/var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion",
@@ -790,6 +797,7 @@ println("OK: Jenkins admin user reset and security configured")
     subprocess.run(["sudo", "chown", "-R", "jenkins:jenkins", groovy_dir], check=True)
 
     # 3. Enable and start Jenkins
+    subprocess.run(["sudo", "systemctl", "reset-failed", "jenkins"], check=False)
     subprocess.run(["sudo", "systemctl", "enable", "--now", "jenkins"], check=True)
     print("✅ Jenkins first-time configuration complete (credentials: admin / admin)")
 

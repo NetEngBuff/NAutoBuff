@@ -131,7 +131,9 @@ echo "    - Ollama  (local AI runtime, ~50MB binary)"
 echo "    - llama3.1:8b model  (~5GB download)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 read -rp "  Enable AI chatbot? [y/N]: " ENABLE_CHATBOT
+SCRIPT_DIR_OLLAMA="$(cd "$(dirname "$0")" && pwd)"
 if [[ "${ENABLE_CHATBOT,,}" == "y" ]]; then
+    touch "${SCRIPT_DIR_OLLAMA}/../NSOT/misc/.ollama_enabled"
     echo "  Installing Ollama runtime..."
     # zstd is required by the Ollama installer — install from source if not in apt
     if ! command -v zstd &>/dev/null; then
@@ -146,6 +148,7 @@ if [[ "${ENABLE_CHATBOT,,}" == "y" ]]; then
     ollama pull llama3.1:8b
     echo "✅ AI chatbot enabled — NBot will be available in the web UI"
 else
+    rm -f "${SCRIPT_DIR_OLLAMA}/../NSOT/misc/.ollama_enabled"
     echo "⚠️  AI chatbot skipped."
     echo "   To enable later:"
     echo "     curl -fsSL https://ollama.com/install.sh | sh"
@@ -221,4 +224,4 @@ fi
 echo ""
 echo "✅ Setup Complete. Please log out and back in for group changes."
 echo ""
-echo "  Next step:  cd pilot-config && ./pilot.sh"
+echo "  Next step:  ./pilot.sh"
